@@ -12,9 +12,9 @@ spoiler-free guide. Everything is drawn in the game's own menu style.
 
 ## Devices
 
-| Device | Status |
-|---|---|
-| AYN Thor | Tested, made for it |
+| Device                        | Status                                       |
+| ----------------------------- | -------------------------------------------- |
+| AYN Thor                      | Tested, made for it                          |
 | Retroid Pocket Duo / Duo Lite | Should work, not yet tested on real hardware |
 
 Any Android 8.0+ device runs the games. The companion needs a second screen.
@@ -105,25 +105,25 @@ shows a "not supported" notice).
 
 ✅ works · ◐ partly · — not yet
 
-| Game | Version | Party | Bag | Battle | Map | Pokédex | Guide |
-|---|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| Pokémon FireRed | USA/Europe, rev 0 and 1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Pokémon LeafGreen | USA/Europe, rev 0 and 1 | ✅ | ✅ | ◐ | ✅ | ✅ | ✅ |
-| Pokémon Emerald | USA/Europe | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Pokémon Ruby | USA, rev 1 and 2 | ✅ | ✅ | ◐ | ✅ | ✅ | ✅ |
-| Pokémon Sapphire | USA, rev 1 and 2 | ✅ | ✅ | ◐ | ✅ | ✅ | ✅ |
-| Pokémon Unbound | 2.1.1.1 | ✅ | ✅ | ◐ | ✅ | ✅ | ✅ |
-| Pokémon Radical Red | 4.1 | ✅ | ✅ | ◐ | ✅ | ✅ | ✅ |
-| Pokémon Gaia | 3.2 | ✅ | ✅ | ◐ | ✅ | ✅ | ✅ |
-| Pokémon Odyssey | 4.1.1 | ✅ | ✅ | ◐ | ✅ | ✅ | ✅ |
-| Pokémon Heart and Soul | 2.0.6 | ✅ | ✅ | ✅ | ◐ | ✅ | ✅ |
-| Pokémon Amethyst | 1.3.0 | ✅ | ✅ | — | ✅ | ✅ | ✅ |
-| Celia's Stupid Romhack | 1.1.4 | ✅ | ✅ | ◐ | ✅ | ✅ | ✅ |
-| Pokémon Lazarus | 2.0 | ✅ | ✅ | — | ◐ | ✅ | — |
-| Emerald Seaglass | 3.0 | ✅ | ✅ | — | ✅ | ✅ | — |
-| Too Many Types 2 | 1.5.2 | ✅ | ✅ | — | ✅ | ✅ | — |
-| Emerald Rogue | 2.2.1-EX | ✅ | ✅ | ✅ | ✅ | — | — |
-| Pokémon R.O.W.E. | 2.1.9.1 Experimental | — | — | — | — | — | — |
+| Game                   | Version                 | Party | Bag | Battle | Map | Pokédex | Guide |
+| ---------------------- | ----------------------- | :---: | :-: | :----: | :-: | :-----: | :---: |
+| Pokémon FireRed        | USA/Europe, rev 0 and 1 |  ✅   | ✅  |   ✅   | ✅  |   ✅    |  ✅   |
+| Pokémon LeafGreen      | USA/Europe, rev 0 and 1 |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
+| Pokémon Emerald        | USA/Europe              |  ✅   | ✅  |   ✅   | ✅  |   ✅    |  ✅   |
+| Pokémon Ruby           | USA, rev 1 and 2        |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
+| Pokémon Sapphire       | USA, rev 1 and 2        |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
+| Pokémon Unbound        | 2.1.1.1                 |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
+| Pokémon Radical Red    | 4.1                     |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
+| Pokémon Gaia           | 3.2                     |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
+| Pokémon Odyssey        | 4.1.1                   |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
+| Pokémon Heart and Soul | 2.0.6                   |  ✅   | ✅  |   ✅   |  ◐  |   ✅    |  ✅   |
+| Pokémon Amethyst       | 1.3.0                   |  ✅   | ✅  |   —    | ✅  |   ✅    |  ✅   |
+| Celia's Stupid Romhack | 1.1.4                   |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
+| Pokémon Lazarus        | 2.0                     |  ✅   | ✅  |   —    |  ◐  |   ✅    |   —   |
+| Emerald Seaglass       | 3.0                     |  ✅   | ✅  |   —    | ✅  |   ✅    |   —   |
+| Too Many Types 2       | 1.5.2                   |  ✅   | ✅  |   —    | ✅  |   ✅    |   —   |
+| Emerald Rogue          | 2.2.1-EX                |  ✅   | ✅  |   ✅   | ✅  |    —    |   —   |
+| Pokémon R.O.W.E.       | 2.1.9.1 Experimental    |   —   |  —  |   —    |  —  |    —    |   —   |
 
 R.O.W.E. plays, but its companion is still in progress. Map ◐ means place names
 only, without the map picture. Battle ◐ means the battle panes work but haven't
@@ -141,6 +141,10 @@ PokeDaisey has no accounts, ads or analytics. It only goes online to:
 - fetch cover art from SteamGridDB, only if you add your own API key.
 
 Your games and saves never leave your device.
+
+## AI tooling note
+
+This project may use AI-assisted development tools, such as Claude Code, to help with code generation, refactoring, and documentation. All changes are still reviewed by the maintainer and validated with the project's existing checks before release.
 
 ## Building from source
 
