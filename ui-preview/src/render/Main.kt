@@ -394,7 +394,7 @@ fun withApiKey(make: () -> androidx.activity.ComponentActivity): androidx.activi
 }
 
 fun fakeRelease() = com.pokedaisey.app.AppUpdater.Release(
-    "1.0.4",
+    "1.0.5",
     "- LOAD SAVE: put another save file into a game\n- INFO on every game\n- Fixes for the ROMs folder scan",
     "", 0, "",
 )
