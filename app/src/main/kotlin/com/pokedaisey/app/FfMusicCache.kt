@@ -28,6 +28,7 @@ class FfMusicCache(filesDir: File, romCrc: String) {
     }
 
     private fun file(key: String) = File(dir, "$key.wav")
+    private fun introFile(key: String) = File(dir, "$key.intro.wav")
 
     /** Whether FfMusicRenderer has finished a full pass for this ROM. */
     var prefetched: Boolean
@@ -39,11 +40,26 @@ class FfMusicCache(filesDir: File, romCrc: String) {
     /** The cached clip for [key], or null if nothing's been captured yet. */
     fun fileIfCached(key: String): File? = file(key).takeIf { it.isFile && it.length() > 0 }
 
+    /** What plays once before [key]'s loop: the song from its first note up to
+     * where the clip starts (empty for a song kept whole). Null for a clip
+     * recorded before intros were kept - it then plays loop-only until the
+     * song is heard and recorded again. */
+    fun introIfCached(key: String): File? = introFile(key).takeIf { it.isFile }
+
+    /** Both parts there: the loop and its intro. */
+    fun complete(key: String): Boolean = has(key) && introFile(key).isFile
+
     /** Writes [len] shorts of [pcm] from [from] as [key]'s clip, a plain PCM WAV
      * that FfMusicPlayer loops as is (FfMusicRenderer cuts it at the song's own
      * loop, see M4aLoopSplice). */
     fun writeClip(key: String, pcm: ShortArray, from: Int, len: Int, sampleRate: Int) {
         writeWav(file(key), pcm, len, sampleRate, from)
+    }
+
+    /** Writes the song's first [len] shorts of [pcm] as [key]'s intro: played once,
+     * it runs straight into the clip (the clip starts where it ends). */
+    fun writeIntro(key: String, pcm: ShortArray, len: Int, sampleRate: Int) {
+        writeWav(introFile(key), pcm, len, sampleRate, 0)
     }
 
     /** Deletes every cached clip for this ROM — a manual escape hatch if a

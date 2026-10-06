@@ -64,10 +64,10 @@ class EmulatorEngine(
     var onSpeedChanged: ((label: String) -> Unit)? = null
 
     /** Fired (emu thread) only when the FF music that should be playing
-     * actually changes — a cached clip file to loop, or null to stop
-     * (nothing cached yet for this state, or FF isn't active). Wrap
-     * MediaPlayer work in the callback yourself (see FfMusicPlayer). */
-    var onFfMusicChanged: ((file: File?) -> Unit)? = null
+     * actually changes — a cached clip (its loop, intro and when the song
+     * started), or null to stop (nothing cached yet for this state, or FF
+     * isn't active). Wrap MediaPlayer work in the callback yourself (see FfMusicPlayer). */
+    var onFfMusicChanged: ((clip: FfMusicPlayer.Clip?) -> Unit)? = null
 
     /** Fired (emu thread) in STEADY when the game starts a song with no clip
      * yet ([FfMusicKey]) - hand it to [FfMusicRenderer.request]. */
@@ -272,6 +272,11 @@ class EmulatorEngine(
         var lastBattleInputSample = 0L
         var lastFfMusicFile: File? = null
         var requestedKey: String? = null
+        // The song playing and when it started (elapsedRealtime), so a clip picks up
+        // where the song is: from the top for a song that just started, further on
+        // when FF comes on mid-song. A key blinking off for a moment isn't a new song.
+        var songKey: String? = null
+        var songStartedAt = 0L
         // SPED-UP: the core's audio averaged down to real time (a box
         // filter, so it's the game's own sound pitched and tempo'd up).
         val spedUpOut = ShortArray(scratch.size)
@@ -307,12 +312,16 @@ class EmulatorEngine(
                 // The song the game is playing right now (FfMusicKey): read
                 // every frame, so a clip starts and stops exactly with it.
                 val ffMusicKey = FfMusicKey.current(InProcessReader)
+                if (ffMusicKey != null && ffMusicKey != songKey) {
+                    songKey = ffMusicKey
+                    songStartedAt = android.os.SystemClock.elapsedRealtime()
+                }
                 // STEADY: have each new song rendered on its own, at any
                 // speed, so its clip is usually ready before FF needs it.
                 if (mode != FfMusicMode.STEADY) requestedKey = null
                 else if (ffMusicKey != null && ffMusicKey != requestedKey) {
                     requestedKey = ffMusicKey
-                    if (!ffMusicCache.has(ffMusicKey)) runCatching { onFfMusicWanted?.invoke(ffMusicKey) }
+                    if (!ffMusicCache.complete(ffMusicKey)) runCatching { onFfMusicWanted?.invoke(ffMusicKey) }
                 }
                 // The clip follows the FF the player asked for, not SMART's 1x stretches: it
                 // plays straight through a menu instead of handing over to the game's music
@@ -322,7 +331,9 @@ class EmulatorEngine(
                 } else null
                 if (clip != lastFfMusicFile) {
                     lastFfMusicFile = clip
-                    onFfMusicChanged?.invoke(clip)
+                    onFfMusicChanged?.invoke(
+                        clip?.let { FfMusicPlayer.Clip(it, ffMusicCache.introIfCached(ffMusicKey!!), songStartedAt) },
+                    )
                 }
                 // Heard at 1x (unless a clip is playing through SMART's 1x); during FF
                 // only as SPED-UP (which STEADY falls back to until its clip is ready,

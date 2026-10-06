@@ -287,11 +287,14 @@ ROMs (retail + QoL) their `MapMusic*.kt` list, any other ROM every `gSongTable` 
 themselves (fanfares) count as done. **Clips loop where the song loops** (`M4aLoop.kt`, cache v6): the BGM's
 first track jumping back through its GOTO (0xB2) marks the loop end, the frame its main stream passed the
 GOTO target the start (no intro: two GOTOs apart); `M4aLoopSplice` cuts one period starting 1 s into the
-loop, tuned to the sample. The old audio-envelope `LoopDetector` cut battle themes to ~3 s and looped back
+loop, tuned to the sample. The recording before that cut is saved as `<key>.intro.wav`: `FfMusicPlayer` plays it once, then
+hands over gaplessly to the loop (`setNextMediaPlayer`), both started at the song's own position
+(`Clip.songStartedAt`, when the BGM key changed). Without the intro a song with one started ~9 s in
+(FireRed's Route 7). A heard song whose clip predates intros is re-recorded; the background pass isn't redone. The old audio-envelope `LoopDetector` cut battle themes to ~3 s and looped back
 to the intro. **The clip follows the FF the player asked for** (`EmulatorEngine.requestedSpeed`), not SMART's
 temporary 1x: it plays straight through a menu (game audio muted meanwhile, menu SFX included) instead of
-handing over to the game's music and restarting from 0:00 when FF resumed; and `FfMusicPlayer` resumes a clip
-that comes back within 15 s where it would be by now. Debug the
+handing over to the game's music and restarting from 0:00 when FF resumed; and a clip that comes back (after a menu, or FF
+off for a moment) picks up where the song is by now (`Clip.songStartedAt`). Debug the
 render core headless with `native-capture/mgba_dump`'s `call` / `park` / `bgm` / `wav`. The
 SETTINGS title also shows the device battery (`BatteryIndicator`, fed by the activity through
 `DeviceBattery`).

@@ -58,9 +58,9 @@ class FfMusicRenderer(
         }, "pokedaisey-ffmusic-render").apply { isDaemon = true; start() }
     }
 
-    /** Render [key]'s song soon, unless it's cached or already asked for. */
+    /** Render [key]'s song soon, unless it's cached (with its intro) or already asked for. */
     fun request(key: String) {
-        if (!stopped && !cache.has(key) && requested.add(key)) queue.offerFirst(key)
+        if (!stopped && !cache.complete(key) && requested.add(key)) queue.offerFirst(key)
     }
 
     fun stop() {
@@ -93,7 +93,7 @@ class FfMusicRenderer(
                 }
                 val songId = when (job) {
                     is Int -> job
-                    is String -> if (cache.has(job)) null else songs.songId(job)
+                    is String -> if (cache.complete(job)) null else songs.songId(job)
                     else -> null
                 }
                 val outcome = if (songId == null) Outcome.CACHED
@@ -177,7 +177,8 @@ class FfMusicRenderer(
         fun record(songs: M4aSongs, songId: Int, background: Boolean): Outcome {
             repeat(ATTEMPTS) {
                 val key = start(songs, songId) ?: return Outcome.ENDED.also { Log.i("pokedaisey", "FF music: song $songId didn't start") }
-                if (cache.has(key)) return Outcome.CACHED
+                // A song being heard is redone if its clip predates intros; the background pass isn't.
+                if (if (background) cache.has(key) else cache.complete(key)) return Outcome.CACHED
                 val loop = M4aLoopWatch(reader)
                 var pos = 0
                 var frames = 0
@@ -205,12 +206,16 @@ class FfMusicRenderer(
                 if (pos < 0) return@repeat
                 if (loop.found) {
                     M4aLoopSplice.clip(buf, pos, frameStart[loop.startFrame], frameStart[loop.endFrame], sampleRate)?.let { (from, len) ->
+                        // The recording starts at the song's first note: all of it up to the
+                        // clip is the intro, which runs seamlessly into the clip.
+                        cache.writeIntro(key, buf, from, sampleRate)
                         cache.writeClip(key, buf, from, len, sampleRate)
                         Log.i("pokedaisey", "FF music: recorded song $songId as $key, a ${len / 2 / sampleRate.toFloat()} s loop")
                         return Outcome.CACHED
                     }
                 }
                 if (pos >= buf.size) {
+                    cache.writeIntro(key, buf, 0, sampleRate)   // kept whole: it starts at the top already
                     cache.writeClip(key, buf, 0, pos, sampleRate)
                     Log.i("pokedaisey", "FF music: recorded song $songId as $key, no loop seen - kept ${FfMusicCache.CAPTURE_SECONDS} s")
                     return Outcome.CACHED
@@ -223,7 +228,7 @@ class FfMusicRenderer(
         /** A song the player is hearing now waits at the queue's head (and it isn't [songId]). */
         private fun liveRequestWaiting(songs: M4aSongs, songId: Int): Boolean {
             val head = queue.peekFirst() as? String ?: return false
-            return !cache.has(head) && songs.songId(head).let { it != null && it != songId }
+            return !cache.complete(head) && songs.songId(head).let { it != null && it != songId }
         }
 
         /** Plays the menu click alone (the booted game's music stopped first) and hands it to [click]. */

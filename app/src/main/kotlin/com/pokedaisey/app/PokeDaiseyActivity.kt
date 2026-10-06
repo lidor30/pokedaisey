@@ -410,7 +410,7 @@ class PokeDaiseyActivity : Activity() {
             }
             onSpeedChanged = { label -> runOnUiThread { showHud(label) } }
             onFastForwardToggledChanged = { on -> Prefs(this@PokeDaiseyActivity).ffToggled = on }
-            onFfMusicChanged = { file -> runOnUiThread { ffMusicPlayer.setClip(file) } }
+            onFfMusicChanged = { clip -> runOnUiThread { ffMusicPlayer.setClip(clip) } }
             onFfMusicWanted = { key -> ffMusicRenderer?.request(key) }
             onSample = {   // runs on the emu thread
                 val snap = telemetry.refresh()
