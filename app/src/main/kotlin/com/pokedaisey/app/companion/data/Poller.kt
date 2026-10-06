@@ -279,6 +279,11 @@ class TelemetrySampler {
      * [sample] has resolved which game/path is active, or on a pre-v3 ROM
      * (structSize too small to have these fields at all).
      */
+    /** The detected game's verified gMain and its inBattle offset (its native config), or null
+     * (not detected yet, or the QoL struct path) - for SMART FF's menu watch ([FfMenuWatch]). */
+    val knownGMain: Pair<Long, Long>?
+        get() = (if (kind == GameKind.UNBOUND) NATIVE_UNBOUND else nativeCfg)?.let { it.gMain to it.inBattleOff }
+
     fun sampleBattleInputFast(reader: MemoryReader): Pair<Int, Int>? {
         // Unbound's `kind` is decided directly in detect() without ever
         // populating nativeCfg (see the GameKind.UNBOUND branch there) -

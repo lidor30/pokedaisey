@@ -12,9 +12,15 @@ package com.pokedaisey.app.companion.data
  * the START menu and dialogue are overlays that keep the field's). So no
  * per-game menu table is needed, only two addresses per ROM, which are
  * learned, not looked up:
- *  - `gMain` itself: the IWRAM word pair at +0x20/+0x24 (vblankCounter1/2)
- *    that advances exactly with the frames between two snapshots, beside a
- *    ROM pointer at +4 (callback2) - the same in every game ([tick]).
+ *  - `gMain` itself: the detected game's own address when it has a native
+ *    config ([useKnownGMain]); otherwise the IWRAM word pair at +0x20/+0x24
+ *    (vblankCounter1/2) that advances exactly with the frames between two
+ *    snapshots, beside ROM pointers at +4 (callback2) and +0xC (the VBlank
+ *    callback) ([locate]). Either way it is re-checked every [VERIFY_GAP]
+ *    frames: a counter that stops moving means the address is wrong (a task's
+ *    frame counter once passed for FireRed's, and its slot's function pointer
+ *    then read as "a menu" on the field and as "the field" in real menus), so
+ *    it's dropped with whatever was learned through it and found again.
  *  - the field's callback2: the one running whenever the player has moved
  *    ([notePosition]); the battle's: the one running most while `inBattle`.
  * Both are remembered per ROM ([load] / [onLearned]), so a menu is caught
@@ -26,7 +32,13 @@ object FfMenuWatch {
     var onLearned: ((field: Long, battle: Long) -> Unit)? = null
 
     private var gMain = -1L
+    /** The detected game's own gMain, once known ([useKnownGMain]); scanning stops then. */
+    private var knownGMain = -1L
     private var inBattleOff = 0x439L
+    private var verifyFrame = 0
+    private var verifyPrimed = false
+    private var verifyC1 = 0L
+    private var verifyC2 = 0L
     private var frame = 0
     private var snapshot: ByteArray? = null
     private var scans = 0
@@ -43,6 +55,9 @@ object FfMenuWatch {
     @Synchronized
     fun load(gameCode: String, learnedField: Long, learnedBattle: Long) {
         gMain = -1L
+        knownGMain = -1L
+        verifyFrame = 0
+        verifyPrimed = false
         inBattleOff = if (gameCode == "AXVE" || gameCode == "AXPE") 0x43DL else 0x439L // Ruby/Sapphire's Main has 4 more bytes
         frame = 0
         snapshot = null
@@ -58,6 +73,22 @@ object FfMenuWatch {
         lastPos = null
     }
 
+    /**
+     * The detected game's verified gMain (its native config) - used instead of
+     * the scan. A different address than the scan found means the scan was
+     * wrong, so what was learned through it goes too.
+     */
+    @Synchronized
+    fun useKnownGMain(addr: Long, inBattleOffset: Long) {
+        if (addr == knownGMain || addr <= 0L || knownGMain == Long.MIN_VALUE) return
+        knownGMain = addr
+        inBattleOff = inBattleOffset
+        if (gMain >= 0 && gMain != addr) forgetLearned()
+        gMain = addr
+        verifyFrame = 0
+        verifyPrimed = false
+    }
+
     /** Emu thread, once a frame: true while a menu screen is up. */
     @Synchronized
     fun tick(r: MemoryReader): Boolean {
@@ -65,6 +96,7 @@ object FfMenuWatch {
             findGMain(r)
             return false
         }
+        if (!stillGMain(r)) return false
         val b = runCatching { r.readCoreMemory(gMain + 4, 4) }.getOrNull() ?: return false
         cb2 = Gfx.u32(b, 0)
         inBattle = runCatching { (r.readCoreMemory(gMain + inBattleOff, 1)[0].toInt() shr 1) and 1 == 1 }.getOrDefault(false)
@@ -95,6 +127,48 @@ object FfMenuWatch {
         }
     }
 
+    /**
+     * Every [VERIFY_GAP] frames: did either frame counter move? Off while it
+     * hasn't been checked yet. Not moving at all for that long means [gMain]
+     * isn't the game's (a busy game can drop VBlanks, never every one of them):
+     * drop it and everything learned through it, and scan again.
+     */
+    private fun stillGMain(r: MemoryReader): Boolean {
+        if (++verifyFrame < VERIFY_GAP) return true
+        verifyFrame = 0
+        val b = runCatching { r.readCoreMemory(gMain + 0x20, 8) }.getOrNull() ?: return true
+        val c1 = Gfx.u32(b, 0)
+        val c2 = Gfx.u32(b, 4)
+        val moved = c1 != verifyC1 || c2 != verifyC2
+        verifyC1 = c1
+        verifyC2 = c2
+        if (!verifyPrimed) {
+            verifyPrimed = true
+            return true
+        }
+        if (moved) return true
+        // A known address that doesn't count frames isn't this game's after all (an
+        // unknown hack running on a retail config): scan instead, from now on.
+        knownGMain = if (gMain == knownGMain) Long.MIN_VALUE else knownGMain
+        gMain = -1L
+        verifyPrimed = false
+        frame = 0
+        scans = 0
+        forgetLearned()
+        return false
+    }
+
+    /** What was learned through a wrong gMain is wrong too: start over (and say so, so it isn't kept). */
+    private fun forgetLearned() {
+        fieldVotes.clear()
+        battleFrames.clear()
+        field = 0L
+        battle = 0L
+        cb2 = 0L
+        inBattle = false
+        learned()
+    }
+
     private fun learned() {
         val f = field
         val b = battle
@@ -123,9 +197,10 @@ object FfMenuWatch {
 
     /**
      * gMain's address from IWRAM snapshots [a] then [b], [frames] frames apart,
-     * or -1 unless exactly one place fits: callback2 (+4) a ROM pointer and
-     * vblankCounter1 (+0x20) moved exactly [frames], vblankCounter2 (+0x24) no
-     * more. FireRed's vblankCounter1 is a pointer instead (0 on the field), so
+     * or -1 unless exactly one place fits: callback2 (+4) and the VBlank
+     * callback (+0xC) ROM pointers (a task's slot, whose data can count frames
+     * too, has its own data there) and vblankCounter1 (+0x20) moved exactly
+     * [frames], vblankCounter2 (+0x24) no more. FireRed's vblankCounter1 is a pointer instead (0 on the field), so
      * only when nothing fits that way: counter2 moved exactly [frames] and
      * +0x20 held still. (That second rule alone also fits 4 bytes early on
      * Emerald, hence the order.)
@@ -136,7 +211,7 @@ object FfMenuWatch {
             var found = -1L
             var o = 0
             while (o + 0x28 <= minOf(a.size, b.size)) {
-                if (Gfx.inRom(Gfx.u32(b, o + 4))) {
+                if (Gfx.inRom(Gfx.u32(b, o + 4)) && Gfx.inRom(Gfx.u32(b, o + 0xC))) {
                     val c1a = Gfx.u32(a, o + 0x20)
                     val c1b = Gfx.u32(b, o + 0x20)
                     if (fits(c1a, c1b, Gfx.u32(a, o + 0x24), Gfx.u32(b, o + 0x24))) {
@@ -163,4 +238,5 @@ object FfMenuWatch {
     private const val MIN_BATTLE_FRAMES = 120
     private const val SEED_VOTES = 3
     private const val SEED_FRAMES = 600
+    private const val VERIFY_GAP = 300 // ~5 s at 1x
 }

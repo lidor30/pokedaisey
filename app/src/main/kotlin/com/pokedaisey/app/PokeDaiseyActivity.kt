@@ -414,7 +414,9 @@ class PokeDaiseyActivity : Activity() {
             onFfMusicWanted = { key -> ffMusicRenderer?.request(key) }
             onSample = {   // runs on the emu thread
                 val snap = telemetry.refresh()
-                // SMART FF learns the field's main callback from the player moving.
+                // SMART FF reads the game's own gMain once the game is known (no scan
+                // guesswork), and learns the field's main callback from the player moving.
+                telemetry.knownGMain()?.let { (addr, inBattleOff) -> FfMenuWatch.useKnownGMain(addr, inBattleOff) }
                 if (snap.connected) FfMenuWatch.notePosition(snap.x, snap.y, snap.mapGroup, snap.mapNum, snap.inBattle)
                 if (snap.connected) battleSwitchAddrs = switchAddrsFor(snap.game)
                 // party.isNotEmpty(), not just connected: `connected` flips true as

@@ -57,4 +57,7 @@ class TelemetryStore {
     /** Fast, non-1Hz-throttled peek at (battleActiveBattler, battleInputState)
      * — see [TelemetrySampler.sampleBattleInputFast]. Call on the emu thread. */
     fun refreshBattleInputFast(): Pair<Int, Int>? = sampler.sampleBattleInputFast(InProcessReader)
+
+    /** The detected game's own gMain + inBattle offset, when it has a native config. */
+    fun knownGMain(): Pair<Long, Long>? = sampler.knownGMain
 }

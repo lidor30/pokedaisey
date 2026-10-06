@@ -58,12 +58,14 @@ class Prefs(context: Context) {
 
     /** What FfMenuWatch learned for a ROM (by CRC): its field's and battle's gMain.callback2, 0 = not yet. */
     fun ffMenuCallbacks(romKey: String): Pair<Long, Long> {
-        val v = p.getString("ff_menu_cb2_$romKey", null)?.split(',') ?: return 0L to 0L
+        // v2: before it, the scan could settle on a task's slot instead of gMain (FireRed),
+        // and what it learned there is wrong - not carried over.
+        val v = p.getString("ff_menu_cb2_v2_$romKey", null)?.split(',') ?: return 0L to 0L
         return (v.getOrNull(0)?.toLongOrNull() ?: 0L) to (v.getOrNull(1)?.toLongOrNull() ?: 0L)
     }
 
     fun setFfMenuCallbacks(romKey: String, field: Long, battle: Long) =
-        p.edit().putString("ff_menu_cb2_$romKey", "$field,$battle").apply()
+        p.edit().putString("ff_menu_cb2_v2_$romKey", "$field,$battle").apply()
 
     /** Fast-forward on/off, remembered across launches (restored alongside
      * [ffMaxSpeed] on every engine creation - fresh boot or resume-from-state
