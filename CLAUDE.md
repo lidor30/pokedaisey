@@ -1,4 +1,4 @@
-# PokeDaisey — Project Notes for Claude
+# PokeDaisy — Project Notes for Claude
 
 Dual-screen Android app (AYN Thor, Retroid Pocket Duo): an embedded libmgba core on the
 top screen and a live companion for Gen 3 Pokémon games and ROM hacks on the bottom
@@ -12,7 +12,7 @@ from the player's own ROM (`RomArt`), not bundled. Keep it that way.
 
 ## Relationship to the FireRed QoL repo
 
-PokeDaisey was split out of the user's **private** FireRed QoL ROM-hack repo (local
+PokeDaisy was split out of the user's **private** FireRed QoL ROM-hack repo (local
 checkout `~/Projects/tests/my-rom-hacks`, where it lived as `tools/pokedaisey`
 under the name pokedaisey) on 2026-10-06, without git history. That repo still owns:
 

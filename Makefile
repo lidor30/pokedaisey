@@ -1,4 +1,4 @@
-# Convenience wrappers around PokeDaisey's workflows (`make help`). The real
+# Convenience wrappers around PokeDaisy's workflows (`make help`). The real
 # logic lives in Gradle, scripts/ and ui-preview/.
 #
 # Machine-local paths (decomp builds, mon icons) go in an untracked local.mk -

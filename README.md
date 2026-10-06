@@ -1,8 +1,8 @@
-# PokeDaisey
+# PokeDaisy
 
 **Play Gen 3 Pokémon on the top screen. See everything about your game on the bottom one.**
 
-PokeDaisey is a GBA player for dual-screen Android handhelds, made for Pokémon
+PokeDaisy is a GBA player for dual-screen Android handhelds, made for Pokémon
 FireRed, LeafGreen, Emerald, Ruby, Sapphire and popular ROM hacks. The game runs
 on the top screen. The bottom screen is a live companion that reads your game
 as you play: your party, your bag, the map, battle matchups, your Pokédex, and a
@@ -21,14 +21,14 @@ Any Android 8.0+ device runs the games. The companion needs a second screen.
 
 ## Install
 
-1. Download `PokeDaisey-<version>.apk` from the
+1. Download `PokeDaisy-<version>.apk` from the
    [latest release](https://github.com/lidor30/pokedaisey/releases/latest) on the device.
 2. Open it. If Android asks, allow your browser or file manager to install apps.
-3. Open PokeDaisey. A short setup helps you:
+3. Open PokeDaisy. A short setup helps you:
    - **Link your ROMs folder** (optional). Every supported game in it shows up in
      your library, played right where it is. New games are picked up every time
      you open the app.
-   - **Choose where saves go.** Use PokeDaisey's own folder, or point it at
+   - **Choose where saves go.** Use PokeDaisy's own folder, or point it at
      another emulator's (like RetroArch's) to keep playing the same saves.
    - **Add cover art** (optional) with a free [SteamGridDB](https://www.steamgriddb.com) API key.
 
@@ -38,7 +38,7 @@ You can change all of this later in Settings.
 
 ### Updates
 
-PokeDaisey checks for a new version each time you open it and offers to install
+PokeDaisy checks for a new version each time you open it and offers to install
 it. You can also check from **Settings > VERSION**.
 
 ## Features
@@ -88,7 +88,7 @@ Pick which tabs sit in the tab bar in the companion's Settings.
   - **Load a save** file into it (your current save is kept as a dated backup).
   - See its **info**: ROM, save file and save states.
 - Works with frontends like **ES-DE**, **Cocoon** and **iiSU**. They can launch
-  a game straight into PokeDaisey. See
+  a game straight into PokeDaisy. See
   [frontend setup](docs/DEVELOPMENT.md#launch-from-a-frontend-cocoon-iisu-es-de-).
 
 ### Saves
@@ -135,7 +135,7 @@ Want another game supported? [Open an issue](https://github.com/lidor30/pokedais
 
 ## Privacy
 
-PokeDaisey has no accounts, ads or analytics. It only goes online to:
+PokeDaisy has no accounts, ads or analytics. It only goes online to:
 
 - check this page for a new version, and download it if you say so;
 - fetch cover art from SteamGridDB, only if you add your own API key.
@@ -160,12 +160,12 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## License
 
-PokeDaisey is free software under the [GNU GPL v3](LICENSE), with one
-[additional term](NOTICE): if you share PokeDaisey or anything built from it,
-keep the credit **"Based on PokeDaisey by Lidor Itzhari -
+PokeDaisy is free software under the [GNU GPL v3](LICENSE), with one
+[additional term](NOTICE): if you share PokeDaisy or anything built from it,
+keep the credit **"Based on PokeDaisy by Lidor Itzhari -
 https://github.com/lidor30/pokedaisey"** in its documentation and credits.
 Forks must stay open source under the same license.
 
-PokeDaisey is a fan project, not affiliated with or endorsed by Nintendo,
+PokeDaisy is a fan project, not affiliated with or endorsed by Nintendo,
 Game Freak, Creatures or The Pokémon Company. Pokémon and all related names are
 trademarks of their respective owners. ROM hacks belong to their creators.

@@ -1,10 +1,10 @@
 # ui-preview
 
-Renders PokeDaisey's real Compose UI to PNGs **without the Android SDK** — a
-Compose *Desktop* (JVM) build of the app's own sources against small
+Renders PokeDaisy's real Compose UI to PNGs **without the Android SDK** — a
+Compose _Desktop_ (JVM) build of the app's own sources against small
 hand-written Android shims. Built for environments where Google's Maven /
 `dl.google.com` is unreachable (e.g. Claude Code cloud sessions), where the
-Android app itself can't even compile. Where the SDK *is* available, prefer
+Android app itself can't even compile. Where the SDK _is_ available, prefer
 Paparazzi (`./gradlew :app:recordPaparazziDebug`, see the repo's CLAUDE.md) —
 but note Paparazzi only covers the companion; this also renders the top-screen
 Library and Settings.

@@ -1,4 +1,4 @@
-# PokeDaisey — plan
+# PokeDaisy — plan
 
 A single Android app for the AYN Thor (and other dual-screen Android handhelds): it
 **embeds an emulator core** (mGBA / `libmgba`) on the top screen and runs the
@@ -25,18 +25,19 @@ binary at all** (proven last session by symbol inspection + a verbose startup lo
 The config toggle and menu entry are inert. See the `android-companion-thor-blocker`
 memory.
 
-PokeDaisey removes RetroArch from the picture. We embed `libmgba` and read game
+PokeDaisy removes RetroArch from the picture. We embed `libmgba` and read game
 memory via its C API **in-process** (`mCoreGetMemoryBlock`, `core->busRead*`). No
 network interface, no `HAVE_COMMAND`, no second app. Savestates and speed become the
 core's own native features rather than something we bolt onto a decomp port.
 
-This is *not* the Goldoire `pokeemerald-dualscreen` approach (native decompilation,
+This is _not_ the Goldoire `pokeemerald-dualscreen` approach (native decompilation,
 no emulator). That path can never run Unbound or any closed-source hack — no source
 to compile. We deliberately chose the emulator path so FireRed + Emerald + **Unbound**
-+ arbitrary future GBA hacks all work through one code path. Goldoire's repo is still
-the blueprint for the *Android dual-screen shell* (Presentation API, touch controls,
-ROM gate) — see `android/app/src/main/java/com/pokeemerald/experimental/`
-(`DualScreenPresentation`, `DualScreenBridge`, `GbaControlsView`, `RomGateActivity`).
+
+- arbitrary future GBA hacks all work through one code path. Goldoire's repo is still
+  the blueprint for the _Android dual-screen shell_ (Presentation API, touch controls,
+  ROM gate) — see `android/app/src/main/java/com/pokeemerald/experimental/`
+  (`DualScreenPresentation`, `DualScreenBridge`, `GbaControlsView`, `RomGateActivity`).
 
 ## Architecture
 
@@ -68,15 +69,15 @@ We already drive `libmgba-dev` from the headless test harness (`mgba_headless.c`
 the API is known. Direct use beats the libretro wrapper here: fewer layers, direct
 memory-block access, full control of frame pacing.
 
-| Need | libmgba primitive |
-|---|---|
-| Run | `mCore` (`mCoreFind` → `init` → `loadROM` → `loadSave`), `core->runFrame()`; core on its own thread (`mCoreThread`) with `mCoreThreadRunFunction` to marshal state ops onto it |
-| Video | `core->getPixelBuffer` → GL texture upload (240×160, BGRX) |
-| Audio | `blip_t` L/R → `AudioTrack`; `mCoreSyncProduceAudio` |
-| Input | `core->setKeys(core, bitmask)` each frame |
-| **Savestate** | `mCoreSaveStateNamed(core, vf, flags)` / `mCoreLoadStateNamed`; `flags = SAVESTATE_SCREENSHOT \| SAVESTATE_SAVEDATA \| SAVESTATE_RTC \| SAVESTATE_METADATA`. Slot files `<rom>.ss0`..`.ss9` — **byte-compatible with desktop mGBA**, since RetroArch's mgba core and desktop mGBA use this same serializer. Screenshot flag → slot-picker thumbnails for free. |
-| **Speed (fast-forward)** | uncapped: `thread->impl->sync.audioWait = false; sync.videoFrameWait = false`. Fixed multiplier (1.5/2/3/4×): target frame interval `= (1s / 59.7275) / multiplier` in the pacing loop; drop audio while active (resample later). Slowdown (0.5×): larger interval, keep audio. |
-| Rewind | `mCoreRewindContextInit` (mGBA built-in ring buffer) — Phase 4 |
+| Need                     | libmgba primitive                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Run                      | `mCore` (`mCoreFind` → `init` → `loadROM` → `loadSave`), `core->runFrame()`; core on its own thread (`mCoreThread`) with `mCoreThreadRunFunction` to marshal state ops onto it                                                                                                                                                                                 |
+| Video                    | `core->getPixelBuffer` → GL texture upload (240×160, BGRX)                                                                                                                                                                                                                                                                                                     |
+| Audio                    | `blip_t` L/R → `AudioTrack`; `mCoreSyncProduceAudio`                                                                                                                                                                                                                                                                                                           |
+| Input                    | `core->setKeys(core, bitmask)` each frame                                                                                                                                                                                                                                                                                                                      |
+| **Savestate**            | `mCoreSaveStateNamed(core, vf, flags)` / `mCoreLoadStateNamed`; `flags = SAVESTATE_SCREENSHOT \| SAVESTATE_SAVEDATA \| SAVESTATE_RTC \| SAVESTATE_METADATA`. Slot files `<rom>.ss0`..`.ss9` — **byte-compatible with desktop mGBA**, since RetroArch's mgba core and desktop mGBA use this same serializer. Screenshot flag → slot-picker thumbnails for free. |
+| **Speed (fast-forward)** | uncapped: `thread->impl->sync.audioWait = false; sync.videoFrameWait = false`. Fixed multiplier (1.5/2/3/4×): target frame interval `= (1s / 59.7275) / multiplier` in the pacing loop; drop audio while active (resample later). Slowdown (0.5×): larger interval, keep audio.                                                                                |
+| Rewind                   | `mCoreRewindContextInit` (mGBA built-in ring buffer) — Phase 4                                                                                                                                                                                                                                                                                                 |
 
 JNI wrappers: crib from mGBA's own `src/platform/android/` in the mgba tree.
 
@@ -89,16 +90,16 @@ is the current `tools/android-companion` UI with the transport swapped.
 Reused **near-verbatim** from `tools/android-companion/` (source currently in package
 `com.fireredqol.companion`; all of it repackaged under `com.pokedaisey.*` on the way in):
 
-| File(s) | Change |
-|---|---|
-| `ui/PartyScreen.kt`, `ui/MapScreen.kt`, `ui/ItemsScreen.kt`, `ui/BattleInfoScreen.kt` (was `BattlePanel.kt`), `ui/MonDetailScreen.kt` (was `MonDetailDialog.kt`), `ui/Components.kt`, `ui/AssetImages.kt`, `ui/theme/Theme.kt` | none (repackage) |
-| `data/Telemetry.kt`, `data/Gen3Mon.kt`, `data/SnapshotView.kt` | none |
-| `data/ActiveTables.kt`, `data/SpeciesNames*.kt`, `data/SpeciesTypes*.kt`, `data/MoveData*.kt`, `data/ItemNames*.kt`, `data/MapSecData*.kt`, `data/TypeChart*.kt`, `data/TypeChartUtil.kt` | none — generated tables carry over unchanged |
-| `data/UnboundIconSource.kt` | none (still reads Unbound icon tables out of ROM RAM — now via `InProcessReader`) |
-| `assets/pokemon/*.png`, region-map assets | copied as-is |
-| `data/RetroArchClient.kt`, `data/NativeReader.kt`, `data/Poller.kt` | **replaced** by `InProcessReader` (below) |
-| `data/Settings.kt`, `data/Config.kt` | fold into the app's unified settings (keybinds + emulator + data-source) |
-| `MainActivity.kt`, `TelemetryViewModel.kt` | `MainActivity` → `EmulatorActivity`; ViewModel keeps its `GameState` flow, fed by `InProcessReader` |
+| File(s)                                                                                                                                                                                                                        | Change                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| `ui/PartyScreen.kt`, `ui/MapScreen.kt`, `ui/ItemsScreen.kt`, `ui/BattleInfoScreen.kt` (was `BattlePanel.kt`), `ui/MonDetailScreen.kt` (was `MonDetailDialog.kt`), `ui/Components.kt`, `ui/AssetImages.kt`, `ui/theme/Theme.kt` | none (repackage)                                                                                    |
+| `data/Telemetry.kt`, `data/Gen3Mon.kt`, `data/SnapshotView.kt`                                                                                                                                                                 | none                                                                                                |
+| `data/ActiveTables.kt`, `data/SpeciesNames*.kt`, `data/SpeciesTypes*.kt`, `data/MoveData*.kt`, `data/ItemNames*.kt`, `data/MapSecData*.kt`, `data/TypeChart*.kt`, `data/TypeChartUtil.kt`                                      | none — generated tables carry over unchanged                                                        |
+| `data/UnboundIconSource.kt`                                                                                                                                                                                                    | none (still reads Unbound icon tables out of ROM RAM — now via `InProcessReader`)                   |
+| `assets/pokemon/*.png`, region-map assets                                                                                                                                                                                      | copied as-is                                                                                        |
+| `data/RetroArchClient.kt`, `data/NativeReader.kt`, `data/Poller.kt`                                                                                                                                                            | **replaced** by `InProcessReader` (below)                                                           |
+| `data/Settings.kt`, `data/Config.kt`                                                                                                                                                                                           | fold into the app's unified settings (keybinds + emulator + data-source)                            |
+| `MainActivity.kt`, `TelemetryViewModel.kt`                                                                                                                                                                                     | `MainActivity` → `EmulatorActivity`; ViewModel keeps its `GameState` flow, fed by `InProcessReader` |
 
 ### The data bridge — `InProcessReader`
 
@@ -143,7 +144,7 @@ output contract: a `GameState` snapshot per tick.
 
 - **`libmgba`** for `arm64-v8a` (and `armeabi-v7a` if the Thor needs it): NDK +
   CMake, `-DBUILD_QT=OFF -DBUILD_SDL=OFF -DBUILD_LIBRETRO=OFF -DBUILD_STATIC=ON
-  -DBUILD_SHARED=OFF -DUSE_FFMPEG=OFF -DUSE_DISCORD_RPC=OFF`. Pin an mGBA release
+-DBUILD_SHARED=OFF -DUSE_FFMPEG=OFF -DUSE_DISCORD_RPC=OFF`. Pin an mGBA release
   tag. Vendor as a submodule or a fixed tarball under `third_party/`.
 - **JNI** (`libpokedaisey.so`): thin C over `mCore`; `externalNativeBuild { cmake }`
   in Gradle links `libmgba` static.
@@ -163,13 +164,14 @@ speed with sound on the Thor.
 
 > **Phase 0 COMPLETE (2026-09-08).** mGBA `0.10.5` vendored as a submodule; NDK build of
 > the bare core links clean (`app/src/main/cpp/CMakeLists.txt`); JNI bridge + GLES2 blit
-> + audio-paced emu thread + input mapping done
-> (`app/src/main/kotlin/com/pokedaisey/app/`). Core runs on a plain thread, not
-> `mCoreThread`. **Verified on the Thor (device `<adb-serial>`):** all five target ROMs
-> (`firered-qol`, `emerald-qol`, vanilla FireRed, vanilla Emerald, Unbound — the last a
-> 32 MiB ROM) boot, render with correct colour/aspect, take gamepad input, and hold a
-> steady **59.4–60.3 fps** (`Log.i("pokedaisey","fps=…")`). Audio device active; sound
-> pacing gates the loop cleanly. No crashes. Next: Phase 1 (savestates).
+>
+> - audio-paced emu thread + input mapping done
+>   (`app/src/main/kotlin/com/pokedaisey/app/`). Core runs on a plain thread, not
+>   `mCoreThread`. **Verified on the Thor (device `<adb-serial>`):** all five target ROMs
+>   (`firered-qol`, `emerald-qol`, vanilla FireRed, vanilla Emerald, Unbound — the last a
+>   32 MiB ROM) boot, render with correct colour/aspect, take gamepad input, and hold a
+>   steady **59.4–60.3 fps** (`Log.i("pokedaisey","fps=…")`). Audio device active; sound
+>   pacing gates the loop cleanly. No crashes. Next: Phase 1 (savestates).
 
 **Phase 1 — savestates.** `mCoreSaveStateNamed`/`LoadStateNamed` slots 0–9 into
 `files/states/<hash>/`, screenshot flag on. Configurable save/load/next-slot buttons.
@@ -229,9 +231,9 @@ Items / Battle panel all live from in-process reads.
 > save file isn't writable (adb-pushed imports). **Verified:** Thor exposes Screen-2 as
 > display 4 with `FLAG_PRESENTATION`; `companion presentation shown on display 4`
 > logged; with the user's real `.srm` imported, `telemetry game=FIRERED connected=true
-> party=6 (18,7)` — struct found + decoded in-process, no UDP, no crash, 60fps held.
+party=6 (18,7)` — struct found + decoded in-process, no UDP, no crash, 60fps held.
 > Both Thor displays are `FLAG_SECURE` so `adb screencap` can't grab Screen-2 — the
-> companion UI *rendering* needs a look on the physical device. Only the FireRed-struct
+> companion UI _rendering_ needs a look on the physical device. Only the FireRed-struct
 > path was exercised; Emerald/Unbound/vanilla-FireRed paths are coded but untested.
 > `regionMapSectionId` read as 0 (player in an unnamed interior) → "Unknown area" — real
 > data, resolves on named routes.
@@ -299,7 +301,7 @@ lets you pick FIGHT/BAG/POKEMON/RUN and a move by tapping the bottom screen, but
 because it's a native from-source build with the touch handling written straight into
 the battle menu's own C code — impossible for Unbound and beside the point for
 vanilla FireRed/Emerald (see "Why this design" above: we deliberately don't compile
-from source). We can reach the same *result* through the mechanism PokeDaisey already
+from source). We can reach the same _result_ through the mechanism PokeDaisy already
 has instead: read the live battle-menu state out of RAM and **inject synthetic
 button presses** into the emulated core (`GbaInput.setTouchBits`, already wired for the
 existing D-pad/A/B touch overlay) to drive the real menu, exactly as if the user had
@@ -332,7 +334,7 @@ naive "read cursor, compute delta" approach.
   `gBattlerControllerFuncs[gActiveBattler]` against `&HandleInputChooseAction` /
   `&HandleInputChooseMove` (drop `static` off `HandleInputChooseAction` — same pattern
   already used for `sItemIconTable` in the v2 icon-table export). **Critical:** compute
-  this at the very top of `QolTelemetry_Update()` in `src/qol_telemetry.c`, *before* the
+  this at the very top of `QolTelemetry_Update()` in `src/qol_telemetry.c`, _before_ the
   existing `if (++sSkipCounter < 60) return;` early-out — that throttle exists for the
   expensive per-mon `GetMonData()` decrypt loop and is fine to keep for the rest of the
   struct, but a menu-state field gated to ~1 Hz would make the touch UI feel laggy and
@@ -353,17 +355,17 @@ naive "read cursor, compute delta" approach.
     (`EmulatorEngine.kt:216`), calling `input.setTouchBits(...)` — each queued button
     needs an explicit release frame before the next press, or the ROM's `JOY_NEW` edge
     detection (true only on the frame a bit transitions from unset to set) will silently
-    swallow back-to-back presses. This drains correctly regardless of PokeDaisey's own
+    swallow back-to-back presses. This drains correctly regardless of PokeDaisy's own
     GAME SPEED / fast-forward multiplier from Phase 2, since FF only changes wall-clock
     pacing between real `runFrame()` calls, not how many of them happen — worth a
     one-line check at 2-4× during verification anyway, not because the design is
     theoretically unsound.
   - UI: extend `BattlePanel.kt`'s existing per-move `Row` (already renders name/type/PP/
     matchup chips) with a tap target, enabled only while `battleInputState` says
-    ACTION_SELECT/MOVE_SELECT for `battleActiveBattler` and no sequence is already in
+    ACTION*SELECT/MOVE_SELECT for `battleActiveBattler` and no sequence is already in
     flight. Tapping a move queues [walk-to-FIGHT if not already there] → [walk-to-that-
     move] → A. Tapping BAG/POKEMON/RUN queues a walk-to-that-cell → A (opens the real
-    screen; navigating *inside* Bag/Party stays out of scope for v1 — finish via the
+    screen; navigating \_inside* Bag/Party stays out of scope for v1 — finish via the
     existing touch D-pad overlay or physical input once inside).
   - Verify with the headless-mGBA harness first (script a real fight, screenshot around
     the injected sequence, confirm PP/HP/move landed as intended), then on-device against
@@ -384,7 +386,7 @@ naive "read cursor, compute delta" approach.
   > wrong — `gActiveBattler` is not "which battler is choosing".** It's
   > `battle_main.c`'s own per-frame controller-dispatch loop variable:
   > `for (gActiveBattler = 0; gActiveBattler < gBattlersCount; gActiveBattler++)
-  > gBattlerControllerFuncs[gActiveBattler]();`. By the time `QolTelemetry_Update()` runs
+gBattlerControllerFuncs[gActiveBattler]();`. By the time `QolTelemetry_Update()` runs
   > (from `AgbMain()`, after that loop has already dispatched every battler for the
   > frame), `gActiveBattler == gBattlersCount` — one past the last valid battler, not any
   > particular slot. Reading `gBattlerControllerFuncs[gActiveBattler]` there is reading
@@ -408,9 +410,9 @@ naive "read cursor, compute delta" approach.
   fix above does, just done in Kotlin instead of C since there's no telemetry export to
   compute it for us. Three addresses needed per game (not four — no `gActiveBattler`):
   `gBattlerControllerFuncs` array base, `HandleInputChooseAction`, `HandleInputChooseMove`.
-  *(Superseded 2026-09-17: originally scoped around `gActiveBattler` +
+  _(Superseded 2026-09-17: originally scoped around `gActiveBattler` +
   `gBattlerControllerFuncs[gActiveBattler]`, same bug as Tier A's first ship — corrected
-  above before implementation started, so no rework needed here.)*
+  above before implementation started, so no rework needed here.)_
 
   > **Tier B implemented 2026-09-18, not yet device-verified.** Addresses sourced by
   > building genuinely vanilla (unpatched) ROMs in the `firered-qol-build` Docker image
@@ -421,11 +423,12 @@ naive "read cursor, compute delta" approach.
   > different FireRed source files (the Wally/Safari/Recorded-battle controllers each
   > define their own local copy). Disambiguated by cross-referencing each candidate
   > address against `battle_controller_player.o`'s `.text` range from the `.map` file
-  > (which *does* list per-object-file section ranges, just not the local symbols inside
+  > (which _does_ list per-object-file section ranges, just not the local symbols inside
   > them). FireRed rev1 build verified byte-identical to retail (sha1 `dd5945db…`);
   > Emerald verified byte-identical too (sha1 `f3ae0881…`); rev0 built but **not**
   > cross-checked against a real retail 1.0 hash (none on file) — same caveat the rest of
   > `NATIVE_FIRERED_REV0` already carries.
+  >
   > - FireRed: `gBattlerControllerFuncs` `0x03004fe0` (identical rev0/rev1, matching the
   >   established pattern for this config); `HandleInputChooseAction`/`HandleInputChooseMove`
   >   rev0 `0x0802e438`/`0x0802ea10`, rev1 `0x0802e44c`/`0x0802ea24` (code addresses, so
@@ -467,8 +470,8 @@ naive "read cursor, compute delta" approach.
 - **Tier C — Unbound.** Same five addresses needed (the three from Tier B plus
   `CompleteWhenChoseItem`/`WaitForMonSelection` added for the Bag/Party BACK button —
   see the Tier A status note below), but Unbound is closed-source — no `.map`/`nm`
-  output to read them from. *(Superseded — see the implemented note below; this turned
-  out not to need a disassembler pass or a live probe at all.)*
+  output to read them from. _(Superseded — see the implemented note below; this turned
+  out not to need a disassembler pass or a live probe at all.)_
 
   > **Tier C implemented 2026-09-18, not yet device-verified.** The user has the actual
   > pinned v2.1.1.1 ROM locally (sha1 `b4776b82…`, matches `unbound-telemetry`'s pin) —
@@ -478,14 +481,14 @@ naive "read cursor, compute delta" approach.
   > same address** in both ROMs. `HandleInputChooseAction`/`HandleInputChooseMove`
   > themselves differ (CFRU visibly redesigns the move-select screen) — but the glue
   > functions that store their addresses into `gBattlerControllerFuncs[]`
-  > (`HandleChooseActionAfterDma3`/`HandleChooseMoveAfterDma3`) are *also* byte-identical
-  > and store the *same target addresses* in both ROMs — CFRU patched those two
+  > (`HandleChooseActionAfterDma3`/`HandleChooseMoveAfterDma3`) are _also_ byte-identical
+  > and store the _same target addresses_ in both ROMs — CFRU patched those two
   > functions in place rather than relocating them. `gBattlerControllerFuncs`'s own
   > address (`0x03004fe0`) is a literal embedded in that same matching byte range, so
   > it's directly confirmed too. Net result: **`NATIVE_UNBOUND` now simply equals
   > `NATIVE_FIRERED_REV0`** — no separate address table needed at all, and no code
   > changes to `BattlePanel`/`BattleInputController`/`BattleControlsScreen`, which were
-  > already fully game-agnostic. This also explains *why* CFRU is documented elsewhere
+  > already fully game-agnostic. This also explains _why_ CFRU is documented elsewhere
   > (`unbound-telemetry`) to keep so many stock rev-0 RAM addresses — it's an ASM-hook
   > patch on the retail binary, not a full rebuild-with-insertions, so untouched regions
   > never move. Static-analysis-verified, not yet confirmed in an actual Unbound battle —
@@ -513,8 +516,8 @@ naive "read cursor, compute delta" approach.
 
 - `tools/telemetry-viewer` (Go, macOS): unchanged. Still the desktop viewer; still
   works against RetroArch on the Mac.
-- `tools/android-companion`: its UI + data tables become PokeDaisey's bottom screen.
+- `tools/android-companion`: its UI + data tables become PokeDaisy's bottom screen.
   Keep the directory as the source of the generated Kotlin tables (or move generation
   under `` and retire it — decide at Phase 3).
-- ROM patches (`patches-firered/`, `patches-emerald/`): unchanged. PokeDaisey runs
+- ROM patches (`patches-firered/`, `patches-emerald/`): unchanged. PokeDaisy runs
   the built ROMs; it doesn't build them.
