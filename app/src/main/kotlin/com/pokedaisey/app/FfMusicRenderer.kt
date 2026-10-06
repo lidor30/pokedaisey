@@ -1,0 +1,313 @@
+package com.pokedaisey.app
+
+import android.os.Process
+import android.util.Log
+import com.pokedaisey.app.companion.data.FfMusicKey
+import com.pokedaisey.app.companion.data.M4aSongs
+import com.pokedaisey.app.companion.data.MapMusicEmerald
+import com.pokedaisey.app.companion.data.MapMusicFireRed
+import com.pokedaisey.app.companion.data.MemoryReader
+import com.pokedaisey.app.companion.data.TelemetryDecodeException
+import java.io.File
+import java.util.concurrent.LinkedBlockingDeque
+import java.util.concurrent.TimeUnit
+
+/**
+ * Records STEADY FF-music clips: each song rendered on its own on a second,
+ * disposable mGBA core (pokedaisey_jni.c's `rg` / MgbaCore.pkRender*) by
+ * calling the ROM's own `m4aSongNumStart` - only the music, never the live
+ * game's mix (which carried menu clicks and battle sounds into the clips).
+ * Never touches the player's running game or save.
+ *
+ * Works on any ROM whose sound engine [M4aSongs] recognises. Songs are
+ * [request]ed as the game starts playing them (at any speed, so a clip is
+ * usually ready before fast-forward needs it), ahead of a one-time pass over
+ * the ROM's whole music list in the background - FireRed / LeafGreen /
+ * Emerald-sized ROMs (retail and the QoL builds) their map + battle list
+ * ([MapMusicFireRed] / [MapMusicEmerald]), any other ROM every song its table
+ * plays on the BGM player - so a song is rarely heard sped up before its clip
+ * exists. A requested song pre-empts the background pass mid-recording. Clips are keyed by [FfMusicKey] read back from the render core - the
+ * key the live game produces for that song.
+ *
+ * It also renders the game's menu click (SE_SELECT) for [GameClickSound],
+ * first thing, once per ROM.
+ */
+class FfMusicRenderer(
+    private val rom: File,
+    private val romCrc: String,
+    private val cache: FfMusicCache,
+    private val click: GameClickSound? = null,
+) {
+    // String keys (played now: first), Int song ids (prefetch: last) or CLICK (first of all).
+    private val queue = LinkedBlockingDeque<Any>()
+    private val requested = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
+    @Volatile private var stopped = false
+
+    /** False once the ROM's sound engine turned out unrecognised (STEADY then has no clips here). */
+    @Volatile var supported = true
+        private set
+
+    fun start() {
+        Thread({
+            Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
+            try {
+                run()
+            } catch (t: Throwable) {
+                Log.w("pokedaisey", "FF music renderer failed", t)
+            }
+        }, "pokedaisey-ffmusic-render").apply { isDaemon = true; start() }
+    }
+
+    /** Render [key]'s song soon, unless it's cached or already asked for. */
+    fun request(key: String) {
+        if (!stopped && !cache.has(key) && requested.add(key)) queue.offerFirst(key)
+    }
+
+    fun stop() {
+        stopped = true
+        queue.offerFirst(STOP)
+    }
+
+    private fun run() {
+        val (songs, prefetch) = locateSongs() ?: run {
+            supported = false
+            Log.i("pokedaisey", "FF music: ${rom.name}'s sound engine isn't recognised - no STEADY clips")
+            return
+        }
+        prefetch.forEach { queue.offerLast(it) }
+        if (click?.hasOwn == false) queue.offerFirst(CLICK)
+        var prefetchLeft = prefetch.size
+        var prefetchOk = true
+        var core: RenderCore? = null
+        try {
+            while (!stopped) {
+                // Idle for a while: give the core's memory back until the next request.
+                val job = queue.poll(IDLE_SECONDS, TimeUnit.SECONDS) ?: run {
+                    core?.close(); core = null
+                    queue.take()
+                }
+                if (job === STOP || stopped) break
+                if (job === CLICK) {
+                    (core ?: RenderCore(songs).also { core = it }).recordClick(songs)
+                    continue
+                }
+                val songId = when (job) {
+                    is Int -> job
+                    is String -> if (cache.has(job)) null else songs.songId(job)
+                    else -> null
+                }
+                val outcome = if (songId == null) Outcome.CACHED
+                else (core ?: RenderCore(songs).also { core = it }).record(songs, songId, background = job is Int)
+                if (job is Int) {
+                    // A song the player is hearing came first: this one goes back in line.
+                    if (outcome == Outcome.DEFERRED) { queue.offerLast(job); continue }
+                    if (outcome == Outcome.FAILED) prefetchOk = false
+                    if (--prefetchLeft == 0 && prefetchOk) cache.prefetched = true
+                }
+            }
+        } finally {
+            core?.close()
+        }
+    }
+
+    /** The ROM's songs and the ones to render once in the background - the ROM's bytes are let go after. */
+    private fun locateSongs(): Pair<M4aSongs, List<Int>>? {
+        val romBytes = readChunked(rom)
+        val songs = M4aSongs.locate(romBytes) ?: return null
+        return songs to if (cache.prefetched) emptyList() else prefetchList(romBytes, songs)
+    }
+
+    /** The songs to render once in the background: see the class comment. */
+    private fun prefetchList(romBytes: ByteArray, songs: M4aSongs): List<Int> {
+        val code = if (romBytes.size >= 0xB0) String(romBytes, 0xAC, 4, Charsets.US_ASCII) else ""
+        val retail = romBytes.size <= RETAIL_MAX_BYTES
+        return when {
+            retail && (code == "BPRE" || code == "BPGE") -> MapMusicFireRed.allSongIds.toList()
+            retail && code == "BPEE" -> MapMusicEmerald.allSongIds.toList()
+            else -> songs.bgmSongIds
+        }
+    }
+
+    /** How a [RenderCore.record] went. */
+    private enum class Outcome {
+        CACHED,
+        /** Nothing to loop: the song never started, or ended on its own (a fanfare). */
+        ENDED,
+        /** The booted game kept switching songs over it. */
+        FAILED,
+        /** A background recording stopped for a song the player is hearing now. */
+        DEFERRED,
+    }
+
+    /** The render core booted with this ROM, held (under [coreLock]) until [close]. */
+    private inner class RenderCore(songs: M4aSongs) {
+        private val sampleRate: Int
+        private val scratch = ShortArray(4096)
+
+        init {
+            synchronized(coreLock) {
+                while (coreBusy) (coreLock as Object).wait()
+                coreBusy = true
+            }
+            check(MgbaCore.pkRenderInit(rom.absolutePath)) { "render core failed to init" }
+            sampleRate = MgbaCore.pkRenderSampleRate()
+            // Let boot settle (logos / title) so the sound engine is set up,
+            // then park the game so its intro can't switch songs mid-recording.
+            // (Unparked, a take the game interrupts is simply retried.) Some
+            // games keep the engine paused through long splash screens (Emerald
+            // Rogue: ~15 s), where a forced song never starts - so past
+            // BOOT_FRAMES, wait for the game's own music to play.
+            repeat(BOOT_FRAMES) { MgbaCore.pkRenderRunFrame() }
+            var extra = 0
+            while (FfMusicKey.current(reader) == null && extra++ < MAX_BOOT_FRAMES - BOOT_FRAMES) MgbaCore.pkRenderRunFrame()
+            val parked = songs.idleLoop?.let { MgbaCore.pkRenderPark(it) } ?: false
+            if (!parked) Log.w("pokedaisey", "FF music: couldn't park ${rom.name}'s render core")
+        }
+
+        // One recording's worth (~19 MB at 48 kHz), shared by every song this core records.
+        private val buf by lazy { ShortArray(sampleRate * 2 * FfMusicCache.CAPTURE_SECONDS) }
+        private val frameStart = IntArray(WATCHDOG_FRAMES + 1)   // each frame's first short in buf
+
+        /**
+         * Plays [songId] alone and caches one seamless loop of it, cut where
+         * the sound engine itself loops ([M4aLoopWatch]); a song whose loop
+         * isn't seen within CAPTURE_SECONDS is kept whole. A [background]
+         * recording gives way to a song the player is hearing now.
+         */
+        fun record(songs: M4aSongs, songId: Int, background: Boolean): Outcome {
+            repeat(ATTEMPTS) {
+                val key = start(songs, songId) ?: return Outcome.ENDED.also { Log.i("pokedaisey", "FF music: song $songId didn't start") }
+                if (cache.has(key)) return Outcome.CACHED
+                val loop = M4aLoopWatch(reader)
+                var pos = 0
+                var frames = 0
+                var stopAt = buf.size
+                var ended = false
+                while (pos < stopAt && frames < WATCHDOG_FRAMES && !stopped) {
+                    if (background && liveRequestWaiting(songs, songId)) return Outcome.DEFERRED
+                    frameStart[frames++] = pos
+                    MgbaCore.pkRenderRunFrame()
+                    val n = MgbaCore.pkRenderReadAudio(scratch)
+                    // The song stopped by itself (a fanfare: nothing to loop), or the
+                    // booted game changed the music (its intro moved on): this take
+                    // is spoiled - start the song again.
+                    val now = FfMusicKey.current(reader)
+                    if (now != key) { ended = now == null; pos = -1; break }
+                    val take = minOf(n, buf.size - pos)
+                    if (take > 0) System.arraycopy(scratch, 0, buf, pos, take)
+                    pos += take.coerceAtLeast(0)
+                    loop.onFrame()
+                    // Once the loop is known, only a little more is needed to cut it.
+                    if (loop.found && stopAt == buf.size) stopAt = minOf(buf.size, pos + sampleRate * 2 * LOOP_TAIL_SECONDS)
+                }
+                if (stopped) return Outcome.DEFERRED
+                if (ended) return Outcome.ENDED.also { Log.i("pokedaisey", "FF music: song $songId ends by itself - no clip") }
+                if (pos < 0) return@repeat
+                if (loop.found) {
+                    M4aLoopSplice.clip(buf, pos, frameStart[loop.startFrame], frameStart[loop.endFrame], sampleRate)?.let { (from, len) ->
+                        cache.writeClip(key, buf, from, len, sampleRate)
+                        Log.i("pokedaisey", "FF music: recorded song $songId as $key, a ${len / 2 / sampleRate.toFloat()} s loop")
+                        return Outcome.CACHED
+                    }
+                }
+                if (pos >= buf.size) {
+                    cache.writeClip(key, buf, 0, pos, sampleRate)
+                    Log.i("pokedaisey", "FF music: recorded song $songId as $key, no loop seen - kept ${FfMusicCache.CAPTURE_SECONDS} s")
+                    return Outcome.CACHED
+                }
+            }
+            Log.w("pokedaisey", "FF music: song $songId kept getting interrupted")
+            return Outcome.FAILED
+        }
+
+        /** A song the player is hearing now waits at the queue's head (and it isn't [songId]). */
+        private fun liveRequestWaiting(songs: M4aSongs, songId: Int): Boolean {
+            val head = queue.peekFirst() as? String ?: return false
+            return !cache.has(head) && songs.songId(head).let { it != null && it != songId }
+        }
+
+        /** Plays the menu click alone (the booted game's music stopped first) and hands it to [click]. */
+        fun recordClick(songs: M4aSongs) {
+            val fn = songs.songNumStart and 1L.inv()
+            // MUS_DUMMY replaces whatever the title screen was playing with silence.
+            if (!MgbaCore.pkRenderForceSong(fn, MUS_DUMMY)) return
+            repeat(SILENCE_FRAMES) { MgbaCore.pkRenderRunFrame(); MgbaCore.pkRenderReadAudio(scratch) }
+            if (!MgbaCore.pkRenderForceSong(fn, SE_SELECT)) return
+            val buf = ShortArray(sampleRate * 2 * CLICK_FRAMES / 60 + scratch.size)
+            var pos = 0
+            repeat(CLICK_FRAMES) {
+                MgbaCore.pkRenderRunFrame()
+                val n = minOf(MgbaCore.pkRenderReadAudio(scratch), buf.size - pos)
+                if (n > 0) System.arraycopy(scratch, 0, buf, pos, n)
+                pos += n.coerceAtLeast(0)
+            }
+            click?.write(buf, pos, sampleRate)
+            Log.i("pokedaisey", "click sound: rendered SE_SELECT (${pos / 2} frames)")
+        }
+
+        /** Starts [songId] via the ROM's m4aSongNumStart; the key it plays under, once its tracks run. */
+        private fun start(songs: M4aSongs, songId: Int): String? {
+            if (!MgbaCore.pkRenderForceSong(songs.songNumStart and 1L.inv(), songId)) return null
+            // MPlayStart clears the player's status; the next sound tick marks its tracks playing.
+            repeat(START_FRAMES) {
+                MgbaCore.pkRenderRunFrame()
+                MgbaCore.pkRenderReadAudio(scratch)
+                FfMusicKey.current(reader)?.let { return it }
+            }
+            return null
+        }
+
+        fun close() {
+            MgbaCore.pkRenderDeinit()
+            synchronized(coreLock) {
+                coreBusy = false
+                (coreLock as Object).notifyAll()
+            }
+        }
+    }
+
+    /** The render core's memory, for [FfMusicKey]. */
+    private val reader = object : MemoryReader {
+        override fun readCoreMemory(addr: Long, size: Int): ByteArray =
+            MgbaCore.pkRenderReadBytes(addr, size) ?: throw TelemetryDecodeException("render core read @ 0x${addr.toString(16)} failed")
+    }
+
+    private fun readChunked(f: File): ByteArray {
+        val out = ByteArray(f.length().toInt())
+        f.inputStream().use { s ->
+            var o = 0
+            while (o < out.size) {
+                val n = s.read(out, o, minOf(1 shl 20, out.size - o))
+                if (n < 0) break
+                o += n
+            }
+        }
+        return out
+    }
+
+    private companion object {
+        val STOP = Any()
+        val CLICK = Any()
+
+        /** One render core per process (`rg` is a C global): a new game's renderer waits for the last one. */
+        val coreLock = Any()
+        var coreBusy = false
+
+        /** FireRed / Emerald-sized ROMs share the retail music lists; bigger ones are hacks. */
+        const val RETAIL_MAX_BYTES = 16 shl 20
+
+        // Song numbers every Gen 3 song table shares (include/constants/songs.h).
+        const val MUS_DUMMY = 0
+        const val SE_SELECT = 5
+        const val SILENCE_FRAMES = 20                                 // the title music's release tail
+        const val CLICK_FRAMES = 45                                   // SE_SELECT is ~0.25 s
+
+        const val IDLE_SECONDS = 30L
+        const val ATTEMPTS = 2
+        const val START_FRAMES = 30                                   // up to half a second for a forced song to start
+        const val BOOT_FRAMES = 300                                   // ~5 s of game time at 60 fps
+        const val MAX_BOOT_FRAMES = 1800                              // 30 s: waiting for the title music
+        val WATCHDOG_FRAMES = 60 * (FfMusicCache.CAPTURE_SECONDS + 5)
+        const val LOOP_TAIL_SECONDS = 3   // past the loop's end: the clip starts 1 s in, plus the splice search
+    }
+}

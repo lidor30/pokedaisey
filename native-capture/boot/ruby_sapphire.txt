@@ -1,0 +1,20 @@
+# Retail Ruby / Sapphire (no quest-log recap): START, then A to skip the intro
+# logo, A at the title, A on CONTINUE. The user's RUBY save needs two more A
+# presses first ("The save file is corrupt. The previous save file will be
+# loaded." - its newer slot is inconsistent), so this has five A presses; on
+# the Sapphire save (Oldale Town, outdoors) the extra two land harmlessly on
+# the field. Don't add more: the Ruby save stands at the record-mixing counter.
+wait 400
+press START
+wait 150
+press A
+wait 100
+press A
+wait 100
+press A
+wait 100
+press A
+wait 100
+press A
+wait 100
+wait 120

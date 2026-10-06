@@ -1,0 +1,9 @@
+# Copy to local.mk (untracked) and point these at your machine.
+
+# Directory holding the built pret decomp checkouts (pokefirered/, pokeemerald/,
+# pokeruby/, pokehns/, each built at its pinned commit). Used by the generator
+# scripts in scripts/ and by ui-preview's ROM-art rendering.
+DECOMPS ?= $(HOME)/src/decomps
+
+# Optional: mon icon PNGs named <internal species id>.png, for ui-preview's fake party.
+MON_ICONS ?=

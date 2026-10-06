@@ -1,0 +1,26 @@
+# Retail LeafGreen (the user's save, FEDE on Cinnabar Island): START skips the
+# intro, then A through the title, CONTINUE and the five "Previously on your
+# quest" recap pages - nine A presses in all, then the field. Fewer and the
+# capture lands mid-recap; B instead backs out to the title screen.
+wait 400
+press START
+wait 150
+press A
+wait 100
+press A
+wait 100
+press A
+wait 100
+press A
+wait 100
+press A
+wait 100
+press A
+wait 100
+press A
+wait 100
+press A
+wait 100
+press A
+wait 100
+wait 120

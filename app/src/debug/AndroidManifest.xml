@@ -1,0 +1,16 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Debug-build-only override: exports PokeDaiseyActivity so the
+         scripts/smoke_test.sh regression harness can launch a specific ROM
+         directly via an EXTRA_ROM extra from adb (the main manifest keeps it
+         exported=false in every real build; only this debug-variant overlay
+         changes it, via Gradle's manifest merger, so the flag never ships in
+         a release build). -->
+    <application>
+        <activity
+            android:name=".PokeDaiseyActivity"
+            android:exported="true"
+            tools:replace="android:exported" />
+    </application>
+</manifest>

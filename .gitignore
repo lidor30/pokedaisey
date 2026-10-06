@@ -1,0 +1,34 @@
+# Never commit ROMs or saves - supply your own legally-dumped copy.
+*.gba
+*.gbc
+*.sav
+*.srm
+*.sa1
+
+# Machine-local config
+local.properties
+local.mk
+# Release signing (see app/build.gradle.kts) - never commit the key or its passwords.
+keystore.properties
+*.jks
+*.keystore
+
+# Gradle / Android build outputs
+.gradle/
+build/
+.cxx/
+.kotlin/
+.idea/
+*.iml
+
+# Paparazzi screenshots - a viewing aid, re-recorded on demand (see CLAUDE.md).
+/app/src/test/snapshots/
+
+# Headless capture tool output: mgba_dump is compiled fresh inside the
+# pokedaisey-capture image each run (a Linux ELF, not portable).
+/native-capture/mgba_dump
+/native-capture/menu-shots/
+
+__pycache__/
+.DS_Store
+.claude/settings.local.json

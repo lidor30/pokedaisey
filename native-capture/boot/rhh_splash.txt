@@ -1,0 +1,17 @@
+# Boot sequence for pokeemerald-expansion hacks with the long "powered by
+# PRET x RHH" splash (Heart and Soul v2.0.6, Lazarus v2.0). default.txt
+# presses START during that splash and then mashes A on the field, where A
+# talks to a following Pokemon. This skips the splash/intro (3 x START),
+# picks CONTINUE and waits on the field instead. Verified 2026-09-27 against
+# the user's saves (both reach the field with the party loaded by frame ~800).
+wait 300
+press START
+wait 60
+press START
+wait 90
+press START
+wait 90
+press A
+wait 120
+press A
+wait 400

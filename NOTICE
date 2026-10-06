@@ -1,0 +1,33 @@
+PokeDaisey
+Copyright (C) 2026 Lidor Itzhari
+https://github.com/lidor30/pokedaisey
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, version 3 (see LICENSE), with the additional term below.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+ADDITIONAL TERM (GNU GPL version 3, section 7(b))
+
+Anyone who conveys this program, or any work based on it, in source or
+compiled form, must preserve the following attribution:
+
+    Based on PokeDaisey by Lidor Itzhari - https://github.com/lidor30/pokedaisey
+
+It must appear (1) in this NOTICE file, kept with the source; (2) in the
+work's README or equivalent documentation; and (3) where the work shows
+credits, an "About" screen or other Appropriate Legal Notices, there too.
+
+THIRD-PARTY COMPONENTS
+
+- mGBA (third_party/mgba), Copyright (c) 2013-2022 Jeffrey Pfau and
+  contributors, Mozilla Public License 2.0 - https://github.com/mgba-emu/mgba
+- Pixel Operator font (app/src/main/assets/fonts), by Jayvee Enaguas,
+  CC0 1.0 (public domain dedication).
+
+Pokemon and all related names are trademarks of Nintendo, Game Freak,
+Creatures and The Pokemon Company. PokeDaisey is not affiliated with or
+endorsed by them. No game data is included: players supply their own ROMs.

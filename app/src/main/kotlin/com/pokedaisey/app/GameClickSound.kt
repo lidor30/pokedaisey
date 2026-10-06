@@ -1,0 +1,70 @@
+package com.pokedaisey.app
+
+import android.media.AudioAttributes
+import android.media.SoundPool
+import java.io.File
+
+/**
+ * The game's own menu click (SE_SELECT), played by the companion's buttons
+ * (companion/ui/ClickSound.kt's LocalClickSound). Nothing is bundled:
+ * [FfMusicRenderer] renders it once per ROM on its render core and hands it
+ * to [write]; it's kept as `sfx/<crc>-select.wav`. A ROM whose sound engine
+ * the renderer can't drive (pokeemerald-expansion hacks) borrows the newest
+ * click another game rendered.
+ */
+class GameClickSound(filesDir: File, romCrc: String) {
+    private val dir = File(filesDir, "sfx").apply { mkdirs() }
+    private val own = File(dir, "$romCrc$SUFFIX")
+    private val pool = SoundPool.Builder()
+        .setMaxStreams(2)
+        .setAudioAttributes(
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_GAME)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build(),
+        )
+        .build()
+    @Volatile private var soundId = 0
+
+    init {
+        pool.setOnLoadCompleteListener { p, id, status ->
+            if (status != 0) return@setOnLoadCompleteListener
+            val old = soundId
+            soundId = id
+            if (old != 0 && old != id) p.unload(old)
+        }
+        load()
+    }
+
+    /** Whether this ROM's own click has been rendered yet. */
+    val hasOwn: Boolean get() = own.isFile && own.length() > 0
+
+    private fun load() {
+        val f = own.takeIf { hasOwn }
+            ?: dir.listFiles { f -> f.name.endsWith(SUFFIX) && f.length() > 0 }?.maxByOrNull { it.lastModified() }
+            ?: return
+        runCatching { pool.load(f.path, 1) } // released under a late render: nothing to play anyway
+    }
+
+    /** Stores this ROM's click ([len] samples of interleaved stereo [pcm]), silence trimmed off both ends, and plays it from now on. */
+    fun write(pcm: ShortArray, len: Int, sampleRate: Int) {
+        fun loud(frame: Int) = maxOf(Math.abs(pcm[frame * 2].toInt()), Math.abs(pcm[frame * 2 + 1].toInt())) > SILENCE
+        val frames = len / 2
+        val first = (0 until frames).firstOrNull(::loud) ?: return
+        val last = (frames - 1 downTo first).first(::loud)
+        writeWav(own, pcm, (last - first + 1) * 2, sampleRate, from = first * 2)
+        load()
+    }
+
+    fun play() {
+        val id = soundId
+        if (id != 0) pool.play(id, 1f, 1f, 1, 0, 1f)
+    }
+
+    fun release() = pool.release()
+
+    private companion object {
+        const val SUFFIX = "-select.wav"
+        const val SILENCE = 8 // |sample| at or below this counts as silence
+    }
+}

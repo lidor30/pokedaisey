@@ -1,0 +1,167 @@
+# PokeDaisey
+
+**Play Gen 3 Pokémon on the top screen. See everything about your game on the bottom one.**
+
+PokeDaisey is a GBA player for dual-screen Android handhelds, made for Pokémon
+FireRed, LeafGreen, Emerald, Ruby, Sapphire and popular ROM hacks. The game runs
+on the top screen. The bottom screen is a live companion that reads your game
+as you play: your party, your bag, the map, battle matchups, your Pokédex, and a
+spoiler-free guide. Everything is drawn in the game's own menu style.
+
+[**Download the latest version**](https://github.com/lidor30/pokedaisey/releases/latest)
+
+## Devices
+
+| Device | Status |
+|---|---|
+| AYN Thor | Tested, made for it |
+| Retroid Pocket Duo / Duo Lite | Should work, not yet tested on real hardware |
+
+Any Android 8.0+ device runs the games. The companion needs a second screen.
+
+## Install
+
+1. Download `PokeDaisey-<version>.apk` from the
+   [latest release](https://github.com/lidor30/pokedaisey/releases/latest) on the device.
+2. Open it. If Android asks, allow your browser or file manager to install apps.
+3. Open PokeDaisey. A short setup helps you:
+   - **Link your ROMs folder** (optional). Every supported game in it shows up in
+     your library, played right where it is. New games are picked up every time
+     you open the app.
+   - **Choose where saves go.** Use PokeDaisey's own folder, or point it at
+     another emulator's (like RetroArch's) to keep playing the same saves.
+   - **Add cover art** (optional) with a free [SteamGridDB](https://www.steamgriddb.com) API key.
+
+You can change all of this later in Settings.
+
+**No games are included.** Use your own legally dumped ROMs.
+
+### Updates
+
+PokeDaisey checks for a new version each time you open it and offers to install
+it. You can also check from **Settings > VERSION**.
+
+## Features
+
+### The companion (bottom screen)
+
+- **PARTY** - your team with HP, levels and status, in your game's own party
+  screen. Tap a Pokémon for its full summary: stats, moves, EXP, and what it's
+  weak or resistant to.
+- **BAG** - every pocket, with item icons and descriptions.
+- **BATTLE** - opens by itself when a battle starts.
+  - **INFO**: both Pokémon, your moves rated SUPER / RESISTED / NEUTRAL / IMMUNE,
+    and the foe's weaknesses.
+  - **SUGGESTIONS**: the best Pokémon and move for this fight.
+  - **FOE TEAM**: the trainer's remaining Pokémon.
+  - Touch buttons to fight, switch or run without reaching for the controls (FireRed and Emerald).
+- **MAP** - the game's region map with you on it. Tap any place to name it,
+  or search the list of every town and route.
+- **DEX** - your Pokédex with seen / caught marks and full entries: sprite,
+  types, stats, abilities, dex text.
+- **GUIDE** - hints first, answers on a second tap:
+  - **HERE**: wild Pokémon, items, gifts and trades in the area you're in, with what you already have ticked off.
+  - **NEXT BOSS**: the next gym leader's team.
+  - **EVOLUTIONS**, plus **TIPS**, **WHERE IS** and **STUCK?** pages.
+- **CARD** - your trainer card, drawn exactly like the game's, front and back.
+- **STATES** - 10 save-state slots with screenshots.
+
+Pick which tabs sit in the tab bar in the companion's Settings.
+
+### The player (top screen)
+
+- **Fast-forward** with a speed cap, plus slow motion. **Smart** fast-forward
+  drops to normal speed in menus and on the map, and keeps battles fast.
+- **Fast-forward music** (alpha) that keeps playing the song at its normal speed, instead of chipmunk sound.
+- **Save states** on hotkeys, with undo.
+- **Status bar** (optional): game, location, money, clock and battery above the game.
+- **Controls**: remap every GBA button and hotkey. On AYN and Retroid devices,
+  A and B match the labels on the buttons. On-screen touch controls appear when
+  no controller is connected.
+- **Themes** to recolor the whole app.
+
+### Library
+
+- List or grid view, recently played, and cover art from SteamGridDB (or pick your own image).
+- Long-press a game to:
+  - **Rename** or **hide** it.
+  - **Load a save** file into it (your current save is kept as a dated backup).
+  - See its **info**: ROM, save file and save states.
+- Works with frontends like **ES-DE**, **Cocoon** and **iiSU**. They can launch
+  a game straight into PokeDaisey. See
+  [frontend setup](docs/DEVELOPMENT.md#launch-from-a-frontend-cocoon-iisu-es-de-).
+
+### Saves
+
+Saves are standard `.sav` / `.srm` files, the same format as mGBA and RetroArch,
+so you can move them between emulators freely. A game finds its save by the ROM's
+file name.
+
+## Supported games
+
+Any GBA game plays. The companion needs one of the games below, **in the exact
+version listed** (ROM hacks are recognized by their file, so another version
+shows a "not supported" notice).
+
+✅ works · ◐ partly · — not yet
+
+| Game | Version | Party | Bag | Battle | Map | Pokédex | Guide |
+|---|---|:-:|:-:|:-:|:-:|:-:|:-:|
+| Pokémon FireRed | USA/Europe, rev 0 and 1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Pokémon LeafGreen | USA/Europe, rev 0 and 1 | ✅ | ✅ | ◐ | ✅ | ✅ | ✅ |
+| Pokémon Emerald | USA/Europe | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Pokémon Ruby | USA, rev 1 and 2 | ✅ | ✅ | ◐ | ✅ | ✅ | ✅ |
+| Pokémon Sapphire | USA, rev 1 and 2 | ✅ | ✅ | ◐ | ✅ | ✅ | ✅ |
+| Pokémon Unbound | 2.1.1.1 | ✅ | ✅ | ◐ | ✅ | ✅ | ✅ |
+| Pokémon Radical Red | 4.1 | ✅ | ✅ | ◐ | ✅ | ✅ | ✅ |
+| Pokémon Gaia | 3.2 | ✅ | ✅ | ◐ | ✅ | ✅ | ✅ |
+| Pokémon Odyssey | 4.1.1 | ✅ | ✅ | ◐ | ✅ | ✅ | ✅ |
+| Pokémon Heart and Soul | 2.0.6 | ✅ | ✅ | ✅ | ◐ | ✅ | ✅ |
+| Pokémon Amethyst | 1.3.0 | ✅ | ✅ | — | ✅ | ✅ | ✅ |
+| Celia's Stupid Romhack | 1.1.4 | ✅ | ✅ | ◐ | ✅ | ✅ | ✅ |
+| Pokémon Lazarus | 2.0 | ✅ | ✅ | — | ◐ | ✅ | — |
+| Emerald Seaglass | 3.0 | ✅ | ✅ | — | ✅ | ✅ | — |
+| Too Many Types 2 | 1.5.2 | ✅ | ✅ | — | ✅ | ✅ | — |
+| Emerald Rogue | 2.2.1-EX | ✅ | ✅ | ✅ | ✅ | — | — |
+| Pokémon R.O.W.E. | 2.1.9.1 Experimental | — | — | — | — | — | — |
+
+R.O.W.E. plays, but its companion is still in progress. Map ◐ means place names
+only, without the map picture. Battle ◐ means the battle panes work but haven't
+been checked in every kind of battle. The guides were
+written from each game's own data and may contain mistakes; the app says so the
+first time you open one.
+
+Want another game supported? [Open an issue](https://github.com/lidor30/pokedaisey/issues).
+
+## Privacy
+
+PokeDaisey has no accounts, ads or analytics. It only goes online to:
+
+- check this page for a new version, and download it if you say so;
+- fetch cover art from SteamGridDB, only if you add your own API key.
+
+Your games and saves never leave your device.
+
+## Building from source
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
+## Credits
+
+- [mGBA](https://mgba.io) by Jeffrey Pfau and contributors runs the games (MPL 2.0;
+  source in [`third_party/mgba`](https://github.com/mgba-emu/mgba)).
+- [Pixel Operator](https://www.dafont.com/pixel-operator.font) font by Jayvee Enaguas (CC0).
+- The [pret](https://github.com/pret) decompilation projects, which the game data and guides were checked against.
+- Cover art from [SteamGridDB](https://www.steamgriddb.com) and its contributors.
+
+## License
+
+PokeDaisey is free software under the [GNU GPL v3](LICENSE), with one
+[additional term](NOTICE): if you share PokeDaisey or anything built from it,
+keep the credit **"Based on PokeDaisey by Lidor Itzhari -
+https://github.com/lidor30/pokedaisey"** in its documentation and credits.
+Forks must stay open source under the same license.
+
+PokeDaisey is a fan project, not affiliated with or endorsed by Nintendo,
+Game Freak, Creatures or The Pokémon Company. Pokémon and all related names are
+trademarks of their respective owners. ROM hacks belong to their creators.
