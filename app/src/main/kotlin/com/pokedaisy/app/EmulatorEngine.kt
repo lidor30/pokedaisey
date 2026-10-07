@@ -64,6 +64,9 @@ class EmulatorEngine(
 
     /** Fired from the emu thread; wrap UI work in the callback yourself. */
     var onCoreReady: ((width: Int, height: Int) -> Unit)? = null
+
+    /** False for a Game Boy / Color ROM: the GBA-only watchers (region map, menus, m4a songs) stay off. */
+    @Volatile var gba = true
     var onStateResult: ((action: Hotkeys.Action, slot: Int, ok: Boolean) -> Unit)? = null
     var onSlotChanged: ((slot: Int) -> Unit)? = null
     var onSpeedChanged: ((label: String) -> Unit)? = null
@@ -326,15 +329,16 @@ class EmulatorEngine(
                     runCatching { onBattleInputSample?.invoke() }
                 }
 
-                mapOpen = RegionMapWatch.isOpen(InProcessReader)
-                menuOpen = FfMenuWatch.tick(InProcessReader)
+                // GBA memory watchers; a Game Boy game has none of these screens / engines to read.
+                mapOpen = gba && RegionMapWatch.isOpen(InProcessReader)
+                menuOpen = gba && FfMenuWatch.tick(InProcessReader)
                 val speed = effectiveSpeed()
                 // FF the player still has on - SMART only holding it at 1x for a menu.
                 val ffWanted = requestedSpeed() > 1f
                 val mode = ffMusicMode
                 // The song the game is playing right now (FfMusicKey): read
                 // every frame, so a clip starts and stops exactly with it.
-                val ffMusicKey = FfMusicKey.current(InProcessReader)
+                val ffMusicKey = if (gba) FfMusicKey.current(InProcessReader) else null
                 if (ffMusicKey != null && ffMusicKey != songKey) {
                     songKey = ffMusicKey
                     songStartedAt = android.os.SystemClock.elapsedRealtime()

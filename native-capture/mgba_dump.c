@@ -21,7 +21,8 @@
 //   press KEYS        - press KEYS for one frame then release (comma-separated:
 //                        A,B,SELECT,START,UP,DOWN,LEFT,RIGHT,L,R)
 //   hold KEYS N        - hold KEYS for N frames then release
-//   dump DIR           - write DIR/ewram.bin and DIR/iwram.bin (DIR must exist)
+//   dump DIR           - write DIR/ewram.bin and DIR/iwram.bin (DIR must exist);
+//                        a GB/GBC ROM writes DIR/wram.bin (C000-DFFF) + hram.bin (FF80-FFFE)
 //   vdump DIR          - write DIR/{vram,pal,oam,io}.bin (video memory, palette
 //                        RAM, OAM and the first 0x400 I/O registers) - what the
 //                        PPU is drawing from, for pulling a screen's graphics
@@ -126,9 +127,14 @@ static void cmdShot(const char* path) {
         fprintf(stderr, "mgba_dump: cannot open %s for writing\n", path);
         return;
     }
-    fprintf(f, "P6\n%u %u\n255\n", videoW, videoH);
-    for (unsigned i = 0; i < videoW * videoH; i++) {
-        uint32_t c = (uint32_t) video[i];
+    // The buffer is sized for the largest frame (a GB core: the SGB border's 256x224);
+    // the frame itself (160x144 without a border) sits top-left at stride videoW
+    // (this libmgba predates currentVideoSize).
+    unsigned w = videoW, h = videoH;
+    if (core->platform(core) == mPLATFORM_GB) { w = 160; h = 144; }
+    fprintf(f, "P6\n%u %u\n255\n", w, h);
+    for (unsigned i = 0; i < w * h; i++) {
+        uint32_t c = (uint32_t) video[(i / w) * videoW + i % w];
         uint8_t rgb[3] = { (uint8_t) c, (uint8_t) (c >> 8), (uint8_t) (c >> 16) };
         fwrite(rgb, 1, 3, f);
     }
@@ -172,6 +178,15 @@ static void cmdWav(const char* path, int frames) {
 
 static void cmdDump(const char* outDir) {
     char path[1024];
+    if (core->platform(core) == mPLATFORM_GB) {
+        // Game Boy / Color: WRAM C000-DFFF (the bank SVBK has in D000) and HRAM FF80-FFFE.
+        snprintf(path, sizeof(path), "%s/wram.bin", outDir);
+        dumpRegion(0xC000, 0x2000, path);
+        snprintf(path, sizeof(path), "%s/hram.bin", outDir);
+        dumpRegion(0xFF80, 0x7F, path);
+        fprintf(stderr, "mgba_dump: dumped wram+hram to %s (frame %u)\n", outDir, core->frameCounter(core));
+        return;
+    }
     snprintf(path, sizeof(path), "%s/ewram.bin", outDir);
     dumpRegion(0x02000000, 0x40000, path);
     snprintf(path, sizeof(path), "%s/iwram.bin", outDir);

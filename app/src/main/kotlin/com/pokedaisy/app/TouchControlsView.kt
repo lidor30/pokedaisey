@@ -42,6 +42,10 @@ class TouchControlsView(context: Context) : View(context) {
 
     private var mask = 0
 
+    /** The L / R buttons: off for a Game Boy / Color game, which has none. */
+    var shoulders = true
+        set(v) { if (field != v) { field = v; invalidate() } }
+
     override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
         val unit = min(w, h)
         dpadR = unit * 0.20f
@@ -78,8 +82,10 @@ class TouchControlsView(context: Context) : View(context) {
         circle(c, bBtn, "B", MgbaCore.Key.B)
         pill(c, startBtn, "START", MgbaCore.Key.START)
         pill(c, selectBtn, "SELECT", MgbaCore.Key.SELECT)
-        pill(c, lBtn, "L", MgbaCore.Key.L)
-        pill(c, rBtn, "R", MgbaCore.Key.R)
+        if (shoulders) {
+            pill(c, lBtn, "L", MgbaCore.Key.L)
+            pill(c, rBtn, "R", MgbaCore.Key.R)
+        }
     }
 
     private fun circle(c: Canvas, r: RectF, text: String, bit: Int) {
@@ -127,8 +133,8 @@ class TouchControlsView(context: Context) : View(context) {
         if (inCircle(x, y, bBtn)) bits = bits or MgbaCore.Key.B
         if (startBtn.contains(x, y)) bits = bits or MgbaCore.Key.START
         if (selectBtn.contains(x, y)) bits = bits or MgbaCore.Key.SELECT
-        if (lBtn.contains(x, y)) bits = bits or MgbaCore.Key.L
-        if (rBtn.contains(x, y)) bits = bits or MgbaCore.Key.R
+        if (shoulders && lBtn.contains(x, y)) bits = bits or MgbaCore.Key.L
+        if (shoulders && rBtn.contains(x, y)) bits = bits or MgbaCore.Key.R
         return bits
     }
 

@@ -134,6 +134,7 @@ fun itemDescription(id: Int): String = when (activeGame) {
     // Renumbered items with no description table: vanilla text would be wrong.
     GameKind.EMERALD_SEAGLASS -> itemDescriptionsSeaglass[id] ?: ""
     GameKind.CELIA, GameKind.TMT2 -> ""
+    GameKind.YELLOW -> ""   // Gen 1 items have no descriptions
     else -> itemDescriptions[id] ?: ""
 }
 

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -167,12 +168,16 @@ private enum class MapLabelStyle(val width: Int, val height: Int) {
     FIRERED(120, 16),
 
     /** Emerald: the standard framed window, white, in the full-screen map's bottom-right corner. */
-    EMERALD(110, 30);
+    EMERALD(110, 30),
+
+    /** Gen 1 (Yellow): the name in black on a white strip over the town map's top row. */
+    GEN1(128, 8);
 
     /** The player's 16x16 head on the map (regionmap/player_*.png, from the ROM by RomArt). */
     fun headAsset(gender: Int): String = when (this) {
         FIRERED -> if (gender == 1) "player_leaf" else "player_red"
         EMERALD -> if (gender == 1) "player_may" else "player_brendan"
+        GEN1 -> "player_yellow"   // Red's standing sprite, from the ROM (Gen1Art)
     }
 
     companion object {
@@ -181,7 +186,11 @@ private enum class MapLabelStyle(val width: Int, val height: Int) {
             GameKind.EMERALD_ROGUE, GameKind.HEART_AND_SOUL, GameKind.LAZARUS, GameKind.SOULGOLD,
         )
 
-        fun of(game: GameKind?) = if (game in EMERALD_FAMILY) EMERALD else FIRERED
+        fun of(game: GameKind?) = when (game) {
+            in EMERALD_FAMILY -> EMERALD
+            GameKind.YELLOW -> GEN1
+            else -> FIRERED
+        }
     }
 }
 
@@ -299,6 +308,8 @@ private fun MapLabel(style: MapLabelStyle, label: String, dungeon: String?, crop
             val h = style.height * sy
             val (x, y) = when (style) {
                 MapLabelStyle.FIRERED -> 0f to row * h
+                // The tab's frame covers the map's top edge: the row starts inside it.
+                MapLabelStyle.GEN1 -> 0f to MAP_FRAME.toPx()
                 // The game's window ends 1px from the screen's edge; the tab's frame
                 // covers that edge, so it ends 1px inside the frame instead.
                 MapLabelStyle.EMERALD -> {
@@ -307,21 +318,28 @@ private fun MapLabel(style: MapLabelStyle, label: String, dungeon: String?, crop
                 }
             }
             Box(
-                contentAlignment = Alignment.CenterStart,
+                contentAlignment = if (style == MapLabelStyle.GEN1) Alignment.TopStart else Alignment.CenterStart,
                 modifier = Modifier
                     .offset { IntOffset(x.toInt(), y.toInt()) }
                     .size(w.toDp(), h.toDp())
                     .drawBehind {
                         when (style) {
                             MapLabelStyle.FIRERED -> drawRect(FR_STRIP)
+                            MapLabelStyle.GEN1 -> drawRect(Color.White)
                             MapLabelStyle.EMERALD -> drawLayeredBox(OptionColors.listLayers.map { (c, lw) -> c to lw * sy }, Color.White, radius = sy)
                         }
                     }
                     // FireRed's text sits 2px in, but the tab's frame covers the map's edge here.
-                    .padding(start = ((if (style == MapLabelStyle.FIRERED) 4 else 7) * sx).toDp()),
+                    .padding(start = ((if (style == MapLabelStyle.EMERALD) 7 else 4) * sx).toDp()),
             ) {
                 when (style) {
                     MapLabelStyle.FIRERED -> GbaText(text, Color.White, FR_SHADOW, m)
+                    // Its letters fill the 8px row (glyph rows 0-6 sit 6 font pixels under the
+                    // line's top), wider than the row's line box: measured unbounded, pulled up.
+                    MapLabelStyle.GEN1 -> GbaText(
+                        text, OptionColors.titleText, Color.Transparent, m,
+                        Modifier.wrapContentHeight(Alignment.Top, unbounded = true).offset { IntOffset(0, -6 * k + (sy / 2).toInt()) },
+                    )
                     MapLabelStyle.EMERALD -> GbaText(text, OptionColors.titleText, OptionColors.titleShadow, m)
                 }
             }

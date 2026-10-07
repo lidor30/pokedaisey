@@ -27,7 +27,7 @@ object RomArchive {
     /** File extensions read as archives. */
     val EXTENSIONS = setOf("zip", "7z")
     /** What a ROM inside an archive may be called. */
-    val ROM_EXTENSIONS = setOf("gba", "agb", "bin")
+    val ROM_EXTENSIONS = setOf("gba", "agb", "bin", "gb", "gbc")
     private const val MIN_ROM_BYTES = 0x200L
     private const val MAX_ROM_BYTES = 32L shl 20
     /** How many extracted ROMs [playable] keeps; older ones go. */
@@ -72,11 +72,11 @@ object RomArchive {
         }
     }.getOrNull()
 
-    /** Skips macOS's `__MACOSX/` and `._` junk and anything too small or big to be a GBA ROM. */
+    /** Skips macOS's `__MACOSX/` and `._` junk and anything too small or big to be a ROM (GB carts start at 32 KB). */
     private fun pick(entries: Sequence<Entry>): Entry? = entries.filter { e ->
         e.extension in ROM_EXTENSIONS && !e.name.substringAfterLast('/').startsWith(".") &&
             !e.name.startsWith("__MACOSX/") && e.size in MIN_ROM_BYTES..MAX_ROM_BYTES
-    }.maxWithOrNull(compareBy<Entry>({ it.extension == "gba" }, { it.size }))
+    }.maxWithOrNull(compareBy<Entry>({ it.extension == "gba" }, { it.extension == "gbc" || it.extension == "gb" }, { it.size }))
 
     /** [entry]'s bytes; closing the stream closes the archive. */
     private fun openEntry(archive: File, entry: Entry, format: Format): InputStream = when (format) {

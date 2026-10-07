@@ -35,6 +35,7 @@ import com.pokedaisy.app.companion.ui.AchievementBadges
 import com.pokedaisy.app.companion.BatteryStatus
 import com.pokedaisy.app.companion.DeviceBattery
 import com.pokedaisy.app.companion.FfMode
+import com.pokedaisy.app.companion.ScreenFilter
 import com.pokedaisy.app.companion.FfMusicMode
 import com.pokedaisy.app.companion.data.FfMenuWatch
 import com.pokedaisy.app.companion.TelemetryStore
@@ -153,6 +154,9 @@ class PokeDaisyActivity : Activity() {
         override fun switchTo(personality: Long) { if (::engine.isInitialized) engine.battleSwitchTo(personality) }
     }
 
+    /** The loaded ROM is a Game Boy / Color cart (no GBA header, no L/R). */
+    @Volatile private var romIsGameBoy = false
+
     /** The loaded ROM's header code / revision byte, for [switchAddrsFor]. */
     @Volatile private var romCode = ""
     @Volatile private var romRev = -1
@@ -259,6 +263,16 @@ class PokeDaisyActivity : Activity() {
         override val stretchGame get() = Prefs(this@PokeDaisyActivity).stretchGame
         override fun setStretchGame(on: Boolean) {
             Prefs(this@PokeDaisyActivity).stretchGame = on
+            runOnUiThread { syncGameScreen() }
+        }
+        override val gbaColors get() = Prefs(this@PokeDaisyActivity).gbaColors
+        override fun setGbaColors(on: Boolean) {
+            Prefs(this@PokeDaisyActivity).gbaColors = on
+            runOnUiThread { syncGameScreen() }
+        }
+        override val screenFilter get() = Prefs(this@PokeDaisyActivity).screenFilter
+        override fun setScreenFilter(filter: ScreenFilter) {
+            Prefs(this@PokeDaisyActivity).screenFilter = filter
             runOnUiThread { syncGameScreen() }
         }
         override val hasSecondScreen get() = presentation != null
@@ -446,13 +460,17 @@ class PokeDaisyActivity : Activity() {
         unlockSound?.release()
         unlockSound = GameClickSound(filesDir, crc, GameClickSound.FANFARE)
         ffMusicRenderer?.stop()
-        ffMusicRenderer = FfMusicRenderer(r, crc, ffMusicCache, clickSound, unlockSound).also { it.start() }
+        // A Game Boy / Color game: none of the GBA ROM scans below apply (m4a music,
+        // GBA art fingerprints, FireRed's region_map.c); its click is borrowed.
+        val gameBoy = RomIdentity.isGameBoy(r)
+        romIsGameBoy = gameBoy
+        ffMusicRenderer = if (gameBoy) null else FfMusicRenderer(r, crc, ffMusicCache, clickSound, unlockSound).also { it.start() }
         // FireRed / Emerald party-menu art and region maps come from the ROM
         // itself, once per ROM (see RomArt) - nothing of the game is bundled.
-        RomArt.prefetch(filesDir, crc, r)
+        if (!gameBoy) RomArt.prefetch(filesDir, crc, r) else com.pokedaisy.app.companion.data.Gen1Art.prefetch(filesDir, r)
         // A FireRed-engine hack's own region map (Unbound, Odyssey, ...), read
         // from the ROM on every launch - a few KB of reads (see RomRegionMap).
-        RomRegionMap.load(filesDir, crc, r)
+        if (!gameBoy) RomRegionMap.load(filesDir, crc, r)
         // SMART FF steps aside while the game's region map or a menu is up (see EmulatorEngine).
         RegionMapWatch.load(r)
         val (menuField, menuBattle) = Prefs(this).ffMenuCallbacks(crc)
@@ -467,8 +485,15 @@ class PokeDaisyActivity : Activity() {
         FfMenuWatch.onLearned = { field, battle -> Prefs(appContext).setFfMenuCallbacks(crc, field, battle) }
 
         engine = EmulatorEngine(input, states!!, ffMusicCache).apply {
+            gba = !gameBoy
             onCoreReady = { w, h ->
-                MgbaCore.pkVideoBuffer()?.let { buf -> runOnUiThread { view.bindCore(buf, w, h) } }
+                MgbaCore.pkVideoBuffer()?.let { buf ->
+                    runOnUiThread {
+                        stage.aspect = w.toFloat() / h   // 3:2, or a Game Boy's 10:9
+                        touchControls.shoulders = !gameBoy
+                        view.bindCore(buf, w, h)
+                    }
+                }
             }
             onStateResult = { action, slot, ok ->
                 val msg = when (action) {
@@ -713,14 +738,16 @@ class PokeDaisyActivity : Activity() {
         setContentView(view)
     }
 
-    /** Show the status bar above the game per SETTINGS > STATUS BAR, and fit or
-     * stretch the game per SETTINGS > ASPECT. */
+    /** Show the status bar above the game per SETTINGS > STATUS BAR, fit or
+     * stretch the game per SETTINGS > ASPECT, and draw it through SETTINGS > SHADERS. */
     private fun syncGameScreen() {
         if (!::statusBar.isInitialized) return
         val prefs = Prefs(this)
         statusBar.visibility = if (prefs.statusBar) View.VISIBLE else View.GONE
         (statusBar.parent as? GameStageLayout)?.stretch = prefs.stretchGame
         view.stretch = prefs.stretchGame
+        view.gbaColors = prefs.gbaColors
+        view.screenEffect = ScreenShaders.effectFor(prefs.screenFilter)
     }
 
     /**

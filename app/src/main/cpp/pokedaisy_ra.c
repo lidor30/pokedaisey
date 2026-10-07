@@ -23,6 +23,8 @@
 #include <mgba/core/core.h>
 #include <mgba/internal/gba/gba.h>
 #include <mgba/internal/gba/memory.h>
+#include <mgba/internal/gb/gb.h>
+#include <mgba/internal/gb/memory.h>
 
 #include "rc_client.h"
 #include "rc_consoles.h"
@@ -107,10 +109,33 @@ static uint32_t raReadMemory(uint32_t address, uint8_t* buffer, uint32_t num_byt
     return n;
 }
 
+// RA's Game Boy / Color map: $0000-$FFFF the CPU bus (WRAM bank 1 fixed at $D000),
+// then $10000-$15FFF the Color's WRAM banks 2-7.
+static uint32_t raReadMemoryGb(struct mCore* core, uint32_t address, uint8_t* buffer, uint32_t num_bytes) {
+    struct GB* gb = core->board;
+    uint32_t done = 0;
+    for (; done < num_bytes; done++) {
+        uint32_t a = address + done;
+        if (a >= 0xD000 && a < 0xE000) {
+            buffer[done] = gb->memory.wram[0x1000 + (a - 0xD000)];
+        } else if (a < 0x10000) {
+            buffer[done] = (uint8_t) core->busRead8(core, a);
+        } else if (a < 0x16000) {
+            buffer[done] = gb->memory.wram[0x2000 + (a - 0x10000)];
+        } else {
+            break;
+        }
+    }
+    return done;
+}
+
 static uint32_t raReadMemoryImpl(uint32_t address, uint8_t* buffer, uint32_t num_bytes) {
     struct mCore* core = pkMainCore();
     if (!core) {
         return 0;
+    }
+    if (core->platform(core) == mPLATFORM_GB) {
+        return raReadMemoryGb(core, address, buffer, num_bytes);
     }
     uint32_t done = 0;
     while (done < num_bytes) {
@@ -435,6 +460,18 @@ RA_FN(raLoadGame)(JNIEnv* env, jobject thiz) {
     struct mCore* core = pkMainCore();
     if (!core || !ra_client) {
         return JNI_FALSE;
+    }
+    if (core->platform(core) == mPLATFORM_GB) {
+        // Hashed the same way (MD5 of the file); a Color-only cart (0x143 = 0xC0) is a
+        // GBC game to RA, a dual-mode one (Yellow, Gold/Silver: 0x80) a Game Boy one.
+        struct GB* gb = core->board;
+        if (!gb->memory.rom || gb->pristineRomSize < 0x150) {
+            return JNI_FALSE;
+        }
+        uint32_t console = gb->memory.rom[0x143] == 0xC0 ? RC_CONSOLE_GAMEBOY_COLOR : RC_CONSOLE_GAMEBOY;
+        rc_client_begin_identify_and_load_game(ra_client, console, NULL,
+            (const uint8_t*) gb->memory.rom, gb->pristineRomSize, raGameLoaded, NULL);
+        return JNI_TRUE;
     }
     struct GBA* gba = core->board;
     if (!gba->memory.rom || !gba->pristineRomSize) {

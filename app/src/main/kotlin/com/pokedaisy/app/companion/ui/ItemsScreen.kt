@@ -352,6 +352,22 @@ private val SoulGoldBag = BagPalette(
     backdropArt = RomArt.BAG_STARS_SOULGOLD,
 )
 
+/**
+ * Pokémon Yellow (Game Boy): Gen 1's ITEM window - black text on white inside the
+ * text box's double line (black, white, black), no shadows, no row lines.
+ */
+private val YellowBag = BagPalette(
+    panelLayers = listOf(Color(0xFF181818) to 1, Color.White to 1, Color(0xFF181818) to 1, Color.White to 1),
+    tabLayerCount = 3,
+    fill = Color.White, divider = null,
+    text = Color(0xFF181818), textShadow = Color.Transparent,
+    tabText = Color(0xFF181818), tabTextShadow = Color.Transparent, tabUnderline = Color(0xFF181818),
+    descLayers = listOf(Color(0xFF181818) to 1, Color.White to 1, Color(0xFF181818) to 1), descFill = Color.White,
+    descText = Color(0xFF181818), descTextShadow = Color.Transparent,
+    iconBox = Color.White, iconBoxEdge = Color(0xFF181818),
+    backdrop = Color.White to Color.White,
+)
+
 /** Whether [ItemsBackdrop] replaces the party backdrop behind this game's Items tab. */
 fun hasItemsBackdrop(game: GameKind): Boolean = bagPaletteFor(game).backdrop != null
 
@@ -406,6 +422,7 @@ private fun bagPaletteFor(game: GameKind): BagPalette = when (game) {
     GameKind.LAZARUS, GameKind.EMERALD_SEAGLASS -> PlainExpansionBag
     GameKind.ROWE -> RoweBag
     GameKind.SOULGOLD -> SoulGoldBag
+    GameKind.YELLOW -> YellowBag
     // Too Many Types 2's bag is Emerald's; Gaia's and Celia's are FireRed's.
     GameKind.TMT2 -> EmeraldBag
     else -> FireRedBag
@@ -432,7 +449,8 @@ fun ItemsScreen(items: List<ItemView>, modifier: Modifier = Modifier) {
     // (e.g. no Key Items exported by a pre-v4 ROM) shouldn't show as a dead
     // tab with nothing behind it.
     val categoriesPresent = pocketOrder.filter { p -> items.any { it.pocket == p } }
-    val tabs = listOf<Int?>(null) + categoriesPresent
+    // A bag of one pocket (Gen 1's single list) needs no tab besides ALL.
+    val tabs = listOf<Int?>(null) + categoriesPresent.takeIf { it.size > 1 }.orEmpty()
     val capsLabels = capsBagLabels(activeGame)
     val tabLabels = tabs.map { if (capsLabels) capsPocketLabel(it) else titlePocketLabel(it) }
     val sortLabel = { s: ItemSort -> tr(s.label).let { if (capsLabels) it.uppercase() else it } }

@@ -233,6 +233,26 @@ with smol art (`SG_REGION_*` -> `regionmap/soulgold.png`) and a u16 cursor grid
 (`RegionLayout(cellBytes = 2)`, two layers), placed a row higher than Emerald's: offset (1, 1). Its
 POKéDEX (`POKEDEX_SOULGOLD`): no Emerald-style nationalMagic (the game never sets one), so the tab
 opens on Johto like the game; FLAG_SYS_POKEDEX_GET is 0x98D (to open its dex headlessly).
+**Game Boy / Color (Pokémon Yellow first)**: mGBA's GB core is on (`M_CORE_GB`; `pk_gb_config` turns
+SGB borders off so Red/Blue/Yellow give 160x144, not 256x224); `pkPlatform()` / `RomIdentity.isGameBoy`
+(the header logo at 0x104) tell the platforms apart, and every GBA-only path stays off for GB: `pk_call` /
+park / `pkFindMagic` / `pkRomCode` return early, the engine's watchers (`EmulatorEngine.gba`), FF music
+renders, `RomArt` / `RomRegionMap`; the stage takes the core's aspect (10:9) and the touch pad drops L/R.
+RetroAchievements identifies GB carts too (console 4, or 6 for a Color-only cart; RA's GB memory map).
+A GB cart is bank-switched, so the Poller hashes it through `pkRomRead` (the cart buffer), not the bus.
+Yellow's addresses are pret/pokeyellow's symbols - its build is byte-identical to retail, so build it
+(rgbds 1.0.3 in Docker) for `pokeyellow.sym` rather than guessing (Red/Blue's WRAM is Yellow's + 1).
+`Gen1Reader.kt` reads WRAM (big-endian party_struct / battle_struct, internal species -> Dex number via
+PokedexOrder); tables from `scripts/gen_gen1_tables.py` in the game's own ALL-CAPS. **The look is the
+game's** (the user's rule: match it even with fewer colours): `Gen1Art` rebuilds the font (8x8 1bpp
+FontGraphics -> a TrueType file, `BitmapTtf`, Pixel Operator's 100-unit pixel; `LocalGameFont` from
+CompanionScreen makes every `GbaText` use it), the party icons (MonPartySpritePointers into a virtual
+VRAM, mirrored halves, the GBC party menu's white / yellow / black), the town map (CompressedMap RLE,
+CGB PAL_TOWNMAP) and the player's town-map sprite into rom-art; `OptionColors` / PlatinumButton /
+`YellowPartyPalette` / `YellowBag` / `MapLabelStyle.GEN1` switch to Gen 1's black-on-white windows (the
+text box's double line) while YELLOW runs. Headless: `mgba_dump`'s `dump` writes `wram.bin` (C000-DFFF)
++ `hram.bin` for a GB core, which `FixtureMemoryReader` loads; a wild battle = poke wCurEnemyLevel
+(0xD126) and wCurOpponent (0xD058, an internal species index) on the field.
 **No empty BATTLE tab**: the tab (and the jump to it) needs `SnapshotView.showsBattle` - in a
 battle *and* something read (a battler, the foe's party or the battle input state). A game whose
 battle memory isn't mapped stays on its tabs instead of showing a blank INFO page. Seaglass's battle
@@ -367,6 +387,16 @@ the top screen - `EmulatorView.stretch` drops the quad's letterbox and `GameStag
 game all the space under the status bar. The bottom screen flips it in place; the top-screen Settings opens
 `AspectPicker` (both choices drawn as the top screen in miniature, with the newest savestate thumbnail, else a
 drawn stand-in) and the game picks it up on resume (`syncGameScreen`).
+**SHADERS** (a sub-page of SETTINGS on either screen; `EmulatorView.FrameRenderer`, shaders in
+`ScreenShaders.kt`): FILTER (`Prefs.screenFilter`: NONE / LCD / SCANLINES / CRT) and GBA COLORS
+(`Prefs.gbaColors`, mGBA's `gba-color`), which stack. GBA COLORS runs into an FBO at the GBA's own size. A
+`prescale` effect (LCD, SCANLINES: mGBA's MIT shaders, hard-edged) draws into an FBO at the largest whole
+multiple of 240x160 that fits per axis, then LINEAR-scales onto the view, so its grid stays even at the
+Thor's 6.75x; a direct one (CRT, ours: gaussian beams + a 1-view-pixel RGB mask on `gl_FragCoord`) is the
+view pass itself. Every texture keeps the frame's top-first row order (`vUv.y` runs down the game); only
+the view pass flips. Shaders get `uTex` / `vUv` / `uTexSize`. None of it shows in Paparazzi / ui-preview:
+screenshot the Thor (`adb exec-out screencap -p -d <display id>`), or run the real shader strings in WebGL
+(GLSL ES 1.0, same as GLES2) in the browser pane - how the CRT was tuned, on a 240x160 frame at 1620x1080.
 
 **RetroAchievements** (`achievements/RetroAchievements.kt` + `RaNative.kt`, native
 `app/src/main/cpp/pokedaisy_ra.c`): rcheevos' `rc_client` over the player's core (`pkMainCore()`,

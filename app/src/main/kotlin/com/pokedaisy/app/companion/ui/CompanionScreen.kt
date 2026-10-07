@@ -68,6 +68,8 @@ import com.pokedaisy.app.companion.DEFAULT_COMPANION_TABS
 import com.pokedaisy.app.companion.MAX_BAR_TABS
 import com.pokedaisy.app.companion.ui.theme.QolColors
 import com.pokedaisy.app.companion.ui.theme.QolTheme
+import com.pokedaisy.app.companion.ui.theme.LocalGameFont
+import com.pokedaisy.app.companion.ui.theme.rememberGameFont
 
 /** The whole bottom-screen companion, driven by a single [SnapshotView]. */
 @Composable
@@ -96,7 +98,9 @@ fun CompanionScreen(
     // (backdrops, party slots, bag) reads the plain `activeGame` global, which
     // Compose can't observe - without the key a freshly launched game kept the
     // previous game's backdrop until something else happened to recompose.
-    CompositionLocalProvider(LocalCompanionBack provides back, LocalClickSound provides clickSound) { QolTheme { key(snapshot.game) {
+    CompositionLocalProvider(
+        LocalCompanionBack provides back, LocalClickSound provides clickSound, LocalGameFont provides rememberGameFont(snapshot.game),
+    ) { QolTheme { key(snapshot.game) {
         val game = snapshot.game
         // Until the first real data arrives (the ROM takes a few seconds to
         // boot / be detected) the data tabs show a loading animation.
@@ -550,8 +554,7 @@ private fun TabChipShell(
                 // Idle tabs take the list window's frame + grey; the selected
                 // one the title window's white, like the OPTION screen's cursor row.
                 val px = u.toPx()
-                if (selected) drawLayeredBox(OptionColors.titleLayers.inPx(px), OptionColors.titleFill, radius = 3 * px)
-                else drawLayeredBox(OptionColors.titleLayers.inPx(px), OptionColors.listFill, radius = 3 * px)
+                drawLayeredBox(OptionColors.titleLayers.inPx(px), if (selected) OptionColors.tabSelectedFill else OptionColors.tabIdleFill, radius = 3 * px)
             }
             .soundClickable(interactionSource = noRipple, indication = null, enabled = enabled, onClick = onClick)
             .padding(horizontal = u * 2, vertical = u * 6),

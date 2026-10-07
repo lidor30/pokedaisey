@@ -141,7 +141,7 @@ internal fun NavButton(
         enabled = enabled,
         contentPadding = PaddingValues(0.dp),
         onClick = onClick,
-    ) { PixelIcon(icon, Color.White, Modifier.size(26.dp)) }
+    ) { PixelIcon(icon, buttonContent, Modifier.size(26.dp)) }
 }
 
 /** The party as a row of raised buttons, one per Pokémon: the one shown is

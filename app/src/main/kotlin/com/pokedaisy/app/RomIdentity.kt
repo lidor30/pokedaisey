@@ -19,6 +19,13 @@ object RomIdentity {
     fun gameCode(rom: File): String? =
         RomArchive.readAt(rom, 0xACL, 4)?.takeIf { it.size == 4 }?.let { String(it, Charsets.US_ASCII) }
 
+    /** A Game Boy / Color cart: its header's Nintendo logo starts CE ED 66 66 at 0x104
+     * (a GBA ROM has ARM code there). */
+    fun isGameBoy(rom: File): Boolean =
+        RomArchive.readAt(rom, 0x104L, 4)?.contentEquals(GB_LOGO_START) == true
+
+    private val GB_LOGO_START = byteArrayOf(0xCE.toByte(), 0xED.toByte(), 0x66, 0x66)
+
     /** The header's 12-character internal title at 0x0A0 (`POKEMON FIRE`, …). */
     fun headerTitle(rom: File): String? =
         RomArchive.readAt(rom, 0xA0L, 12)?.takeIf { it.size == 12 }

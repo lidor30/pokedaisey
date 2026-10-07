@@ -16,6 +16,9 @@ package com.pokedaisy.app.companion.data
 class FixtureMemoryReader private constructor(
     private val ewram: ByteArray,
     private val iwram: ByteArray,
+    // A Game Boy / Color fixture (wram.bin / hram.bin, mgba_dump's GB `dump`) instead:
+    // WRAM at 0xC000 (the bank in D000 at capture time), HRAM at 0xFF80.
+    private val gbRegions: List<Pair<Long, ByteArray>> = emptyList(),
 ) : MemoryReader {
     override fun readCoreMemory(addr: Long, size: Int): ByteArray {
         val (base, buf) = regionFor(addr, size)
@@ -29,6 +32,7 @@ class FixtureMemoryReader private constructor(
     }
 
     private fun regionFor(addr: Long, size: Int): Pair<Long, ByteArray>? = when {
+        gbRegions.isNotEmpty() -> gbRegions.firstOrNull { (base, buf) -> addr >= base && addr + size <= base + buf.size }
         addr >= EWRAM_BASE && addr + size <= EWRAM_BASE + ewram.size -> EWRAM_BASE to ewram
         addr >= IWRAM_BASE && addr + size <= IWRAM_BASE + iwram.size -> IWRAM_BASE to iwram
         else -> null
@@ -61,11 +65,11 @@ class FixtureMemoryReader private constructor(
         /** [key] must match a directory under app/src/test/resources/fixtures/
          * (and a line in scripts/roms.conf - that's where it came from). */
         fun load(key: String): FixtureMemoryReader {
-            fun read(name: String): ByteArray {
-                val path = "fixtures/$key/$name"
-                val stream = FixtureMemoryReader::class.java.classLoader.getResourceAsStream(path)
-                    ?: error("missing test fixture $path - run scripts/capture_fixture.sh $key first")
-                return stream.use { it.readBytes() }
+            fun stream(name: String) = FixtureMemoryReader::class.java.classLoader.getResourceAsStream("fixtures/$key/$name")
+            fun read(name: String): ByteArray = stream(name)?.use { it.readBytes() }
+                ?: error("missing test fixture fixtures/$key/$name - run scripts/capture_fixture.sh $key first")
+            if (stream("wram.bin") != null) {
+                return FixtureMemoryReader(ByteArray(0), ByteArray(0), listOf(0xC000L to read("wram.bin"), 0xFF80L to read("hram.bin")))
             }
             return FixtureMemoryReader(read("ewram.bin"), read("iwram.bin"))
         }

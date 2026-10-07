@@ -47,7 +47,8 @@ data class ExpProgress(val total: Long, val levelStart: Long, val nextLevel: Lon
 /** Vanilla Gen 3 growth-rate tables (ExpTables.kt) - FireRed and Emerald share them. */
 fun expProgress(species: Int, level: Int, exp: Long?): ExpProgress? {
     if (exp == null || level !in 1..100) return null
-    if (activeGame != GameKind.FIRERED && activeGame != GameKind.EMERALD) return null
+    // Gen 1's growth rates and curves are Gen 3's for the first 151 (Yellow's species are Dex numbers here).
+    if (activeGame != GameKind.FIRERED && activeGame != GameKind.EMERALD && activeGame != GameKind.YELLOW) return null
     val rate = gen3GrowthRates.getOrNull(species)?.toInt() ?: return null
     val table = gen3ExperienceTables.getOrNull(rate) ?: return null
     val start = table[level].toLong()
@@ -153,7 +154,7 @@ private val gamesWithoutRegionData = setOf(GameKind.ODYSSEY)
 fun lookupLocation(regionMapSectionId: Int): LocationView {
     // A FireRed-engine hack's own map, read from its ROM, over the bundled
     // tables; FireRed itself keeps those (they carry its title-cased names).
-    val rom = if (activeGame == GameKind.FIRERED) null else RomRegionMap.current
+    val rom = if (activeGame == GameKind.FIRERED || activeGame == GameKind.YELLOW) null else RomRegionMap.current
     if (rom == null && activeGame in gamesWithoutRegionData) return LocationView("", null, 0, 0, 0, 0)
     val images = rom?.images ?: activeRegionMapImages
     val info = (rom?.sections ?: activeMapSecData)[regionMapSectionId]

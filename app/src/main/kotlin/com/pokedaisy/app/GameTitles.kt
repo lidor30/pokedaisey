@@ -46,9 +46,11 @@ object GameTitles {
         "b9f4d332d30fc88c379f9e037f9eae3b2755ead4" to "Pokémon Emerald Seaglass",
         "ea5d369cc8a31cbf1cfacb7c9470ea670f08957b" to "Pokémon SoulGold",
         "805d880ee229fb6dc3ce03d7b03baf48f0d759d0" to "Pokémon SoulGold",
+        // Game Boy (pret/pokeyellow's roms.sha1).
+        "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1" to "Pokémon Yellow",
     )
 
-    /** Only these games' ROMs are worth hashing: every entry above is one of them. */
+    /** Only these games' ROMs (and Game Boy carts) are worth hashing: every entry above is one of them. */
     private val CODES = setOf("BPRE", "BPGE", "BPEE", "AXVE", "AXPE")
 
     /** What the library shows for [rom]: the player's RENAME, else [defaultLabel]. Cheap. */
@@ -74,7 +76,8 @@ object GameTitles {
         var changed = false
         for (rom in roms) {
             if (cache[rom.absolutePath]?.matches(rom) == true || !rom.isFile) continue
-            val title = if (RomIdentity.gameCode(rom) in CODES) RomIdentity.sha1(rom)?.let { BY_SHA1[it] } else null
+            val worthHashing = RomIdentity.gameCode(rom) in CODES || RomIdentity.isGameBoy(rom)
+            val title = if (worthHashing) RomIdentity.sha1(rom)?.let { BY_SHA1[it] } else null
             cache[rom.absolutePath] = Entry(rom.length(), rom.lastModified(), title)
             changed = true
         }

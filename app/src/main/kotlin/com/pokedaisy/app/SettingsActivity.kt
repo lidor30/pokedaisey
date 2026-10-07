@@ -76,6 +76,7 @@ import com.pokedaisy.app.companion.ui.OptionListWindow
 import com.pokedaisy.app.companion.ui.OptionRows
 import com.pokedaisy.app.companion.ui.OptionSelector
 import com.pokedaisy.app.companion.FfMode
+import com.pokedaisy.app.companion.ScreenFilter
 import com.pokedaisy.app.companion.FfMusicMode
 import com.pokedaisy.app.companion.ui.OptionTextField
 import com.pokedaisy.app.companion.ui.OptionTitleWindow
@@ -99,7 +100,7 @@ import com.pokedaisy.app.companion.ui.drawPixelRoundRect
  */
 class SettingsActivity : ComponentActivity() {
 
-    private enum class Screen { HOME, HOTKEYS, CONTROLS, FOLDERS, COVER_ART, HIDDEN, ACHIEVEMENTS }
+    private enum class Screen { HOME, HOTKEYS, CONTROLS, SHADERS, FOLDERS, COVER_ART, HIDDEN, ACHIEVEMENTS }
 
     private lateinit var prefs: Prefs
     private var screen by mutableStateOf(Screen.HOME)
@@ -184,6 +185,7 @@ class SettingsActivity : ComponentActivity() {
                         Screen.HOME -> tk("SETTINGS")
                         Screen.HOTKEYS -> tk("HOTKEYS")
                         Screen.CONTROLS -> tk("GAME BUTTONS")
+                        Screen.SHADERS -> tk("SHADERS")
                         Screen.FOLDERS -> tk("FOLDERS")
                         Screen.COVER_ART -> tk("COVER ART")
                         Screen.HIDDEN -> tk("HIDDEN GAMES")
@@ -200,6 +202,7 @@ class SettingsActivity : ComponentActivity() {
                     Screen.HOME -> HomeScreen(m)
                     Screen.HOTKEYS -> HotkeysScreen(m, small)
                     Screen.CONTROLS -> ControlsScreen(m, small)
+                    Screen.SHADERS -> ShadersScreen(m)
                     Screen.FOLDERS -> FoldersScreen(m, small)
                     Screen.COVER_ART -> CoverArtScreen(m, small)
                     Screen.HIDDEN -> HiddenScreen(m, small)
@@ -323,6 +326,8 @@ class SettingsActivity : ComponentActivity() {
             },
             // The game at 3:2 or stretched to fill the screen; picked by preview.
             SettingRow(tk("ASPECT"), aspectLabel(prefs.stretchGame)) { aspectPicker = true },
+            // FILTER (LCD / SCANLINES / CRT) and GBA COLORS, on their own page.
+            SettingRow(tk("SHADERS"), prefs.screenFilter.label) { screen = Screen.SHADERS },
             // Game and companion trade screens; the game picks it up on resume.
             SettingRow(tk("SWAP SCREENS"), onOff(prefs.swapScreens)) {
                 prefs.swapScreens = !prefs.swapScreens
@@ -366,6 +371,31 @@ class SettingsActivity : ComponentActivity() {
             }
             Spacer(Modifier.height(m.u * 4))
             AboutFooter(m)
+        }
+    }
+
+    /** SHADERS: what the game is drawn through, like the companion's page; the game picks it up on resume. */
+    @Composable
+    private fun ShadersScreen(m: GbaTextMetrics) {
+        @Suppress("UNUSED_EXPRESSION") revision
+        val filters = ScreenFilter.entries
+        val rows = listOf(
+            // NONE / LCD grid / SCANLINES / CRT.
+            SettingRow(tk("FILTER"), prefs.screenFilter.label) {
+                selector = Selector(tk("FILTER"), filters.map { it.label }, prefs.screenFilter.label) { l ->
+                    prefs.screenFilter = filters.first { it.label == l }
+                }
+            },
+            // The colours as the GBA's own LCD showed them; stacks with any filter.
+            SettingRow(tk("GBA COLORS"), if (prefs.gbaColors) tk("ON") else tk("OFF")) {
+                prefs.gbaColors = !prefs.gbaColors
+                revision++
+            },
+        )
+        Column(Modifier.fillMaxWidth()) {
+            OptionListWindow(m, Modifier.fillMaxWidth().weight(1f, fill = false)) {
+                GroupedRows(rows, m, cursor = -1, onClick = { rows[it].onClick() })
+            }
         }
     }
 

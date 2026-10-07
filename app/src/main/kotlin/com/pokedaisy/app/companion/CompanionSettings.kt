@@ -96,6 +96,14 @@ interface CompanionSettings {
     val stretchGame: Boolean
     fun setStretchGame(on: Boolean)
 
+    /** The GBA LCD's colours on the game - see [Prefs.gbaColors]. */
+    val gbaColors: Boolean
+    fun setGbaColors(on: Boolean)
+
+    /** The screen effect over the game - see [Prefs.screenFilter]. */
+    val screenFilter: ScreenFilter
+    fun setScreenFilter(filter: ScreenFilter)
+
     /** Whether there's a second screen - SWAP SCREENS only shows then. */
     val hasSecondScreen: Boolean get() = false
 
@@ -144,6 +152,17 @@ enum class FfMode(val label: String) {
     NORMAL(tk("NORMAL")),
 }
 
+
+/** SETTINGS > SHADERS > FILTER: the screen effect drawn over the game (EmulatorView, ScreenShaders),
+ * in the order the selector lists them. [label] stays English; the rows translate it. */
+enum class ScreenFilter(val label: String) {
+    NONE(tk("NONE")),
+    /** The GBA's pixel grid. */
+    LCD(tk("LCD")),
+    SCANLINES(tk("SCANLINES")),
+    /** Soft scanline beams and an RGB mask. */
+    CRT(tk("CRT")),
+}
 
 /**
  * What fast-forward sounds like, in the order SETTINGS lists them. [label] is
