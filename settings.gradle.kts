@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PokeDaisey"
+rootProject.name = "PokeDaisy"
 include(":app")

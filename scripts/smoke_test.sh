@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Device regression smoke test: launches PokeDaisey against every ROM listed
+# Device regression smoke test: launches PokeDaisy against every ROM listed
 # in roms.conf (in turn, on the connected device/emulator) and checks the
-# telemetry log line PokeDaisey already prints ~1x/sec
+# telemetry log line PokeDaisy already prints ~1x/sec
 # (TelemetryStore.refresh()) looks healthy - connected, a non-empty party,
 # and (new 2026-09-22) more than one distinct item POCKET represented, so a
 # regression that silently collapses categorization back to one bucket (the
@@ -27,7 +27,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONF="$SCRIPT_DIR/roms.conf"
 SERIAL="${1:-}"
 WAIT_SECS="${2:-10}"
-PKG="com.pokedaisey.app"
+PKG="com.pokedaisy.app"
 
 ADB=(adb)
 if [[ -n "$SERIAL" ]]; then
@@ -64,7 +64,7 @@ for conf_line in "${conf_lines[@]}"; do
     # the DEVICE's /system/bin/sh, which chokes on the parens/spaces most of
     # these ROM filenames have unless the path is quoted for THAT shell (not
     # just the local one) - single-quote it inside one shell string.
-    if ! "${ADB[@]}" shell "am start -n '$PKG/.PokeDaiseyActivity' --es rom '$path'" >/dev/null 2>&1 </dev/null; then
+    if ! "${ADB[@]}" shell "am start -n '$PKG/.PokeDaisyActivity' --es rom '$path'" >/dev/null 2>&1 </dev/null; then
         echo "FAIL  $label — am start failed (is the debug APK installed? scripts/roms.conf path exist on device?)"
         fail=$((fail + 1))
         fail_labels+=("$label: am start failed")
@@ -73,7 +73,7 @@ for conf_line in "${conf_lines[@]}"; do
 
     sleep "$WAIT_SECS"
 
-    line="$("${ADB[@]}" logcat -d 2>/dev/null | grep 'pokedaisey: telemetry' | tail -1)"
+    line="$("${ADB[@]}" logcat -d 2>/dev/null | grep 'pokedaisy: telemetry' | tail -1)"
     if [[ -z "$line" ]]; then
         echo "FAIL  $label — no telemetry line within ${WAIT_SECS}s (ROM crashed, hung, or isn't detected at all)"
         fail=$((fail + 1))

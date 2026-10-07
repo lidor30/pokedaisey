@@ -1,0 +1,465 @@
+package com.pokedaisy.app.companion.data
+
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.util.zip.CRC32
+import java.util.zip.Deflater
+
+/**
+ * FireRed / Emerald art the companion draws with - the party menu's slot,
+ * Poke Ball, status icons, small font and backdrop, the region maps and their
+ * player icons - is
+ * rebuilt from the player's own ROM instead of being bundled. The first time
+ * a ROM is played, [prefetch] scans it once for each [RomBlob] (found by
+ * fingerprint, so retail, QoL builds and hacks that kept the art all work),
+ * composes the same PNGs the app used to ship under the same paths
+ * (`partyfr/slot_normal.png`, `regionmap/kanto.png`, ...) and keeps them in
+ * [DIR] under filesDir for every later launch, whichever game is running.
+ *
+ * Colours use mGBA's 5->8 bit expansion, like the party-slot generator.
+ */
+object RomArt {
+    const val DIR = "rom-art"
+
+    /** Bump when [OUTPUTS] grows, so ROMs scanned before get scanned again. */
+    private const val SCAN_VERSION = 7
+
+    /** Bumped whenever new art lands on disk, so loaders can retry. */
+    val updates: StateFlow<Int> get() = _updates
+    private val _updates = MutableStateFlow(0)
+
+    @Volatile private var running = false
+
+    /** Tells loaders new art landed in [dir] (see [RomRegionMap]). */
+    internal fun announce() {
+        _updates.value++
+    }
+
+    /** Swappable so tests / previews can keep the art elsewhere (Paparazzi has no filesDir). */
+    @Volatile
+    var dirOverride: File? = null
+
+    /** Where the art lives: [DIR] under the app's filesDir. */
+    fun dir(filesDir: File?): File = dirOverride ?: File(filesDir, DIR)
+
+    /** The cached file for an art [path], or null if no ROM has supplied it yet. */
+    fun file(filesDir: File?, path: String): File? = File(dir(filesDir), path).takeIf { it.isFile }
+
+    /**
+     * Scans [rom] in the background unless a ROM with this [romKey] was
+     * already scanned, or every file is already cached. A few hundred ms, once.
+     */
+    fun prefetch(filesDir: File, romKey: String, rom: File) {
+        val dir = dir(filesDir)
+        val marker = File(dir, "scanned/v$SCAN_VERSION-$romKey")
+        if (marker.isFile || running || OUTPUTS.all { File(dir, it).isFile }) return
+        running = true
+        Thread({
+            try {
+                val t0 = System.nanoTime()
+                val wrote = extractTo(readChunked(rom), dir)
+                marker.parentFile?.mkdirs()
+                marker.writeText(wrote.joinToString("\n"))
+                android.util.Log.i("pokedaisy", "RomArt: ${wrote.size} new files from ${rom.name} in ${(System.nanoTime() - t0) / 1_000_000} ms")
+                if (wrote.isNotEmpty()) _updates.value++
+            } catch (t: Throwable) {
+                android.util.Log.w("pokedaisy", "RomArt: scan failed", t)
+            } finally {
+                running = false
+            }
+        }, "pokedaisy-rom-art").apply { isDaemon = true; start() }
+    }
+
+    /** The whole file, 1 MiB per read: one 32 MiB read holds a JNI critical lock (stalling GC) for ~20 ms. */
+    private fun readChunked(f: File): ByteArray {
+        val out = ByteArray(f.length().toInt())
+        f.inputStream().use { s ->
+            var o = 0
+            while (o < out.size) {
+                val n = s.read(out, o, minOf(1 shl 20, out.size - o))
+                if (n < 0) break
+                o += n
+            }
+        }
+        return out
+    }
+
+    /** Writes every art file [rom] can supply that [dir] doesn't have yet; returns their paths. */
+    fun extractTo(rom: ByteArray, dir: File): List<String> {
+        val wanted = OUTPUTS.filter { !File(dir, it).isFile }
+        if (wanted.isEmpty()) return emptyList()
+        val found = find(rom)
+        val images = compose(found)
+        val raw = raw(found)
+        return wanted.mapNotNull { path ->
+            val bytes = images[path]?.png() ?: raw[path] ?: return@mapNotNull null
+            val f = File(dir, path)
+            f.parentFile?.mkdirs()
+            val tmp = File(f.parentFile, f.name + ".tmp")
+            tmp.writeBytes(bytes)
+            tmp.renameTo(f)
+            path
+        }
+    }
+
+    /** The region map's player icons (16x16 heads) by art name: FireRed's Red / Leaf, Emerald's Brendan / May. */
+    private val PLAYER_ICONS = listOf(
+        "player_red" to (RomBlob.FR_PLAYER_RED_GFX to RomBlob.FR_PLAYER_PAL),
+        "player_leaf" to (RomBlob.FR_PLAYER_LEAF_GFX to RomBlob.FR_PLAYER_PAL),
+        "player_brendan" to (RomBlob.EM_PLAYER_BRENDAN_GFX to RomBlob.EM_PLAYER_BRENDAN_PAL),
+        "player_may" to (RomBlob.EM_PLAYER_MAY_GFX to RomBlob.EM_PLAYER_MAY_PAL),
+    )
+
+    /** SoulGold's bag screen backdrop (ItemsScreen's BagPalette.backdropArt). */
+    const val BAG_STARS_SOULGOLD = "bagbg/soulgold.png"
+
+    /** Every file [compose] can make. */
+    val OUTPUTS: List<String> = run {
+        val slots = listOf("normal", "selected", "fainted", "selected_fainted", "nohp_normal", "nohp_selected")
+        listOf("partyfr", "partyem").flatMap { d ->
+            slots.map { "$d/slot_$it.png" } + listOf("$d/pokeball.png", "$d/status_icons.png", "$d/font_small.png")
+        } + listOf("partybg/firered.png", "partybg/emerald.png") +
+            listOf("kanto", "sevii123", "sevii45", "sevii67", "hoenn", "seaglass", "lazarus", "soulgold").map { "regionmap/$it.png" } +
+            PLAYER_ICONS.map { "regionmap/${it.first}.png" } +
+            listOf(BAG_STARS_SOULGOLD) +
+            TrainerCardArt.BLOBS.map { rawPath(it) }
+    }
+
+    /** Blobs kept as decoded bytes rather than composed ([TrainerCardArt] draws from them). */
+    fun rawPath(b: RomBlob) = "trainercard/${b.name.lowercase()}.bin"
+
+    /** The decoded bytes of every [TrainerCardArt.BLOBS] blob [found], by art path. */
+    fun raw(found: Map<RomBlob, ByteArray>): Map<String, ByteArray> =
+        TrainerCardArt.BLOBS.mapNotNull { b -> found[b]?.let { rawPath(b) to it } }.toMap()
+
+
+    /** ARGB pixels, 0 = transparent. */
+    class Image(val width: Int, val height: Int, val argb: IntArray = IntArray(width * height)) {
+        fun png(): ByteArray = Png.encode(this)
+    }
+
+    // --- finding the blobs ---
+
+    private fun fmix(k0: Long): Long {
+        var k = k0
+        k = k xor (k ushr 33); k *= -0xae502812aa7333L // 0xFF51AFD7ED558CCD
+        k = k xor (k ushr 33); k *= -0x3b314601e57a13adL // 0xC4CEB9FE1A85EC53
+        return k xor (k ushr 33)
+    }
+
+    /** The 16-byte window hash the generator stored as [RomBlob.head]. */
+    internal fun head(b: ByteBuffer, i: Int): Long = fmix(b.getLong(i) xor fmix(b.getLong(i + 8)))
+
+    /** [RomBlob.pre] of the 8 bytes [a] (little-endian): the scan's per-byte filter. */
+    private fun pre(a: Long): Int = ((a * -0x61c8864680b583ebL) ushr 48).toInt() // 0x9E3779B97F4A7C15
+
+    /**
+     * Decoded data of every blob found in [rom], in one pass: a rolling 8-byte
+     * window through a 16-bit filter, the full [head] only where that hits.
+     */
+    fun find(rom: ByteArray): Map<RomBlob, ByteArray> {
+        val byHead = RomBlob.entries.groupBy { it.head }
+        val filter = LongArray(1 shl 10)
+        RomBlob.entries.forEach { filter[it.pre ushr 6] = filter[it.pre ushr 6] or (1L shl it.pre) }
+        val buf = ByteBuffer.wrap(rom).order(ByteOrder.LITTLE_ENDIAN)
+        val found = HashMap<RomBlob, ByteArray>()
+        if (rom.size < 16) return found
+        var a = buf.getLong(0) shl 8 // shifted in again below, one byte per offset
+        for (i in 0..rom.size - 16) {
+            a = (a ushr 8) or ((rom[i + 7].toLong() and 0xFF) shl 56)
+            val p = pre(a)
+            if (filter[p ushr 6] and (1L shl p) == 0L) continue
+            for (blob in byHead[head(buf, i)] ?: continue) {
+                if (blob in found) continue
+                decode(rom, i - blob.headOff, blob)?.let { found[blob] = it }
+            }
+            if (found.size == RomBlob.entries.size) break
+        }
+        return found
+    }
+
+    private fun decode(rom: ByteArray, off: Int, blob: RomBlob): ByteArray? {
+        if (off < 0) return null
+        val data = try {
+            when {
+                blob.smol -> Smol.decompressAny(rom.copyOfRange(off, minOf(rom.size, off + 0x10000))).takeIf { it.size == blob.size }
+                blob.lz -> lz77(rom, off, blob.size)
+                else -> rom.copyOfRange(off, off + blob.size)
+            }
+        } catch (_: IndexOutOfBoundsException) {
+            null
+        } catch (_: IllegalArgumentException) {
+            null // not a smol blob after all
+        } ?: return null
+        val crc = CRC32().apply { update(data) }.value
+        return data.takeIf { crc == blob.crc }
+    }
+
+    /** GBA LZ77 (type 0x10) at [off], or null if it isn't one of [size] bytes (any size up to 64 KiB if -1). */
+    internal fun lz77(rom: ByteArray, off: Int, size: Int): ByteArray? {
+        if (rom[off].toInt() != 0x10) return null
+        val n = (rom[off + 1].toInt() and 0xFF) or ((rom[off + 2].toInt() and 0xFF) shl 8) or ((rom[off + 3].toInt() and 0xFF) shl 16)
+        if (if (size < 0) n == 0 || n > 0x10000 else n != size) return null
+        val out = ByteArray(n)
+        var o = 0
+        var i = off + 4
+        while (o < n) {
+            val flags = rom[i++].toInt()
+            for (b in 7 downTo 0) {
+                if (o >= n) break
+                if (flags and (1 shl b) != 0) {
+                    val d = ((rom[i].toInt() and 0xFF) shl 8) or (rom[i + 1].toInt() and 0xFF)
+                    i += 2
+                    val disp = (d and 0xFFF) + 1
+                    if (disp > o) return null
+                    repeat((d ushr 12) + 3) {
+                        if (o < n) { out[o] = out[o - disp]; o++ }
+                    }
+                } else {
+                    out[o++] = rom[i++]
+                }
+            }
+        }
+        return out
+    }
+
+    // --- composing the images (same layouts as scripts/gen_party_assets.py) ---
+
+    private fun expand(v: Int) = (v shl 3) or (v shr 2)
+
+    /** BGR555 -> opaque ARGB. */
+    internal fun palette(b: ByteArray): IntArray = IntArray(b.size / 2) {
+        val c = (b[it * 2].toInt() and 0xFF) or ((b[it * 2 + 1].toInt() and 0xFF) shl 8)
+        (0xFF shl 24) or (expand(c and 31) shl 16) or (expand((c shr 5) and 31) shl 8) or expand((c shr 10) and 31)
+    }
+
+    /** Colour index of pixel ([x],[y]) of 4bpp tile [t]. */
+    private fun px4(tiles: ByteArray, t: Int, x: Int, y: Int): Int {
+        // A hack's tilemap can point past its tiles (at whatever else is in VRAM).
+        val b = tiles.getOrElse(t * 32 + y * 4 + x / 2) { 0 }.toInt()
+        return if (x and 1 != 0) (b shr 4) and 15 else b and 15
+    }
+
+    private fun u16(b: ByteArray, i: Int) = (b[i * 2].toInt() and 0xFF) or ((b[i * 2 + 1].toInt() and 0xFF) shl 8)
+
+    /** A screen of 4bpp BG tiles through a u16 tilemap ([mapW] entries per row), opaque. */
+    internal fun screen(
+        tiles: ByteArray, pal: IntArray, map: ByteArray, mapW: Int, tilesW: Int = 30, tilesH: Int = 20,
+        edit: (Int, Int, Int) -> Int = { _, _, e -> e },
+    ): Image {
+        val img = Image(tilesW * 8, tilesH * 8)
+        for (ty in 0 until tilesH) for (tx in 0 until tilesW) {
+            val e = edit(tx, ty, u16(map, ty * mapW + tx))
+            val t = e and 0x3FF
+            val pn = e shr 12
+            for (y in 0 until 8) for (x in 0 until 8) {
+                val v = px4(tiles, t, if (e and 0x400 != 0) 7 - x else x, if (e and 0x800 != 0) 7 - y else y)
+                img.argb[(ty * 8 + y) * img.width + tx * 8 + x] = pal.getOrElse(pn * 16 + v) { pal[0] }
+            }
+        }
+        return img
+    }
+
+    /** A sprite of [w]x[h] from consecutive 4bpp tiles, index 0 transparent. */
+    private fun sprite(tiles: ByteArray, pal: IntArray, w: Int, h: Int, tileOf: (Int, Int) -> Int = { tx, ty -> ty * (w / 8) + tx }): Image {
+        val img = Image(w, h)
+        for (ty in 0 until h / 8) for (tx in 0 until w / 8) for (y in 0 until 8) for (x in 0 until 8) {
+            val v = px4(tiles, tileOf(tx, ty), x, y)
+            if (v != 0) img.argb[(ty * 8 + y) * w + tx * 8 + x] = pal[v]
+        }
+        return img
+    }
+
+    private class Party(
+        val dir: String, val backdrop: String,
+        val bgGfx: RomBlob, val bgPal: RomBlob, val bgMap: RomBlob, val slotMain: RomBlob, val slotNoHp: RomBlob,
+        val ball: RomBlob, val ballPal: RomBlob, val status: RomBlob, val statusPal: RomBlob,
+        val font: RomBlob, val halfWidthFont: Boolean,
+    )
+
+    private val PARTIES = listOf(
+        Party("partyfr", "partybg/firered.png", RomBlob.FR_PARTY_BG_GFX, RomBlob.FR_PARTY_BG_PAL, RomBlob.FR_PARTY_BG_MAP,
+            RomBlob.FR_SLOT_MAIN, RomBlob.FR_SLOT_NO_HP, RomBlob.FR_BALL_GFX, RomBlob.FR_BALL_PAL,
+            RomBlob.FR_STATUS_GFX, RomBlob.FR_STATUS_PAL, RomBlob.FR_FONT_SMALL, halfWidthFont = true),
+        Party("partyem", "partybg/emerald.png", RomBlob.EM_PARTY_BG_GFX, RomBlob.EM_PARTY_BG_PAL, RomBlob.EM_PARTY_BG_MAP,
+            RomBlob.EM_SLOT_MAIN, RomBlob.EM_SLOT_NO_HP, RomBlob.EM_BALL_GFX, RomBlob.EM_BALL_PAL,
+            RomBlob.EM_STATUS_GFX, RomBlob.EM_STATUS_PAL, RomBlob.EM_FONT_SMALL, halfWidthFont = false),
+    )
+
+    // Window palette 3 with each state's LoadPartyBoxPalette overrides:
+    // (idx 4,5,6 <- ids1), (idx 1,7,8 <- ids2) - both decomps' party_menu.c.
+    private val SLOT_STATES = listOf(
+        "normal" to (intArrayOf(52, 53, 54) to intArrayOf(49, 55, 56)),
+        "selected" to (intArrayOf(116, 117, 118) to intArrayOf(97, 103, 104)),
+        "fainted" to (intArrayOf(84, 85, 86) to intArrayOf(81, 87, 88)),
+        "selected_fainted" to (intArrayOf(148, 149, 150) to intArrayOf(97, 103, 104)),
+    )
+
+    /** Every image whose blobs were all [found], by art path. */
+    fun compose(found: Map<RomBlob, ByteArray>): Map<String, Image> {
+        val out = HashMap<String, Image>()
+        fun has(vararg b: RomBlob) = b.all { it in found }
+        fun d(b: RomBlob) = found.getValue(b)
+        // Each file needs only its own blobs: CFRU hacks keep FireRed's font alone.
+        for (p in PARTIES) {
+            if (has(p.bgGfx, p.bgPal, p.bgMap)) {
+                // The whole screen minus the CANCEL button (the app has none).
+                out[p.backdrop] = screen(d(p.bgGfx), palette(d(p.bgPal)), d(p.bgMap), 32) { tx, ty, e ->
+                    if (tx >= 23 && ty in 17..18) 0x100E else e
+                }
+            }
+            if (has(p.bgGfx, p.bgPal, p.slotMain, p.slotNoHp)) {
+                slots(d(p.bgGfx), palette(d(p.bgPal)), d(p.slotMain), d(p.slotNoHp)).forEach { (k, v) -> out["${p.dir}/$k"] = v }
+            }
+            if (has(p.ball, p.ballPal)) out["${p.dir}/pokeball.png"] = sprite(d(p.ball), palette(d(p.ballPal)), 32, 64)
+            if (has(p.status, p.statusPal)) {
+                // 32x8 icons, one after another -> one row.
+                val status = d(p.status)
+                out["${p.dir}/status_icons.png"] = sprite(status, palette(d(p.statusPal)), status.size / 32 * 8, 8) { tx, _ -> tx }
+            }
+            if (has(p.font)) out["${p.dir}/font_small.png"] = font(d(p.font), p.halfWidthFont)
+        }
+        if (has(RomBlob.FR_REGION_GFX, RomBlob.FR_REGION_PAL)) {
+            val tiles = d(RomBlob.FR_REGION_GFX)
+            val pal = palette(d(RomBlob.FR_REGION_PAL))
+            listOf("kanto" to RomBlob.FR_KANTO_MAP, "sevii123" to RomBlob.FR_SEVII123_MAP,
+                "sevii45" to RomBlob.FR_SEVII45_MAP, "sevii67" to RomBlob.FR_SEVII67_MAP).forEach { (name, map) ->
+                if (has(map)) out["regionmap/$name.png"] = screen(tiles, pal, d(map), 30)
+            }
+        }
+        // Emerald's region map, and Seaglass's / Lazarus's / SoulGold's own (same region_map.c, their own art).
+        listOf(
+            "hoenn" to Triple(RomBlob.EM_REGION_GFX, RomBlob.EM_REGION_PAL, RomBlob.EM_REGION_MAP),
+            // Seaglass redrew the tiles, keeping Emerald's tilemap and palette.
+            "seaglass" to Triple(RomBlob.SGL_REGION_GFX, RomBlob.EM_REGION_PAL, RomBlob.EM_REGION_MAP),
+            "lazarus" to Triple(RomBlob.LZ_REGION_GFX, RomBlob.LZ_REGION_PAL, RomBlob.LZ_REGION_MAP),
+            "soulgold" to Triple(RomBlob.SG_REGION_GFX, RomBlob.SG_REGION_PAL, RomBlob.SG_REGION_MAP),
+        ).forEach { (name, blobs) ->
+            if (has(blobs.first, blobs.second, blobs.third)) {
+                out["regionmap/$name.png"] = emeraldRegionMap(d(blobs.first), palette(d(blobs.second)), d(blobs.third))
+            }
+        }
+        for ((name, blobs) in PLAYER_ICONS) {
+            if (has(blobs.first, blobs.second)) out["regionmap/$name.png"] = sprite(d(blobs.first), palette(d(blobs.second)), 16, 16)
+        }
+        // SoulGold's bag backdrop: its night sky, the whole 32x32-tile layer (the game scrolls it; this is one still frame).
+        if (has(RomBlob.SG_BAG_STARS_GFX, RomBlob.SG_BAG_STARS_MAP, RomBlob.SG_BAG_STARS_PAL)) {
+            out[BAG_STARS_SOULGOLD] = screen(
+                d(RomBlob.SG_BAG_STARS_GFX), palette(d(RomBlob.SG_BAG_STARS_PAL)), d(RomBlob.SG_BAG_STARS_MAP), 32, tilesW = 32, tilesH = 32,
+            )
+        }
+        return out
+    }
+
+    /**
+     * Emerald's region_map.c screen: 8bpp tiles through a 64-wide one-byte
+     * affine map; the palette is loaded at BG palette 7, so colour index 112
+     * is its first entry.
+     */
+    private fun emeraldRegionMap(tiles: ByteArray, pal: IntArray, map: ByteArray): Image {
+        val img = Image(240, 160)
+        for (ty in 0 until 20) for (tx in 0 until 30) {
+            val t = map[ty * 64 + tx].toInt() and 0xFF
+            for (y in 0 until 8) for (x in 0 until 8) {
+                val v = (tiles[t * 64 + y * 8 + x].toInt() and 0xFF) - 112
+                img.argb[(ty * 8 + y) * 240 + tx * 8 + x] = pal.getOrElse(v) { pal[0] }
+            }
+        }
+        return img
+    }
+
+    /** The MAIN slot's 80x56 frame per state, from the slot tilemaps (the no-HP one is what an EGG uses). */
+    private fun slots(tiles: ByteArray, pal: IntArray, main: ByteArray, noHp: ByteArray): Map<String, Image> {
+        val states = SLOT_STATES + listOf("nohp_normal" to SLOT_STATES[0].second, "nohp_selected" to SLOT_STATES[1].second)
+        return states.associate { (name, ids) ->
+            val cols = pal.copyOfRange(48, 64)
+            intArrayOf(4, 5, 6).forEachIndexed { k, idx -> cols[idx] = pal[ids.first[k]] }
+            intArrayOf(1, 7, 8).forEachIndexed { k, idx -> cols[idx] = pal[ids.second[k]] }
+            val map = if (name.startsWith("nohp")) noHp else main
+            "slot_$name.png" to sprite(tiles, cols, 80, 56) { tx, ty -> map[ty * 10 + tx].toInt() and 0xFF }
+        }
+    }
+
+    /**
+     * FONT_SMALL as 8x16 cells, 32 per row, by glyph id: 2bpp rows of 8
+     * pixels (a u16, first pixel in the top bits); text (1) red, shadow (2)
+     * blue, for the party slot's runtime tinting. FireRed stores each glyph
+     * as two 8x8 tiles, Emerald as four (16x16) of which the left two count.
+     */
+    private fun font(f: ByteArray, halfWidth: Boolean): Image {
+        val img = Image(256, 256)
+        val glyphBytes = if (halfWidth) 32 else 64
+        val bottomTile = if (halfWidth) 16 else 32
+        for (g in 0 until minOf(512, f.size / glyphBytes)) {
+            val dx = (g % 32) * 8
+            val dy = (g / 32) * 16
+            for (half in 0 until 2) for (y in 0 until 8) {
+                val base = g * glyphBytes + half * bottomTile + y * 2
+                val row = (f[base].toInt() and 0xFF) or ((f[base + 1].toInt() and 0xFF) shl 8)
+                for (x in 0 until 8) {
+                    val c = when ((row shr (14 - 2 * x)) and 3) {
+                        1 -> 0xFFFF0000.toInt()
+                        2 -> 0xFF0000FF.toInt()
+                        else -> continue
+                    }
+                    img.argb[(dy + half * 8 + y) * 256 + dx + x] = c
+                }
+            }
+        }
+        return img
+    }
+
+    /** Just enough PNG (8-bit RGBA, no filtering) to cache [Image]s without android.graphics. */
+    private object Png {
+        fun encode(img: Image): ByteArray {
+            val raw = ByteArray(img.height * (1 + img.width * 4))
+            var o = 0
+            for (y in 0 until img.height) {
+                raw[o++] = 0
+                for (x in 0 until img.width) {
+                    val c = img.argb[y * img.width + x]
+                    raw[o++] = (c shr 16).toByte(); raw[o++] = (c shr 8).toByte(); raw[o++] = c.toByte(); raw[o++] = (c ushr 24).toByte()
+                }
+            }
+            // Fed 16 KiB at a time: each deflate() holds a JNI critical lock
+            // (stalling GC while the game runs) for as long as its input lasts.
+            val z = ByteArrayOutputStream()
+            val def = Deflater()
+            val chunk = ByteArray(8192)
+            var at = 0
+            while (!def.finished()) {
+                if (def.needsInput()) {
+                    if (at < raw.size) {
+                        val n = minOf(16 shl 10, raw.size - at)
+                        def.setInput(raw, at, n)
+                        at += n
+                    } else {
+                        def.finish()
+                    }
+                }
+                z.write(chunk, 0, def.deflate(chunk))
+            }
+            def.end()
+            val out = ByteArrayOutputStream()
+            out.write(byteArrayOf(0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte(), 13, 10, 26, 10))
+            // 8-bit depth, colour type 6 (RGBA), deflate, no filter, no interlace.
+            val ihdr = ByteBuffer.allocate(13).putInt(img.width).putInt(img.height).put(byteArrayOf(8, 6, 0, 0, 0)).array()
+            chunk(out, "IHDR", ihdr)
+            chunk(out, "IDAT", z.toByteArray())
+            chunk(out, "IEND", ByteArray(0))
+            return out.toByteArray()
+        }
+
+        private fun chunk(out: ByteArrayOutputStream, type: String, data: ByteArray) {
+            val t = type.toByteArray(Charsets.US_ASCII)
+            out.write(ByteBuffer.allocate(4).putInt(data.size).array())
+            out.write(t); out.write(data)
+            val crc = CRC32().apply { update(t); update(data) }.value
+            out.write(ByteBuffer.allocate(4).putInt(crc.toInt()).array())
+        }
+    }
+}

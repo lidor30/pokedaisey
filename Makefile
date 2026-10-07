@@ -8,8 +8,8 @@
 SHELL := /bin/bash
 -include local.mk
 
-PKG           := com.pokedaisey.app
-CAPTURE_IMAGE := pokedaisey-capture
+PKG           := com.pokedaisy.app
+CAPTURE_IMAGE := pokedaisy-capture
 
 # Read by scripts/decomps.py and ui-preview (see docs/DEVELOPMENT.md "Build").
 export DECOMPS
@@ -26,8 +26,8 @@ help: ## Show this help
 
 ##@ App
 
-submodules: ## Fetch the mGBA submodule (first build only)
-	git submodule update --init third_party/mgba
+submodules: ## Fetch the mGBA + rcheevos submodules (first build only)
+	git submodule update --init third_party/mgba third_party/rcheevos
 
 apk: ## Build the debug APK
 	./gradlew :app:assembleDebug

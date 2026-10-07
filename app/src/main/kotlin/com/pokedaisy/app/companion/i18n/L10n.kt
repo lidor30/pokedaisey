@@ -1,0 +1,107 @@
+package com.pokedaisy.app.companion.i18n
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import java.util.Locale
+
+/**
+ * The app's own text in six languages. Game data (Pokémon / move / item / type
+ * names, GUIDE pages) isn't translated here - it comes from the game's tables.
+ *
+ * Text is keyed by its English: `tr("CLOSE GAME")` returns the current
+ * language's version from [translations], or the English itself when there's
+ * none. A string the code also compares (a selector option, an enum label)
+ * stays English in the logic and is marked [tk]; the OPTION-menu pieces
+ * (OptionLine, OptionTitleWindow, OptionBadge) translate what they draw.
+ * Arguments go in as `{0}`, `{1}`: `tr("{0} LEFT", n)`. One English word
+ * with two meanings gets a context after a `|`: `tr("NEXT|continue")` shows
+ * "NEXT" in English and has its own translations. `TranslationsTest` fails
+ * on a `tr` / `tk` literal missing from a table.
+ */
+enum class AppLanguage(val code: String, val romLetter: Char, val locale: String, val nativeName: String) {
+    EN("EN", 'E', "en", "ENGLISH"),
+    JA("JA", 'J', "ja", "日本語"),
+    FR("FR", 'F', "fr", "FRANÇAIS"),
+    DE("DE", 'D', "de", "DEUTSCH"),
+    IT("IT", 'I', "it", "ITALIANO"),
+    ES("ES", 'S', "es", "ESPAÑOL"),
+    ;
+
+    companion object {
+        fun ofCode(code: String?): AppLanguage? = entries.firstOrNull { it.code == code }
+
+        /** The game code's 4th letter is its language: BPRE English, BPRF French, AXVJ Japanese... */
+        fun ofRomCode(gameCode: String?): AppLanguage? =
+            gameCode?.getOrNull(3)?.let { l -> entries.firstOrNull { it.romLetter == l } }
+
+        fun ofLocale(locale: Locale): AppLanguage? = entries.firstOrNull { it.locale == locale.language }
+    }
+}
+
+/** [Prefs.appLanguage]'s value for "follow the ROM". */
+const val LANGUAGE_AUTO = "AUTO"
+
+/** One English string's five translations. */
+data class Tr(val ja: String, val fr: String, val de: String, val it: String, val es: String) {
+    fun of(lang: AppLanguage): String? = when (lang) {
+        AppLanguage.EN -> null
+        AppLanguage.JA -> ja
+        AppLanguage.FR -> fr
+        AppLanguage.DE -> de
+        AppLanguage.IT -> it
+        AppLanguage.ES -> es
+    }
+}
+
+object L10n {
+    /** The language on screen. Compose state, so every screen redraws when it changes. */
+    var language: AppLanguage by mutableStateOf(AppLanguage.EN)
+        private set
+
+    /** What AUTO picked ([auto]), for the LANGUAGE row's "AUTO (ENGLISH)". */
+    var autoLanguage: AppLanguage by mutableStateOf(AppLanguage.EN)
+        private set
+
+    /**
+     * Applies [setting] ([LANGUAGE_AUTO] or an [AppLanguage.code]). AUTO = the
+     * running ROM's language ([romCode], its header game code); with no ROM
+     * (Library / Settings) the device's, else English.
+     */
+    fun apply(setting: String, romCode: String?, device: Locale = Locale.getDefault()) {
+        autoLanguage = AppLanguage.ofRomCode(romCode) ?: AppLanguage.ofLocale(device) ?: AppLanguage.EN
+        language = AppLanguage.ofCode(setting) ?: autoLanguage
+    }
+
+    /** The LANGUAGE row's value: "AUTO (ENGLISH)" or the picked language's own name. */
+    fun settingLabel(setting: String): String =
+        AppLanguage.ofCode(setting)?.nativeName ?: "${tr("AUTO")} (${autoLanguage.nativeName})"
+
+    /** The LANGUAGE selector's options, AUTO first: (setting value, label). */
+    val options: List<Pair<String, String>>
+        get() = listOf(LANGUAGE_AUTO to tr("AUTO")) + AppLanguage.entries.map { it.code to it.nativeName }
+}
+
+/** Every table, merged. Each area of the app keeps its own (TrCore, TrCompanion, ...). */
+val translations: Map<String, Tr> by lazy { allTranslationTables().fold(emptyMap()) { acc, t -> acc + t } }
+
+/** [en] in the current language (or [en] itself where there's no translation). */
+fun tr(en: String): String {
+    val lang = L10n.language
+    if (lang != AppLanguage.EN) translations[en]?.of(lang)?.let { return it }
+    return en.substringBefore('|')
+}
+
+/** [tr] with `{0}`, `{1}`... replaced by [args]. */
+fun tr(en: String, vararg args: Any?): String {
+    var s = tr(en)
+    args.forEachIndexed { i, a -> s = s.replace("{$i}", a.toString()) }
+    return s
+}
+
+/**
+ * A string kept in English where the code uses it (an option compared by
+ * label, an enum's label) and translated where it's drawn - OptionLine and
+ * friends call [tr] on what they show. Only marks the literal for the tables.
+ */
+fun tk(en: String): String = en

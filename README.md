@@ -8,7 +8,7 @@ on the top screen. The bottom screen is a live companion that reads your game
 as you play: your party, your bag, the map, battle matchups, your Pokédex, and a
 spoiler-free guide. Everything is drawn in the game's own menu style.
 
-[**Download the latest version**](https://github.com/lidor30/pokedaisey/releases/latest)
+[**Download the latest version**](https://github.com/lidor30/pokedaisy/releases/latest)
 
 ## Devices
 
@@ -22,7 +22,7 @@ Any Android 8.0+ device runs the games. The companion needs a second screen.
 ## Install
 
 1. Download `PokeDaisy-<version>.apk` from the
-   [latest release](https://github.com/lidor30/pokedaisey/releases/latest) on the device.
+   [latest release](https://github.com/lidor30/pokedaisy/releases/latest) on the device.
 2. Open it. If Android asks, allow your browser or file manager to install apps.
 3. Open PokeDaisy. A short setup helps you:
    - **Link your ROMs folder** (optional). Every supported game in it shows up in
@@ -47,13 +47,14 @@ it. You can also check from **Settings > VERSION**.
 
 - **PARTY** - your team with HP, levels and status, in your game's own party
   screen. Tap a Pokémon for its full summary: stats, moves, EXP, and what it's
-  weak or resistant to.
+  weak or resistant to. STATS shows its exact IVs and EVs, nature and Hidden Power.
 - **BAG** - every pocket, with item icons and descriptions.
 - **BATTLE** - opens by itself when a battle starts.
   - **INFO**: both Pokémon, your moves rated SUPER / RESISTED / NEUTRAL / IMMUNE,
     and the foe's weaknesses.
   - **SUGGESTIONS**: the best Pokémon and move for this fight.
   - **FOE TEAM**: the trainer's remaining Pokémon.
+  - **STATS**: the foe's IVs, EVs and nature next to yours (off by default: turn on FOE IVS in Settings).
   - Touch buttons to fight, switch or run without reaching for the controls (FireRed and Emerald).
 - **MAP** - the game's region map with you on it. Tap any place to name it,
   or search the list of every town and route.
@@ -68,6 +69,10 @@ it. You can also check from **Settings > VERSION**.
 
 Pick which tabs sit in the tab bar in the companion's Settings.
 
+The app's own text comes in English, Japanese, French, German, Italian and Spanish. By default it
+follows the ROM's language (the device's in the Library); pick another under LANGUAGE in either
+Settings screen. Pokémon, move and item names and the GUIDE pages stay as the game has them.
+
 ### The player (top screen)
 
 - **Fast-forward** with a speed cap, plus slow motion. **Smart** fast-forward
@@ -75,27 +80,33 @@ Pick which tabs sit in the tab bar in the companion's Settings.
 - **Fast-forward music** (alpha) that keeps playing the song at its normal speed, instead of chipmunk sound.
 - **Save states** on hotkeys, with undo.
 - **Status bar** (optional): game, location, money, clock and battery above the game.
-- **Controls**: remap every GBA button and hotkey. On AYN and Retroid devices,
-  A and B match the labels on the buttons. On-screen touch controls appear when
-  no controller is connected.
+- **Aspect**: the GBA's own 3:2, or stretched to fill a 16:9 top screen (Settings shows a preview of both).
+- **Controls**: remap every GBA button and hotkey, or turn hotkeys off. X and Y
+  are a second START and SELECT, like the menu and registered-item buttons in the
+  DS games. On AYN and Retroid devices, A and B match the labels on the buttons.
+  On-screen touch controls appear when no controller is connected.
 - **Themes** to recolor the whole app.
 
 ### Library
 
-- List or grid view, recently played, and cover art from SteamGridDB (or pick your own image).
+- List or grid view, recently played, and cover art from SteamGridDB or RetroAchievements box art (or pick your own image).
+- ROMs can be plain `.gba` files or zipped (`.zip` / `.7z`), in your ROMs folder or imported with **+**.
+- **Refresh** rescans your ROMs folder and tells you what it found.
 - Long-press a game to:
   - **Rename** or **hide** it.
   - **Load a save** file into it (your current save is kept as a dated backup).
   - See its **info**: ROM, save file and save states.
 - Works with frontends like **ES-DE**, **Cocoon** and **iiSU**. They can launch
-  a game straight into PokeDaisy. See
-  [frontend setup](docs/DEVELOPMENT.md#launch-from-a-frontend-cocoon-iisu-es-de-).
+  a game straight into PokeDaisy. Setup guides for [iiSU](docs/iisu/README.md) and
+  [ES-DE](docs/es-de/README.md); the
+  [technical details](docs/DEVELOPMENT.md#launch-from-a-frontend-cocoon-iisu-es-de-)
+  are for other frontends.
 
 ### Saves
 
 Saves are standard `.sav` / `.srm` files, the same format as mGBA and RetroArch,
 so you can move them between emulators freely. A game finds its save by the ROM's
-file name.
+file name (for a zipped game, the name of the ROM inside the archive, as in RetroArch).
 
 ## Supported games
 
@@ -119,10 +130,11 @@ shows a "not supported" notice).
 | Pokémon Heart and Soul | 2.0.6                   |  ✅   | ✅  |   ✅   |  ◐  |   ✅    |  ✅   |
 | Pokémon Amethyst       | 1.3.0                   |  ✅   | ✅  |   —    | ✅  |   ✅    |  ✅   |
 | Celia's Stupid Romhack | 1.1.4                   |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
-| Pokémon Lazarus        | 2.0                     |  ✅   | ✅  |   —    |  ◐  |   ✅    |   —   |
-| Emerald Seaglass       | 3.0                     |  ✅   | ✅  |   —    | ✅  |   ✅    |   —   |
+| Pokémon Lazarus        | 2.0                     |  ✅   | ✅  |   ◐    | ✅  |   ✅    |   —   |
+| Emerald Seaglass       | 3.0                     |  ✅   | ✅  |   ◐    | ✅  |   ✅    |   —   |
 | Too Many Types 2       | 1.5.2                   |  ✅   | ✅  |   —    | ✅  |   ✅    |   —   |
 | Emerald Rogue          | 2.2.1-EX                |  ✅   | ✅  |   ✅   | ✅  |    —    |   —   |
+| Pokémon SoulGold       | 1.1.4                   |  ✅   | ✅  |   ◐    | ✅  |   ✅    |   —   |
 | Pokémon R.O.W.E.       | 2.1.9.1 Experimental    |   —   |  —  |   —    |  —  |    —    |   —   |
 
 R.O.W.E. plays, but its companion is still in progress. Map ◐ means place names
@@ -131,14 +143,14 @@ been checked in every kind of battle. The guides were
 written from each game's own data and may contain mistakes; the app says so the
 first time you open one.
 
-Want another game supported? [Open an issue](https://github.com/lidor30/pokedaisey/issues).
+Want another game supported? [Open an issue](https://github.com/lidor30/pokedaisy/issues).
 
 ## Privacy
 
 PokeDaisy has no accounts, ads or analytics. It only goes online to:
 
 - check this page for a new version, and download it if you say so;
-- fetch cover art from SteamGridDB, only if you add your own API key.
+- fetch cover art from SteamGridDB or RetroAchievements, only if you add your own API key.
 
 Your games and saves never leave your device.
 
@@ -150,20 +162,31 @@ This project may use AI-assisted development tools, such as Claude Code, to help
 
 See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
+## Support PokeDaisy
+
+PokeDaisy is free, with no ads and nothing locked. If it made a playthrough better and
+you'd like to say thanks, you can buy me a coffee. It's completely optional and doesn't
+unlock anything; it just helps cover the time that goes into mapping new games and ROM hacks.
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/lidor30g)
+
+Bug reports, game requests and a star on the repo help just as much.
+
 ## Credits
 
 - [mGBA](https://mgba.io) by Jeffrey Pfau and contributors runs the games (MPL 2.0;
   source in [`third_party/mgba`](https://github.com/mgba-emu/mgba)).
 - [Pixel Operator](https://www.dafont.com/pixel-operator.font) font by Jayvee Enaguas (CC0).
+- [PixelMplus](https://github.com/itouhiro/PixelMplus) (M+ FONT LICENSE, M+ FONTS PROJECT) for Japanese text, converted to Pixel Operator's pixel grid by `scripts/gen_jp_font.py`.
 - The [pret](https://github.com/pret) decompilation projects, which the game data and guides were checked against.
-- Cover art from [SteamGridDB](https://www.steamgriddb.com) and its contributors.
+- Cover art from [SteamGridDB](https://www.steamgriddb.com) and its contributors, and box art from [RetroAchievements](https://retroachievements.org).
 
 ## License
 
 PokeDaisy is free software under the [GNU GPL v3](LICENSE), with one
 [additional term](NOTICE): if you share PokeDaisy or anything built from it,
 keep the credit **"Based on PokeDaisy by Lidor Itzhari -
-https://github.com/lidor30/pokedaisey"** in its documentation and credits.
+https://github.com/lidor30/pokedaisy"** in its documentation and credits.
 Forks must stay open source under the same license.
 
 PokeDaisy is a fan project, not affiliated with or endorsed by Nintendo,

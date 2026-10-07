@@ -25,7 +25,7 @@ build/
 /app/src/test/snapshots/
 
 # Headless capture tool output: mgba_dump is compiled fresh inside the
-# pokedaisey-capture image each run (a Linux ELF, not portable).
+# pokedaisy-capture image each run (a Linux ELF, not portable).
 /native-capture/mgba_dump
 /native-capture/menu-shots/
 

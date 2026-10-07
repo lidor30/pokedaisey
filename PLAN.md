@@ -6,7 +6,7 @@ A single Android app for the AYN Thor (and other dual-screen Android handhelds):
 Adds RetroArch-style **savestates** and **speed control** on user-configurable
 shortcuts.
 
-Lives in ``. Package / `applicationId` `com.pokedaisey.app`.
+Lives in ``. Package / `applicationId` `com.pokedaisy.app`.
 
 **Target ROMs**: our `firered-qol.gba` and `emerald-qol` (both export the
 `gQolTelemetry` struct), plus **vanilla FireRed**, **vanilla Emerald**, and
@@ -42,7 +42,7 @@ to compile. We deliberately chose the emulator path so FireRed + Emerald + **Unb
 ## Architecture
 
 ```
-┌─ Android app (com.pokedaisey.app) ──────────────────────────┐
+┌─ Android app (com.pokedaisy.app) ──────────────────────────┐
 │                                                                       │
 │  EmulatorActivity (top screen)          DualScreenPresentation        │
 │   ├─ GLSurfaceView: textured quad,       (bottom screen, via          │
@@ -51,7 +51,7 @@ to compile. We deliberately chose the emulator path so FireRed + Emerald + **Unb
 │   └─ physical buttons + touch overlay        android-companion        │
 │        → core->setKeys()                     screens, near-verbatim   │
 │                                                                       │
-│  ┌─ JNI bridge (libpokedaisey.so) ──────────────────────────────┐     │
+│  ┌─ JNI bridge (libpokedaisy.so) ──────────────────────────────┐     │
 │  │  libmgba (static)                                            │     │
 │  │   mCore create/loadROM/loadSave/runFrame                     │     │
 │  │   mCoreSaveStateNamed / mCoreLoadStateNamed  ← savestates    │     │
@@ -88,7 +88,7 @@ JNI wrappers: crib from mGBA's own `src/platform/android/` in the mgba tree.
 is the current `tools/android-companion` UI with the transport swapped.
 
 Reused **near-verbatim** from `tools/android-companion/` (source currently in package
-`com.fireredqol.companion`; all of it repackaged under `com.pokedaisey.*` on the way in):
+`com.fireredqol.companion`; all of it repackaged under `com.pokedaisy.*` on the way in):
 
 | File(s)                                                                                                                                                                                                                        | Change                                                                                              |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
@@ -133,7 +133,7 @@ output contract: a `GameState` snapshot per tick.
 
 ### ROM & save management
 
-- SAF picker or drop into `Android/data/com.pokedaisey.app/files/roms/`.
+- SAF picker or drop into `Android/data/com.pokedaisy.app/files/roms/`.
   Every target is just a `.gba` file — `firered-qol` / `emerald-qol` carry their QoL
   patch baked in; vanilla FireRed / Emerald / Unbound need nothing special.
 - Per-game `.srm` next to the ROM; `mCore` loads/saves it. Same 128 KB flash format
@@ -146,7 +146,7 @@ output contract: a `GameState` snapshot per tick.
   CMake, `-DBUILD_QT=OFF -DBUILD_SDL=OFF -DBUILD_LIBRETRO=OFF -DBUILD_STATIC=ON
 -DBUILD_SHARED=OFF -DUSE_FFMPEG=OFF -DUSE_DISCORD_RPC=OFF`. Pin an mGBA release
   tag. Vendor as a submodule or a fixed tarball under `third_party/`.
-- **JNI** (`libpokedaisey.so`): thin C over `mCore`; `externalNativeBuild { cmake }`
+- **JNI** (`libpokedaisy.so`): thin C over `mCore`; `externalNativeBuild { cmake }`
   in Gradle links `libmgba` static.
 - **App**: Gradle/Kotlin/Compose, mirroring `tools/android-companion`'s setup
   (`compileSdk 34`, `minSdk 26`, Compose BOM). `./gradlew assembleDebug` →
@@ -166,11 +166,11 @@ speed with sound on the Thor.
 > the bare core links clean (`app/src/main/cpp/CMakeLists.txt`); JNI bridge + GLES2 blit
 >
 > - audio-paced emu thread + input mapping done
->   (`app/src/main/kotlin/com/pokedaisey/app/`). Core runs on a plain thread, not
+>   (`app/src/main/kotlin/com/pokedaisy/app/`). Core runs on a plain thread, not
 >   `mCoreThread`. **Verified on the Thor (device `<adb-serial>`):** all five target ROMs
 >   (`firered-qol`, `emerald-qol`, vanilla FireRed, vanilla Emerald, Unbound — the last a
 >   32 MiB ROM) boot, render with correct colour/aspect, take gamepad input, and hold a
->   steady **59.4–60.3 fps** (`Log.i("pokedaisey","fps=…")`). Audio device active; sound
+>   steady **59.4–60.3 fps** (`Log.i("pokedaisy","fps=…")`). Audio device active; sound
 >   pacing gates the loop cleanly. No crashes. Next: Phase 1 (savestates).
 
 **Phase 1 — savestates.** `mCoreSaveStateNamed`/`LoadStateNamed` slots 0–9 into
@@ -216,7 +216,7 @@ Items / Battle panel all live from in-process reads.
 
 > **Phase 3 done (2026-09-08); data + presentation verified on the Thor, UI render is
 > eyes-on-device pending.** Whole `com/fireredqol/companion/` tree copied to
-> `com/pokedaisey/app/companion/`, repackaged; `RetroArchClient` +
+> `com/pokedaisy/app/companion/`, repackaged; `RetroArchClient` +
 > `MainActivity` + `SettingsDialog` + `TelemetryViewModel` dropped. New: `MemoryReader`
 > interface + `InProcessReader` (→ `MgbaCore.pkReadBytes`, a `busRead32` loop in the
 > JNI); `TelemetrySampler` (replaces the coroutine socket `telemetryFlow` — synchronous,
@@ -225,7 +225,7 @@ Items / Battle panel all live from in-process reads.
 > lifecycle/savedstate/viewmodel owners for Compose). JNI adds `pkReadBytes`,
 > `pkFindMagic` (scans IWRAM then EWRAM for `QOLT` — no hardcoded telemetry address),
 > `pkRomCode`, `pkRomSize`. `EmulatorEngine.onSample` fires ~1×/sec between frames →
-> `TelemetryStore.refresh()`. `PokeDaiseyActivity` uses `DisplayManager` +
+> `TelemetryStore.refresh()`. `PokeDaisyActivity` uses `DisplayManager` +
 > `DisplayListener` to show/dismiss the Presentation on the
 > `DISPLAY_CATEGORY_PRESENTATION` display. `pkInit` now falls back to `O_RDONLY` if the
 > save file isn't writable (adb-pushed imports). **Verified:** Thor exposes Screen-2 as
@@ -266,7 +266,7 @@ wanted.
 >
 > **In-app Settings DONE + verified (2026-09-08):** `SettingsActivity` from the Library
 > — fast-forward cap stepper (0=unlimited…10×, `Prefs.ffMaxSpeed`) and per-action hotkey
-> Rebind (captures the next key/button into `hotkeys.properties`). `PokeDaiseyActivity`
+> Rebind (captures the next key/button into `hotkeys.properties`). `PokeDaisyActivity`
 > reloads both on resume. Analog triggers stay hardcoded (no keycode).
 >
 > **Rewind: tried 2026-09-09, reverted.** `mCoreRewindAppend` every frame (non-threaded)

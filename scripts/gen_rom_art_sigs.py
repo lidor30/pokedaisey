@@ -18,18 +18,20 @@ Retail, QoL builds and hacks that kept the art all match, wherever the linker
 put it. Source: the pinned decomp builds (see CLAUDE.md) and their ELFs.
 
 Usage: scripts/gen_rom_art_sigs.py   (needs $DECOMPS/pokefirered and
-$DECOMPS/pokeemerald built once, and the Unbound ROM at UNBOUND_ROM; re-run only
+$DECOMPS/pokeemerald built once, and the Unbound / Lazarus / Seaglass / SoulGold
+ROMs at UNBOUND_ROM / LAZARUS_ROM / SEAGLASS_ROM / SOULGOLD_ROM; re-run only
 if a pin changes)
 """
 import os
 import subprocess
 import zlib
 
+import smol
 from decomps import decomp
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = decomp()
-KOTLIN = os.path.join(HERE, "../app/src/main/kotlin/com/pokedaisey/app/companion/data/RomArtSigsGen.kt")
+KOTLIN = os.path.join(HERE, "../app/src/main/kotlin/com/pokedaisy/app/companion/data/RomArtSigsGen.kt")
 
 M64 = (1 << 64) - 1
 
@@ -92,7 +94,47 @@ def unbound_symbols(rom):
     }
 
 
-# (Kotlin name, symbol, LZ77?) per game.
+# Pokemon Lazarus v2.0 (sha1 7dcdc7e2...): a pokeemerald build (gcc) with its own
+# region map in Emerald's region_map.c. LoadRegionMapGfx's literal pool (ROM
+# 0x1FC6A0) holds sRegionMapBg_GfxLZ, _TilemapLZ, BG_CHAR_ADDR(2),
+# BG_SCREEN_ADDR(28), sRegionMapBg_Pal - only 2 palettes' worth (0x40) before
+# the tiles, and the tiles only use colours 1-28.
+LAZARUS_ROM = os.path.expanduser("~/Downloads/Game ROMs & Emulation/gba/Pokemon Lazarus (v2.0).gba")
+
+
+def lazarus_symbols(rom):
+    return {"RegionGfx": (0xCE1D20, 0), "RegionMap": (0xCE3248, 0), "RegionPal": (0xCE1CE0, 0x40)}
+
+
+# Pokemon SoulGold v1.1.4 (sha1 ea5d369c...): a newer pokeemerald-expansion
+# build whose bag screen draws a night sky of stars on BG3 (headless VRAM dump
+# with the bag open, matched byte for byte). The literal pool next to the bag's
+# graphics loads (ROM 0x0A3444) holds its smol tiles (mode 6, 80 tiles), its
+# smol tilemap (mode 8, 32x32) and the raw palette (BG palette 0).
+SOULGOLD_ROM = os.path.expanduser("~/Downloads/Game ROMs & Emulation/gba/Pokemon-SoulGold-v1.1.4.gba")
+
+
+# Its Johto region map is Emerald's region_map.c with smol art: 8bpp tiles
+# (mode 5), the 64x64 one-byte tilemap (mode 8) and 3 palettes loaded at BG
+# palette 7 (raw, 0x60), checked by rendering them (sRegionMapBg_*).
+def soulgold_symbols(rom):
+    return {
+        "BagStarsGfx": (0x6AED68, 0), "BagStarsMap": (0x6AE9F4, 0), "BagStarsPal": (0x6AF0D8, 0x20),
+        "RegionGfx": (0xF39DA0, 0), "RegionMap": (0xF39AC4, 0), "RegionPal": (0xF37148, 0x60),
+    }
+
+
+# Emerald Seaglass v3.0 (sha1 b9f4d332...) redrew the region map's tiles but
+# kept Emerald's tilemap and palette (EM_REGION_MAP / _PAL): LoadRegionMapGfx's
+# literal pool (ROM 0x1DFFC4) holds the tiles at 0x089534A0, LZ77.
+SEAGLASS_ROM = os.path.expanduser("~/Downloads/Game ROMs & Emulation/gba/Pokemon Emerald Seaglass (v3.0).gba")
+
+
+def seaglass_symbols(rom):
+    return {"RegionGfx": (0x9534A0, 0)}
+
+
+# (Kotlin name, symbol, LZ77? - True / False / "smol") per game.
 GAMES = {
     "FR": ("pokefirered/pokefirered_rev1.gba", "pokefirered/pokefirered_rev1.elf", [
         ("FR_PARTY_BG_GFX", "gPartyMenuBg_Gfx", True),
@@ -185,7 +227,26 @@ GAMES = {
         ("UB_PIC_FEMALE", "PicFemale", True),
         ("UB_PIC_FEMALE_PAL", "PalFemale", True),
     ]),
+    "LZ": (LAZARUS_ROM, None, [
+        ("LZ_REGION_GFX", "RegionGfx", True),
+        ("LZ_REGION_PAL", "RegionPal", False),
+        ("LZ_REGION_MAP", "RegionMap", True),
+    ]),
+    "SGL": (SEAGLASS_ROM, None, [
+        ("SGL_REGION_GFX", "RegionGfx", True),
+    ]),
+    "SG": (SOULGOLD_ROM, None, [
+        ("SG_BAG_STARS_GFX", "BagStarsGfx", "smol"),
+        ("SG_BAG_STARS_MAP", "BagStarsMap", "smol"),
+        ("SG_BAG_STARS_PAL", "BagStarsPal", False),
+        ("SG_REGION_GFX", "RegionGfx", "smol"),
+        ("SG_REGION_MAP", "RegionMap", "smol"),
+        ("SG_REGION_PAL", "RegionPal", False),
+    ]),
 }
+
+# The binary hacks' made-up symbols (no ELF).
+ROM_SYMBOLS = {"UB": unbound_symbols, "LZ": lazarus_symbols, "SGL": seaglass_symbols, "SG": soulgold_symbols}
 
 
 def symbols(elf):
@@ -201,10 +262,13 @@ def main():
     rows = []
     for game, (rom_path, elf, blobs) in GAMES.items():
         rom = open(os.path.join(ROOT, rom_path), "rb").read()
-        syms = symbols(os.path.join(ROOT, elf)) if elf else unbound_symbols(rom)
+        syms = symbols(os.path.join(ROOT, elf)) if elf else ROM_SYMBOLS[game](rom)
         for name, sym, lz in blobs:
             off, size = syms[sym]
-            data, raw_len = lz77(rom, off) if lz else (rom[off:off + size], size)
+            if lz == "smol":
+                data, raw_len = smol.decode(rom[off:off + 0x10000])
+            else:
+                data, raw_len = lz77(rom, off) if lz else (rom[off:off + size], size)
             # The first window (2-byte steps) seen no more often than the blob
             # itself (some are stored twice): an all-blank font glyph would
             # otherwise match everywhere.
@@ -222,15 +286,16 @@ def main():
             win = rom[off + w:off + w + 16]
             h = head(win)
             h = h - (1 << 64) if h >= 1 << 63 else h
-            rows.append(f'    {name}({str(lz).lower()}, {len(data)}, 0x{zlib.crc32(data):08X}L, {w}, {h}L, 0x{pre(win):04X}),')
+            rows.append(f'    {name}({"false" if lz == "smol" else str(lz).lower()}, {len(data)}, 0x{zlib.crc32(data):08X}L, {w}, {h}L, 0x{pre(win):04X}'
+                        f'{", smol = true" if lz == "smol" else ""}),')
             print(f"{name}: {sym} @{off:#x} raw {raw_len} decoded {len(data)} window +{w}")
-    kt = """package com.pokedaisey.app.companion.data
+    kt = """package com.pokedaisy.app.companion.data
 
 // GENERATED by scripts/gen_rom_art_sigs.py from the pinned pokefirered /
 // pokeemerald builds - do not hand-edit; rerun the script instead.
 
 /** A graphics blob [RomArt] looks for in the loaded ROM - see the script for the fields. */
-enum class RomBlob(val lz: Boolean, val size: Int, val crc: Long, val headOff: Int, val head: Long, val pre: Int) {
+enum class RomBlob(val lz: Boolean, val size: Int, val crc: Long, val headOff: Int, val head: Long, val pre: Int, val smol: Boolean = false) {
 """ + "\n".join(rows) + "\n}\n"
     # Long literals: 0x... > Long.MAX_VALUE don't compile as Long, so the CRCs stay
     # under 2^32 (fine) and the heads are emitted signed (above).

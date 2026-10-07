@@ -1,12 +1,12 @@
 // mgba_dump — headless libmgba memory-capture tool, no Android/JNI/adb
 // involved at all. Loads a ROM (+ optional save), runs a scripted boot
 // sequence read from stdin, and dumps EWRAM+IWRAM to the exact same
-// ewram.bin/iwram.bin format PokeDaiseyActivity's dumpFixtureIfPending()
+// ewram.bin/iwram.bin format PokeDaisyActivity's dumpFixtureIfPending()
 // produces on-device — so it's a drop-in replacement for
 // scripts/capture_fixture.sh's data source, consumable by the SAME JVM
 // FixtureMemoryReader tests with zero changes there.
 //
-// Mirrors app/src/main/cpp/pokedaisey_jni.c's proven
+// Mirrors app/src/main/cpp/pokedaisy_jni.c's proven
 // libmgba API usage (core creation, key bits, bus reads) — see that file's
 // comments for why each call is there. The one thing this tool gets for
 // free that the Android/JNI path had to work hard for: since this process
@@ -50,7 +50,7 @@
 #include <mgba/internal/arm/isa-inlines.h>
 
 // GBA key bit positions (GBA_KEY_* in mgba/gba/input.h) — kept local, same
-// as pokedaisey_jni.c, so this file doesn't depend on the GBA-specific
+// as pokedaisy_jni.c, so this file doesn't depend on the GBA-specific
 // header. Matches this project's MgbaCore.Key (app/.../MgbaCore.kt).
 enum {
     KEY_A = 1 << 0, KEY_B = 1 << 1, KEY_SELECT = 1 << 2, KEY_START = 1 << 3,
@@ -198,7 +198,7 @@ static void cmdVdump(const char* outDir) {
 // anywhere - mid-way through the game's own code, whose live registers a bare
 // PC hijack clobbered (Unbound reset its sound). Runs instruction by
 // instruction with IRQs masked until the call returns to SENTINEL, an address
-// in the ROM header that is never executed. Mirrors pokedaisey_jni.c's pk_call.
+// in the ROM header that is never executed. Mirrors pokedaisy_jni.c's pk_call.
 #define PK_CALL_SENTINEL 0x080000C0u
 static bool pk_call(struct mCore* core, uint32_t fn, uint32_t arg0, uint32_t arg1) {
     struct ARMCore* cpu = (struct ARMCore*) core->cpu;
@@ -236,7 +236,7 @@ static bool pk_call(struct mCore* core, uint32_t fn, uint32_t arg0, uint32_t arg
 // music any more, while the VBlank interrupt keeps the sound engine playing.
 // Steps first until the CPU is in the main context (System/User mode, IRQs
 // on) - parking inside an interrupt handler would leave IRQs off for good.
-// Mirrors pokedaisey_jni.c's pk_park.
+// Mirrors pokedaisy_jni.c's pk_park.
 static bool pk_park(struct mCore* core, uint32_t spin) {
     struct ARMCore* cpu = (struct ARMCore*) core->cpu;
     for (int i = 0; i < 5000000; i++) {

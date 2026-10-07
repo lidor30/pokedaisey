@@ -8,7 +8,7 @@
 # just a Docker container + libmgba, not anything Android-specific.
 #
 # Backed by native-capture/mgba_dump.c, built and run
-# inside the pokedaisey-capture image (native-capture/Dockerfile, built on
+# inside the pokedaisy-capture image (native-capture/Dockerfile, built on
 # first use). Drives the ROM through a
 # scripted boot sequence (native-capture/boot/default.txt by default) to
 # clear the intro/title/quest-log-recap screens before dumping, since a save
@@ -24,7 +24,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CAPTURE_DIR="$SCRIPT_DIR/../native-capture"
 CONF="$SCRIPT_DIR/host_roms.conf"
 OUT_ROOT="$SCRIPT_DIR/../app/src/test/resources/fixtures"
-IMAGE="pokedaisey-capture"
+IMAGE="pokedaisy-capture"
 
 KEY="${1:-}"
 BOOT_SCRIPT="$CAPTURE_DIR/boot/default.txt"

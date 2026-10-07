@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Generates PokeDaisey's per-game display tables for a pokeemerald-expansion
+"""Generates PokeDaisy's per-game display tables for a pokeemerald-expansion
 ROM hack, straight from the ROM the user owns (nothing is downloaded).
 
     scripts/gen_expansion_tables.py <game-key> <rom.gba>
 
 Writes app/src/main/kotlin/.../companion/data/{SpeciesNames,ItemNames,MoveData,
-SpeciesTypes,TypeChart,MapSecData,GenderRatios}<Suffix>.kt.
+SpeciesTypes,TypeChart,MapSecData,GenderRatios}<Suffix>.kt (or a game's `only` few).
 
 Every expansion release moves these tables and changes the struct sizes, so
 each game gets its own GAMES entry with addresses found by hand (see the
@@ -18,7 +18,8 @@ code, as long as its tables have the same shape:
     are a u16 bitfield (type:5, category:2, power:9).
   - gTypeEffectiveness: [n][n] u32 uq4.12 multipliers (0x1000 = 1x).
   - gRegionMapEntries: 8-byte entries indexed by mapsec id, name pointer at
-    +0 (newer) or +4 (older {x, y, w, h, name}).
+    +0 (newer) or +4 (older {x, y, w, h, name}); mapsec_count of them (256
+    unless the hack has u16 mapsec ids).
 The sha1 check stops a table being generated from the wrong release.
 """
 import hashlib
@@ -27,7 +28,7 @@ import struct
 import sys
 
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "app", "src", "main", "kotlin",
-                       "com", "pokedaisey", "PokeDaiseyApp", "companion", "data")
+                       "com", "pokedaisy", "app", "companion", "data")
 
 # Newer expansion type ids (include/constants/pokemon.h): 0 None, 10 Mystery,
 # 20 Stellar are left out on purpose - no species/move uses them, and
@@ -79,6 +80,28 @@ GAMES = {
     # +0xA type/power bitfield. Chart: [21][21] u32 like HnS. Mapsecs: the
     # older {x, y, w, h, name ptr} layout, name at +4; the live map header
     # reads 0x5A = "Acrisia City" (the save's town). Hoenn ids 0-85 are empty.
+    # Emerald Seaglass v3.0: species by National Dex number in 0xD0-byte
+    # gSpeciesInfo entries (POKEDEX_EMERALD_SEAGLASS's speciesInfo), name at
+    # +0x2C ("Bulbasaur" in entry 1), types at name-0x26, genderRatio name-0x1A.
+    # gMovesInfo: the only pointer to "Pound" is move 1's name, 0x38 apart
+    # ("Tackle" at 33), the same +0xA type/power bitfield. gItemsInfo: 0x54-byte
+    # entries, inline names ("Ultra Ball" 3, "Master Ball" 4 - expansion's order),
+    # descriptions 8 bytes before each entry, like Lazarus. Only the tables it
+    # lacked: its item names (ItemNamesSeaglass.kt), Emerald's mapsecs and Heart
+    # and Soul's type chart were already right.
+    "seaglass": dict(
+        suffix="Seaglass",
+        label="Pokemon Emerald Seaglass v3.0",
+        sha1="b9f4d332d30fc88c379f9e037f9eae3b2755ead4",
+        only={"SpeciesTypes", "GenderRatios", "ItemDescriptions", "MoveData"},
+        species_name1=0x088F0780 + 0xD0 + 0x2C, species_stride=0xD0, species_max=1489,
+        species_types_off=-0x26, species_gender_off=-0x1A,
+        items_base=0x0867E77C, items_stride=0x54, items_name_inline=True, items_desc_off=-8,
+        moves_base=0x086D2A18 - 0x38, moves_stride=0x38, move_bits_off=0x0A,
+        checks=dict(species={25: "Pikachu", 255: "Torchic", 258: "Mudkip"}, types={25: (14, 14), 255: (11, 11)},
+                    gender={25: 127, 255: 127}, items={4: "Master Ball", 28: "Potion"},  # Torchic 50/50 here
+                    moves={10: (1, 40), 33: (1, 40), 52: (11, 40), 57: (12, 90)}),
+    ),
     "lazarus": dict(
         suffix="Lazarus",
         label="Pokemon Lazarus v2.0",
@@ -89,9 +112,74 @@ GAMES = {
         moves_base=0x088D017C - 33 * 0x34, moves_stride=0x34, move_bits_off=0x0A,
         chart=0x08571B78, chart_n=21,
         mapsec_base=0x08CE4100 - 4 - 0x5A * 8, mapsec_name_off=4,
+        # Its own region map, in Emerald's region_map.c (gcc build): the 8bpp
+        # tiles / tilemap / palette are RomArt's LZ_REGION_* (regionmap/lazarus.png),
+        # sRegionMap_MapSectionLayout [15][28] sits right before the entries' names
+        # (the literal pool next to the tiles + tilemap points at it too).
+        region_map=dict(image="lazarus", layout=0x08CE35C8, w=28, h=15, ox=1, oy=2, none=0xD5),
         checks=dict(species={25: "Pikachu", 653: "Fennekin"}, types={25: (14, 14), 653: (11, 11)},
                     gender={25: 127}, items={1: "Poké Ball", 28: "Potion"},
                     moves={33: (1, 40), 57: (12, 90), 89: (5, 100)}),
+    ),
+    # Pokemon SoulGold v1.1.4 (a Johto remake on pokeemerald-expansion, gcc
+    # build, no source). Found from the ROM alone:
+    #  - species: "Bulbasaur" at 0x087D45F3, "Chikorita" / "Cyndaquil" exactly
+    #    151 / 154 entries of 0x118 later, "Pikachu" at 25 -> National Dex ids,
+    #    disabled species zeroed, forms + Gen 9 past 1000, the table ends at 1578
+    #    (zeroed; dex text follows). Base stats 45/49/49/45/65/65 at name-0x33,
+    #    types (13 Grass, 4 Poison) at name-0x2D, genderRatio 31 at name-0x21;
+    #    names are 13-byte fields (12 chars + EOS: "Bulbasaur" is followed by
+    #    3 zero bytes, then cryId / natDexNum 1), title case.
+    #  - items: the only pointer to "Poké Ball" is item 1's name (0x087520CC),
+    #    "Great Ball" 0x2C later, "Potion" at 28. Like HnS the description
+    #    pointer is 8 bytes before the name pointer (the one 0x24 after it is
+    #    the NEXT item's: it reads Super Potion's "60 points" for Potion).
+    #  - moves: the only pointer to a "Pound" string is move 1's name, "Tackle"
+    #    32 entries of 0x48 later (33), "Body Slam" right after. Same +0xA
+    #    type/power bitfield (Tackle 1/40, Ember 11/40, Surf 12/90, Earthquake
+    #    5/100, Moonblast 19/95).
+    #  - chart: the unique [21][21] u32 run whose Normal row is 1x except
+    #    Rock/Steel 0.5x and Ghost 0x, with Fire 2x on Grass/Ice/Bug/Steel.
+    #  - mapsecs: older {x, y, w, h, name ptr} entries from 0x08F3782C (Hoenn
+    #    0-0x49, Kanto/Sevii 0x4A-0xC3, then Johto: Violet 0xC4, Azalea 0xC5,
+    #    Goldenrod 0xC6, Ecruteak 0xC7, Olivine 0xC8, Cianwood 0xC9, Mahogany 0xCB,
+    #    Blackthorn 0xCC, Cherrygrove 0xCD, Routes 26-48 0xCF-0xE5, New Bark 0xE8,
+    #    the hack's own areas from 0xFF up). 314 of them: mapsec ids are u16 here
+    #    (MAPSEC_NONE = 0x13A; map headers hold a u16 at +0x14 - New Bark's 0xE8,
+    #    then cave/weather/mapType shifted one byte - and use ids up to 0x139).
+    #  - region map: Emerald's region_map.c with its own Johto art, but no
+    #    region_map= yet: LoadRegionMapGfx's pool (0x082251FC..) holds the 8bpp
+    #    tiles 0x08F39DA0 (smol, mode 5), the 64x64 affine tilemap 0x08F39AC4
+    #    (smol tilemap, mode 8 - RomArt can't decode either), the 3-palette
+    #    sRegionMapBg_Pal 0x08F37148 (raw, BG palette 7); the cursor grid is u16
+    #    [15][28] (0x08F3967C, a second layer at 0x08F39334, MAPSEC_NONE filler),
+    #    which RegionLayout's byte grid can't hold. Rendered with the game's own
+    #    decompressor (headless), the entries' rects + (1, 2) land on its towns.
+    "soulgold": dict(
+        suffix="SoulGold",
+        label="Pokemon SoulGold v1.1.4",
+        sha1="ea5d369cc8a31cbf1cfacb7c9470ea670f08957b",
+        species_name1=0x087D45F3, species_stride=0x118, species_max=1579,
+        species_types_off=-0x2D, species_gender_off=-0x21,
+        items_base=0x087520CC - 0x2C, items_stride=0x2C, items_desc_off=-8,
+        moves_base=0x087767C0 - 0x48, moves_stride=0x48, move_bits_off=0x0A,
+        chart=0x0843DBB4, chart_n=21,
+        mapsec_base=0x08F3782C, mapsec_name_off=4, mapsec_count=0x13A,
+        # Its Johto map is Emerald's region_map.c too, with smol art: the tiles /
+        # tilemap / palette are RomArt's SG_REGION_* (regionmap/soulgold.png). The
+        # cursor grid is u16 (ids past 255): sRegionMap_MapSectionLayout at
+        # 0x08F3967C [15][28] and a second layer just before it (0x08F39334: a
+        # few sections on top of the main one, like FireRed's dungeon layer).
+        # Checked: New Bark (0xE8), Cherrygrove (0xCD), Goldenrod (0xC6, 1x2)
+        # sit on the grid exactly where their entries' {x, y, w, h} say. Its map
+        # art sits a row higher than Emerald's: the grid overlaid at (1, 1) covers
+        # every route and town square (at Emerald's (1, 2) everything was a row low).
+        region_map=dict(image="soulgold", layout=0x08F3967C, extra_layers=[0x08F39334], cell=2,
+                        w=28, h=15, ox=1, oy=1, none=0x13A),
+        checks=dict(species={1: "Bulbasaur", 25: "Pikachu", 152: "Chikorita", 155: "Cyndaquil"},
+                    types={1: (13, 4), 25: (14, 14), 152: (13, 13), 155: (11, 11)},
+                    gender={1: 31, 25: 127, 155: 31}, items={1: "Poké Ball", 2: "Great Ball", 28: "Potion"},
+                    moves={1: (1, 40), 33: (1, 40), 52: (11, 40), 57: (12, 90), 89: (5, 100), 585: (19, 95)}),
     ),
 }
 
@@ -150,12 +238,18 @@ def title(s):
 
 
 def header(g, what):
-    return (f"package com.pokedaisey.app.companion.data\n\n"
+    return (f"package com.pokedaisy.app.companion.data\n\n"
             f"// GENERATED by scripts/gen_expansion_tables.py from the {g['label']} ROM\n"
             f"// (sha1 {g['sha1'][:8]}...) - do not hand-edit. {what}\n")
 
 
+# A game's `only` set: the tables (file names without the suffix) to write; None = all.
+ONLY = None
+
+
 def write(name, body):
+    if ONLY is not None and not any(name.startswith(t) for t in ONLY):
+        return
     path = os.path.join(OUT_DIR, name)
     with open(path, "w") as f:
         f.write(body)
@@ -214,6 +308,8 @@ def main():
     if sha1 != g["sha1"]:
         sys.exit(f"sha1 {sha1} is not {g['label']} ({g['sha1']})")
     rom = Rom(data)
+    global ONLY
+    ONLY = g.get("only")
     sfx = g["suffix"]
     low = sfx[0].lower() + sfx[1:]
 
@@ -260,6 +356,9 @@ def main():
           f"val moveData{sfx}: Map<Int, MoveInfo> = mapOf(\n" +
           "".join(f"    {i} to MoveInfo({kstr(n)}, {t}, {p}),\n" for i, n, t, p in rows) + ")\n")
 
+    if "chart" not in g:  # a game whose chart is another's (Seaglass: Heart and Soul's)
+        print(f"{len(names)} species, {len(items)} items, {len(moves)} moves")
+        return
     n = g["chart_n"]
     chart = {}
     for atk in range(n):
@@ -277,7 +376,7 @@ def main():
           "".join(f"    {k} to {v},\n" for k, v in sorted(chart.items())) + ")\n")
 
     mapsecs = {}
-    for i in range(0, 256):
+    for i in range(0, g.get("mapsec_count", 256)):
         a = g["mapsec_base"] + 8 * i
         p = rom.u32(a + g.get("mapsec_name_off", 0))
         if p == 0:
@@ -287,11 +386,43 @@ def main():
         s = rom.text(p)
         if s is not None:  # some slots point at an empty string
             mapsecs[i] = title(s)
-    write(f"MapSecData{sfx}.kt", header(g, "gRegionMapEntries names by mapsec id. No region-map\n"
-          "// image yet, so every entry is region -1 (text-only Map tab, like Unbound).\n") +
-          f"val regionMapImages{sfx} = arrayOf<String>()\n\n" +
-          f"val mapSecData{sfx}: Map<Int, MapSecInfo> = mapOf(\n" +
-          "".join(f"    {i} to MapSecInfo({kstr(s)}, -1, 0, 0, 0, 0),\n" for i, s in sorted(mapsecs.items())) + ")\n")
+    rm = g.get("region_map")
+    if rm is None:
+        write(f"MapSecData{sfx}.kt", header(g, "gRegionMapEntries names by mapsec id. No region-map\n"
+              "// image yet, so every entry is region -1 (text-only Map tab, like Unbound).\n") +
+              f"val regionMapImages{sfx} = arrayOf<String>()\n\n" +
+              f"val mapSecData{sfx}: Map<Int, MapSecInfo> = mapOf(\n" +
+              "".join(f"    {i} to MapSecInfo({kstr(s)}, -1, 0, 0, 0, 0),\n" for i, s in sorted(mapsecs.items())) + ")\n")
+    else:
+        # Older {u8 x, y, w, h; name} entries, in the cursor grid's tiles: the
+        # screen rect is that + (ox, oy), like MapSecDataEmerald. {0, 0} is "not
+        # on the map", unless the grid names the section (then its tiles place it).
+        assert g.get("mapsec_name_off") == 4
+        w, h = rm["w"], rm["h"]
+        cell = rm.get("cell", 1)  # bytes per grid cell: u16 where mapsec ids pass 255
+        grids = [rom.d[rom.off(a):rom.off(a) + w * h * cell] for a in [rm["layout"]] + rm.get("extra_layers", [])]
+        on_grid = {struct.unpack_from("<H" if cell == 2 else "<B", gr, k)[0] for gr in grids for k in range(0, w * h * cell, cell)}
+        on_grid -= {rm["none"]}
+        assert on_grid <= set(mapsecs), sorted(on_grid - set(mapsecs))
+        rows = []
+        for i, s in sorted(mapsecs.items()):
+            a = g["mapsec_base"] + 8 * i
+            x, y, mw, mh = (rom.u8(a + k) for k in range(4))
+            if (x, y) != (0, 0) and mw and mh:
+                rows.append(f"    {i} to MapSecInfo({kstr(s)}, 0, {x + rm['ox']}, {y + rm['oy']}, {mw}, {mh}),\n")
+            elif i in on_grid:
+                rows.append(f"    {i} to MapSecInfo({kstr(s)}, 0, 0, 0, 0, 0),\n")
+            else:
+                rows.append(f"    {i} to MapSecInfo({kstr(s)}, -1, 0, 0, 0, 0),\n")
+        write(f"MapSecData{sfx}.kt", header(g, "gRegionMapEntries by mapsec id, rects in\n"
+              f"// 8px tiles on regionmap/{rm['image']}.png (RomArt rebuilds it from the ROM); region -1 =\n"
+              "// not on the map. The grid is sRegionMap_MapSectionLayout, for the map cursor.\n") +
+              f"val regionMapImages{sfx} = arrayOf(\"{rm['image']}\")\n\n" +
+              f"val mapSecData{sfx}: Map<Int, MapSecInfo> = mapOf(\n" + "".join(rows) + ")\n\n" +
+              f"internal val regionLayouts{sfx}: List<RegionLayout> = listOf(\n"
+              f"    RegionLayout({rm['ox']}, {rm['oy']}, {w}, {h}, 0x{rm['none']:02X}, listOf(\n" +
+              "".join(f"        hexBytes(\"{gr.hex()}\"),\n" for gr in grids) +
+              ("    ), cellBytes = 2),\n)\n" if cell == 2 else "    )),\n)\n"))
     print(f"{len(names)} species, {len(items)} items, {len(moves)} moves, {len(mapsecs)} mapsecs")
 
 
