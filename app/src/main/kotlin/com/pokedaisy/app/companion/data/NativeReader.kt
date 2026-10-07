@@ -68,6 +68,8 @@ data class NativeConfig(
     val itemPalCompressed: Boolean = true,
     // See IconTables.extraItemIconTable (Emerald Rogue's own items).
     val extraItemIconTable: Long = 0,
+    // See IconTables.monIconPalettes (SoulGold's per-species icon palettes).
+    val monIconPalettes: Long = 0,
     val extraItemFirst: Int = 0,
     val extraItemCount: Int = 0,
     val extraItemStride: Int = 8,
@@ -117,6 +119,10 @@ data class NativeConfig(
     val pokedex: PokedexTables? = null,
     // The GUIDE's ROM tables + save flag/var offsets (GuideRom.kt); null = no HERE / NEXT BOSS.
     val guideTables: GuideTables? = null,
+    // The species whose icon is the egg's, for games where an egg keeps its own
+    // species in the struct (gSpeciesInfo's unnamed entry at the end: SoulGold
+    // 1578, Lazarus 1561); 0 = none found (the egg's species icon then).
+    val eggSpecies: Int = 0,
     // gPartyMenu, for the battle POKéMON pane's switch where the activity takes
     // it from the config (SoulGold's releases); 0 = not here.
     val partyMenu: Long = 0,
@@ -149,7 +155,7 @@ data class NativeConfig(
     val iconTables get() = IconTables(
         monIconTable, monIconPaletteTable, monIconPaletteIndices, itemIconTable,
         monIconStride, monPalIdxStride, monPalIdxMask, itemIconStride, itemPalCompressed,
-        extraItemIconTable, extraItemFirst, extraItemCount, extraItemStride,
+        extraItemIconTable, extraItemFirst, extraItemCount, extraItemStride, monIconPalettes,
     )
     val hasBattleInputAddrs get() = battlerControllerFuncs != 0L && handleInputChooseAction != 0L && handleInputChooseMove != 0L
 }
@@ -714,6 +720,7 @@ val NATIVE_LAZARUS = NATIVE_EMERALD.copy(
     completeWhenChoseItem = 0x0805FD79L,
     waitForMonSelection = 0x0805FCA9L,
     handleInputChooseTarget = 0x0805D8A5L,
+    eggSpecies = 1561,
     monIconTable = 0x08C7A3B0L,           // gSpeciesInfo[0].iconSprite
     monIconStride = 0xD4,
     monIconPaletteIndices = 0x08C7A3BEL,  // gSpeciesInfo[0].iconPalIndex
@@ -733,8 +740,10 @@ val NATIVE_LAZARUS = NATIVE_EMERALD.copy(
 //     substructs in a fixed order and no checksum (decodePartyMon's fallback
 //     path), species as National Dex numbers packed with teraType.
 //   - gPlayerParty 0x0203901C (the copy whose HP the party menu shows - the
-//     one at 0x020168A8 is SaveBlock1's), gPlayerPartyCount 0x020394D0 (a
-//     poked 2 showed a second mon), gEnemyParty 0x02038DDC (right before).
+//     one at 0x020168A8 is SaveBlock1's), gEnemyParty 0x02038DDC right before,
+//     and gPlayerPartyCount before that, 0x02038DD5 (77 literal-pool refs; a
+//     six-mon save reads 6 there). 0x020394D0 was taken for it once and showed
+//     only the first mon.
 //   - gSaveBlock1Ptr 0x030040C4 (pos at +0, money at +0x478: the trainer
 //     card's 3080), gSaveBlock2Ptr 0x030040C0 (name "Lidor"; the encryption
 //     key at +0xB4 matched the bag's XORed quantities); gMain 0x030055C0
@@ -768,7 +777,7 @@ val SOULGOLD_BAG_POCKET_ORDER = listOf(
 
 val NATIVE_SOULGOLD = NATIVE_EMERALD.copy(
     playerParty = 0x0203901CL,
-    playerPartyCount = 0x020394D0L,
+    playerPartyCount = 0x02038DD5L,
     monStride = 96,
     partyMonLayout = SOULGOLD_PARTY_MON,
     gMain = 0x030055C0L,
@@ -801,12 +810,14 @@ val NATIVE_SOULGOLD = NATIVE_EMERALD.copy(
     waitForMonSelection = 0x0805FB09L,
     handleInputChooseTarget = 0x0805FEA5L,
     partyMenu = 0x02038D24L,
+    eggSpecies = 1578,
     monIconTable = 0x087D4514L,           // gSpeciesInfo[0].iconSprite
     monIconStride = 0x118,
     monIconPaletteIndices = 0x087D453AL,  // gSpeciesInfo[0].iconPalIndex
     monPalIdxStride = 0x118,
     monPalIdxMask = 0x07,
     monIconPaletteTable = 0x08F15970L,
+    monIconPalettes = 0x087D453CL,        // gSpeciesInfo[0]'s own icon palette (+0x94; shiny +0x98)
     itemIconTable = 0x087520B0L,          // gItemsInfo[0].iconPic
     itemIconStride = 0x2C,
     itemPalCompressed = false,
@@ -827,7 +838,7 @@ val NATIVE_SOULGOLD = NATIVE_EMERALD.copy(
 // was Swords Dance; see ActiveTables' soulGoldV12).
 val NATIVE_SOULGOLD_V1_2 = NATIVE_SOULGOLD.copy(
     playerParty = 0x02039024L,
-    playerPartyCount = 0x020394D8L,
+    playerPartyCount = 0x02038DDDL,
     enemyParty = 0x02038DE4L,
     partyMenu = 0x02038D2CL,
     handleInputChooseAction = 0x08061D09L,
@@ -840,6 +851,7 @@ val NATIVE_SOULGOLD_V1_2 = NATIVE_SOULGOLD.copy(
     monIconPaletteIndices = 0x087D5D62L,  // gSpeciesInfo[0].iconPalIndex
     monPalIdxStride = 0x120,
     monIconPaletteTable = 0x08F20ABCL,
+    monIconPalettes = 0x087D5D64L,
     itemIconTable = 0x08753844L,          // gItemsInfo[0].iconPic
     pokedex = POKEDEX_SOULGOLD_V1_2,
 )
@@ -1311,7 +1323,7 @@ fun readNativeTelemetry(client: MemoryReader, cfg: NativeConfig): Telemetry {
     if (count > 0) {
         val raw = client.readCoreMemory(cfg.playerParty, count * cfg.monStride)
         for (i in 0 until count) decodePartyMon(raw, i * cfg.monStride, cfg.partyMonLayout)?.let {
-            party.add(it.masked(cfg).withNativeGender(raw, i * cfg.monStride, cfg.partyMonLayout.flags))
+            party.add(it.masked(cfg).withNativeGender(raw, i * cfg.monStride, cfg.partyMonLayout.flags, cfg.eggSpecies))
         }
     }
 
@@ -1466,7 +1478,7 @@ private val NIDORAN_M_NAME = byteArrayOf(0xC8.toByte(), 0xC3.toByte(), 0xBE.toBy
  * species ids: retail FireRed/Emerald share [genderRatiosFireRed]; the CFRU
  * hacks have theirs in GenderRatiosCfru.kt.
  */
-private fun Mon.withNativeGender(raw: ByteArray, off: Int, flagsOff: Int = 0x13): Mon {
+private fun Mon.withNativeGender(raw: ByteArray, off: Int, flagsOff: Int = 0x13, eggSpecies: Int = 0): Mon {
     val ratios = when (activeGame) {
         // Emerald shares FireRed's internal Gen3 species ids and base-stat gender ratios.
         GameKind.FIRERED, GameKind.EMERALD -> genderRatiosFireRed
@@ -1485,10 +1497,10 @@ private fun Mon.withNativeGender(raw: ByteArray, off: Int, flagsOff: Int = 0x13)
     // QoL ROMs' own MON_DATA_SPECIES_OR_EGG export). The CFRU hacks kept
     // vanilla's SPECIES_EGG (412 - checked against each ROM's icon table).
     if ((raw[off + flagsOff].toInt() and 0x04) != 0) {
-        // Heart and Soul / Lazarus / SoulGold / Seaglass have no SPECIES_EGG entry in
-        // their species tables, so an egg keeps its species there - just without a gender.
+        // Heart and Soul / Lazarus / SoulGold / Seaglass have no SPECIES_EGG 412, so an
+        // egg is flagged instead: "Egg", no HP bar, the egg's icon where [eggSpecies] is known.
         if (activeGame in setOf(GameKind.HEART_AND_SOUL, GameKind.LAZARUS, GameKind.SOULGOLD, GameKind.EMERALD_SEAGLASS)) {
-            return copy(genderSymbol = GENDER_SYMBOL_NONE)
+            return copy(species = if (eggSpecies != 0) eggSpecies else species, genderSymbol = GENDER_SYMBOL_NONE, isEgg = true)
         }
         return copy(species = SPECIES_EGG_VANILLA, genderSymbol = GENDER_SYMBOL_NONE)
     }

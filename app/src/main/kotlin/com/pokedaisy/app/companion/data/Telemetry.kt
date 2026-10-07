@@ -75,6 +75,9 @@ data class Mon(
     val personality: Long = 0,
     // IVs / EVs / nature from the decrypted RAM struct; null = unknown.
     val stats: MonStats? = null,
+    // An egg read from the RAM struct's flags where [species] stays the egg's own
+    // species (the expansion hacks with no SPECIES_EGG 412; see withNativeGender).
+    val isEgg: Boolean = false,
 )
 
 // QOL_GENDER_* in the ROM's qol_telemetry.h: what FireRed's party menu shows
@@ -174,6 +177,9 @@ data class IconTables(
     val extraItemFirst: Int = 0,
     val extraItemCount: Int = 0,
     val extraItemStride: Int = 8,
+    // Each species' own icon palette (a pointer per gSpeciesInfo entry, [monIconStride]
+    // apart) instead of an index into the 6 shared ones: SoulGold's. 0 = the shared ones.
+    val monIconPalettes: Long = 0,
 ) {
     // Split per-kind: some hacks relocate one table but not the other (Gaia
     // keeps sItemIconTable at its vanilla address but moved gMonIconTable

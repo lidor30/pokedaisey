@@ -72,7 +72,12 @@ reason about Compose layout blind. Two ways, same screens:
    not a regression gate). Tests live in
    `app/src/test/kotlin/.../companion/ui/CompanionScreenshotTest.kt`: one per companion
    tab (via `CompanionScreen(initialTab = …)` — Paparazzi can't tap the tab bar) plus the
-   shared `OptionSelector`/`OptionConfirm`, at the Thor bottom screen's 1240x1080 (landscape). Add a
+   shared `OptionSelector`/`OptionConfirm`, at the Thor bottom screen's 1240x1080 (landscape);
+   `WideCompanionScreenshotTest` re-runs all of them at the top screen's 1920x1080 (where SWAP SCREENS puts
+   the companion; density 2.0, the closest bucket layoutlib has). Wide-screen rules so far: `PartyGrid` goes
+   to 3 columns past 1.6:1 (a measuring `Layout` - BoxWithConstraints composed the slots late and FireRed's
+   icons missed the frame), and the MAP fills the tab only while that stretches it <= 1.2x
+   (`MAX_MAP_STRETCH`; the Thor's bottom is ~1.16), else it keeps its shape, centred, buttons with it. Add a
    test when adding a screen. Paparazzi is pinned to **1.3.4** — the last release on
    Kotlin 1.9.24; newer ones need a Kotlin 2 bump first. Library/Settings (top screen)
    are private composables inside their Activities, so Paparazzi can't reach them; use
@@ -216,7 +221,11 @@ format, v1.1.4's generated tables but TM75 via `soulGoldV12`; gPartyMenu comes f
 assumptions, each a `NativeConfig` field now: its struct Pokemon is 96 bytes and plaintext
 (`SOULGOLD_PARTY_MON`: 12-char nicknames push the egg flags to +0x15, status at +0x4C, level/HP
 from +0x50), BattlePokemon is 0x98 bytes (`SOULGOLD_BATTLE_MON`), mapsec ids are u16 with mapType a
-byte later (`mapSecWide`), and the bag has 8 pockets (Items holds 150). Its art is smol-compressed:
+byte later (`mapSecWide`), and the bag has 8 pockets (Items holds 150). gPlayerPartyCount is 0x02038DD5, right before gEnemyParty (a wrong
+guess once showed only the first mon - test party code on a save with a full party). Mon icons have a palette
+per species (`gSpeciesInfo`+0x94, `IconTables.monIconPalettes`), not vanilla's 6 shared ones. Eggs in the
+expansion hacks keep their species, so they're flagged (`Mon.isEgg`) and drawn with `NativeConfig.eggSpecies`'
+icon (SoulGold 1578, Lazarus 1561: gSpeciesInfo's unnamed last entry; Heart and Soul / Seaglass: none found). Its art is smol-compressed:
 `RomBlob(smol = true)` blobs go through `Smol.decompressAny` (tile modes 1-6 and the tilemap mode 8),
 `scripts/smol.py` is the generator's twin. The bag's night sky (`bagbg/soulgold.png`) is a
 `BagPalette.backdropArt`, drawn still (the game scrolls it). Its Johto map is Emerald's region_map.c
@@ -410,13 +419,26 @@ the renderer can't drive borrows the newest other game's click. In Compose, use
 own buttons (battle FIGHT / BAG / moves / BACK: `PlatinumButton(pressesGame = true)`), which the
 game already sounds, and tap-swallowing scrims. The top-screen Library / Settings stay silent.
 
+**SWAP SCREENS** (SETTINGS on either screen, SCREEN group, only with a second screen; `Prefs.swapScreens`): the game
+on the second display and the companion on the main one, for a device whose main display is its bottom screen
+(the Anbernic RG DS, by a user's report - no device to check it on yet, and no automatic rule until someone posts
+its `dumpsys display`). The activity never moves: the two windows trade *contents* (`PokeDaisyActivity.syncPresentation`)
+- the game's stage (`GameStageLayout`: game view, status bar, touch pad, HUD, side panel) goes into the Presentation
+(`DualScreenPresentation` takes any content now) and a companion becomes the activity's content. A Presentation
+can't go on the default display (WindowManager refuses TYPE_PRESENTATION there), which is why it's not the other way
+round. The GLSurfaceView makes a new GL thread each time it's attached again, and a detached one's `queueEvent`
+goes to the old, exited thread - so `EmulatorView` hands the frame buffer over under a lock, not through the queue.
+The stage keeps its own ViewTree owners (set on itself), the Presentation's are on a frame around its content.
+`Screens` finds the second screen (ui-preview shims it as the Thor's).
 **Single-screen devices** (`SidePanel.kt`, Compose pieces in `companion/ui/SidePanel.kt`; tested on the
 Retroid Pocket 6, 1920x1080): with no second display (`syncPresentation` finds none, debug mirror off) the
 companion is a panel on the right of the game's screen. A BACK tap slides it in over the game; with it open
 BACK is the companion's back, and with nothing left to go back from it closes the panel - unless it's locked.
 The tab on its edge (`SidePanelHandle`: a padlock, `ShadowedPixelIcon`) locks it beside the game (the game's right margin,
 which `GameStageLayout` honours; the touch pad moves to the game's side whenever the panel is open) and
-unlocks it; dragging the tab sideways resizes it (`DragFrame`, screen coordinates - the tab moves with the
+unlocks it; two more tabs for touch (`SidePanelOpenTab` on the screen's right edge, bottom, while closed;
+`SidePanelCloseTab` outside the panel's bottom-left corner, which closes it even locked) go see-through
+(`LOCKED_TAB_ALPHA`) while locked; dragging the lock tab sideways resizes it (`DragFrame`, screen coordinates - the tab moves with the
 finger), snapping when the game is within 48 px of a whole-number scale. Default width half the screen: the
 game at exactly 4x on 1080p; also checked at 3:2 (810 px panel, all fits) and 4:3 (640 px, a few names
 truncate). The panel draws the companion at `sidePanelDensity` - the Thor's own 2.625-equivalent where it's

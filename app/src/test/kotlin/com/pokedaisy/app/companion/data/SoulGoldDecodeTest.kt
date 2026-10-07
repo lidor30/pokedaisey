@@ -23,6 +23,24 @@ class SoulGoldDecodeTest {
     }
 
     @Test
+    fun `party - all six, the egg flagged`() {
+        // gPlayerPartyCount is 0x02038DD5: the byte once used for it read 1 here, so only Beedrill showed.
+        activeGame = GameKind.SOULGOLD
+        val t = decodeNative("soulgold_party", NATIVE_SOULGOLD)
+        assertEquals(6, t.party.size)
+        assertEquals(listOf("Beedrill", "Tinkatuff", "Noibat", "Misdreavus", "Quilava"), t.party.take(5).map { speciesName(it.species) })
+        assertEquals(listOf(30, 10, 0, 71, 75), t.party.take(5).map { it.hp }) // poked (see the fixture's README)
+        assertEquals(GENDER_SYMBOL_FEMALE, t.party[1].genderSymbol)
+        val egg = t.party[5]
+        assertTrue(egg.isEgg)
+        assertEquals(1578, egg.species) // gSpeciesInfo's unnamed last entry: the egg icon
+        assertFalse(t.party[0].isEgg)
+        val view = buildSnapshotView(t)
+        assertEquals("Egg", view.party[5].name)
+        assertTrue(view.party[5].isEgg)
+    }
+
+    @Test
     fun `location, money and bag`() {
         activeGame = GameKind.SOULGOLD
         val t = decodeNative("soulgold", NATIVE_SOULGOLD)

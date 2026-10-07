@@ -34,6 +34,7 @@ internal val trSettings: Map<String, Tr> = mapOf(
     "TOUCH PAD" to Tr(ja = "タッチパッド", fr = "PAD TACTILE", de = "TOUCH-PAD", it = "PAD TATTILE", es = "PAD TÁCTIL"),
     "ALWAYS" to Tr(ja = "いつも", fr = "TOUJOURS", de = "IMMER", it = "SEMPRE", es = "SIEMPRE"),
     "NEVER" to Tr(ja = "つかわない", fr = "JAMAIS", de = "NIE", it = "MAI", es = "NUNCA"),
+    "SWAP SCREENS" to Tr(ja = "がめんを いれかえ", fr = "INVERSER LES ÉCRANS", de = "BILDSCHIRME TAUSCHEN", it = "SCAMBIA SCHERMI", es = "INTERCAMBIAR PANTALLAS"),
     "STATUS BAR" to Tr(ja = "ステータスバー", fr = "BARRE D'ÉTAT", de = "STATUSLEISTE", it = "BARRA DI STATO", es = "BARRA DE ESTADO"),
     "ASPECT" to Tr(ja = "アスペクト", fr = "FORMAT", de = "FORMAT", it = "FORMATO", es = "FORMATO"),
     "STRETCH" to Tr(ja = "ひきのばし", fr = "ÉTIRÉ", de = "GESTRECKT", it = "ESTESO", es = "ESTIRADO"),

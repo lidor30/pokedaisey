@@ -200,7 +200,7 @@ fun buildSnapshotView(t: Telemetry): SnapshotView {
                 MoveView(info.name, typeName(info.type), m.pp[idx], info.power)
             }
         }
-        val isEgg = isVanillaEgg(m.species)
+        val isEgg = m.isEgg || isVanillaEgg(m.species)
         MonView(
             species = m.species,
             name = if (isEgg) gameCase("Egg") else speciesName(m.species),

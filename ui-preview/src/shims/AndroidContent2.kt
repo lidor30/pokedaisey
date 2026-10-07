@@ -13,6 +13,7 @@ open class Intent() {
         data = o.data
     }
     fun setClass(ctx: Context, cls: Class<*>) = this
+    fun setClassName(pkg: String, cls: String) = this
     fun setFlags(f: Int) = this
     fun addFlags(f: Int) = this
     fun setDataAndType(u: android.net.Uri, type: String) = apply { data = u }

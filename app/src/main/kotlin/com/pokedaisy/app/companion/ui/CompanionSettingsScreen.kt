@@ -255,7 +255,7 @@ private fun homeRows(
 ): List<SettingRow> {
     fun onOff(on: Boolean) = if (on) tk("ON") else tk("OFF")
     val rateLabels = FF_RATES.map(::rateLabel)
-    return listOf(
+    return listOfNotNull(
         groupTitle(tk("FAST-FORWARD")),
         // On / off - the group's title already says fast-forward.
         SettingRow("FF", onOff(s.ffToggled)) { s.setFfToggled(!s.ffToggled); changed() },
@@ -304,6 +304,9 @@ private fun homeRows(
         SettingRow(tk("STATUS BAR"), onOff(s.statusBar)) { s.setStatusBar(!s.statusBar); changed() },
         // The game at the GBA's 3:2, or stretched to fill the top screen; flips in place.
         SettingRow(tk("ASPECT"), aspectLabel(s.stretchGame)) { s.setStretchGame(!s.stretchGame); changed() },
+        // Game and companion trade screens (this companion moves with them).
+        SettingRow(tk("SWAP SCREENS"), onOff(s.swapScreens)) { s.setSwapScreens(!s.swapScreens); changed() }
+            .takeIf { s.hasSecondScreen },
     )
 }
 

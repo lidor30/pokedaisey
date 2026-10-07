@@ -13,8 +13,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.ComposeView
 import com.pokedaisy.app.companion.ui.CompanionBack
 import com.pokedaisy.app.companion.ui.LocalClickSound
+import com.pokedaisy.app.companion.ui.SidePanelCloseTab
 import com.pokedaisy.app.companion.ui.SidePanelCompanion
 import com.pokedaisy.app.companion.ui.SidePanelHandle
+import com.pokedaisy.app.companion.ui.SidePanelOpenTab
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -30,8 +32,11 @@ import kotlin.math.roundToInt
  * panel comes back with the game.
  *
  * BACK with the panel open is the companion's back ([back]); with nothing left
- * to go back from, it closes an unlocked panel (a locked one stays). The touch
- * pad stays on the game's side whenever the panel is open.
+ * to go back from, it closes an unlocked panel (a locked one stays). Two more
+ * tabs for touch: one on the screen's right edge, bottom, opens a closed panel;
+ * one outside the panel's bottom-left corner closes it, locked or not. While
+ * locked, both are see-through ([LOCKED_TAB_ALPHA]) - they sit over the letterbox
+ * then. The touch pad stays on the game's side whenever the panel is open.
  */
 class SidePanel(
     private val root: FrameLayout,
@@ -53,6 +58,8 @@ class SidePanel(
 
     private var panel: View? = null
     private var handle: View? = null
+    private var openTab: View? = null
+    private var closeTab: View? = null
     private var lastRootWidth = 0
 
     private val rootWidth get() = root.width.takeIf { it > 0 } ?: context.resources.displayMetrics.widthPixels
@@ -90,16 +97,28 @@ class SidePanel(
                     topMargin = (HANDLE_TOP_DP * context.resources.displayMetrics.density).roundToInt()
                 })
             }
+            val bottom = (TAB_MARGIN_DP * context.resources.displayMetrics.density).roundToInt()
+            closeTab = tabView { SidePanelCloseTab(::hide) }.also {
+                root.addView(it, at + 2, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply { bottomMargin = bottom })
+            }
+            openTab = tabView { SidePanelOpenTab(::show) }.also {
+                root.addView(it, at + 3, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply { bottomMargin = bottom })
+            }
             root.addOnLayoutChangeListener(relayout)
         } else {
             root.removeOnLayoutChangeListener(relayout)
-            panel?.let(root::removeView)
-            handle?.let(root::removeView)
+            for (v in listOfNotNull(panel, handle, closeTab, openTab)) root.removeView(v)
             panel = null
             handle = null
+            closeTab = null
+            openTab = null
             open = false
         }
         apply()
+    }
+
+    private fun tabView(content: @Composable () -> Unit) = ComposeView(context).apply {
+        setContent { CompositionLocalProvider(LocalClickSound provides clickSound, content = content) }
     }
 
     /** A BACK tap; false = not ours (no side panel - the second screen's companion takes it). */
@@ -118,7 +137,7 @@ class SidePanel(
         open = true
         apply()
         val w = panelWidth.toFloat()
-        for (v in listOfNotNull(panel, handle)) {
+        for (v in listOfNotNull(panel, handle, closeTab)) {
             v.translationX = w
             v.animate().translationX(0f).setDuration(SLIDE_MS).setUpdateListener { punchThrough() }.withEndAction(null).start()
         }
@@ -127,10 +146,11 @@ class SidePanel(
     private fun hide() {
         if (!open) return
         open = false
-        // The touch pad takes the whole screen back now; the panel slides out first.
+        // The game and the touch pad take the whole screen back now; the panel slides out over them.
+        setRightMargin(game, 0)
         setRightMargin(touchControls, 0)
         val w = panelWidth.toFloat() + (handle?.width ?: 0)
-        for (v in listOfNotNull(panel, handle)) {
+        for (v in listOfNotNull(panel, handle, closeTab)) {
             v.animate().translationX(w).setDuration(SLIDE_MS).setUpdateListener { punchThrough() }
                 .withEndAction { if (!open) apply() }.start()
         }
@@ -165,6 +185,16 @@ class SidePanel(
             visibility = if (shown) View.VISIBLE else View.GONE
             translationX = 0f
             setRightMargin(this, w)
+        }
+        closeTab?.apply {
+            visibility = if (shown) View.VISIBLE else View.GONE
+            translationX = 0f
+            alpha = if (docked.value) LOCKED_TAB_ALPHA else 1f
+            setRightMargin(this, w)
+        }
+        openTab?.apply {
+            visibility = if (enabled && !open) View.VISIBLE else View.GONE
+            alpha = if (docked.value) LOCKED_TAB_ALPHA else 1f
         }
         setRightMargin(game, if (shown && docked.value) w else 0)
         setRightMargin(touchControls, if (shown) w else 0)
@@ -246,6 +276,9 @@ class SidePanel(
         const val MIN_FRACTION = 0.3f
         const val MAX_FRACTION = 0.75f
         const val HANDLE_TOP_DP = 12
+        const val TAB_MARGIN_DP = 12
+        /** The open / close tabs while the panel is locked: there, but out of the way. */
+        const val LOCKED_TAB_ALPHA = 0.35f
         const val SLIDE_MS = 160L
         const val GBA_W = 240
         const val GBA_H = 160

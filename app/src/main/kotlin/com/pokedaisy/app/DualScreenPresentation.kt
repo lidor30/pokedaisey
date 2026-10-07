@@ -7,9 +7,12 @@ import android.os.Build
 import android.os.Bundle
 import android.view.Display
 import android.view.KeyEvent
+import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
-import androidx.compose.runtime.getValue
+import android.widget.FrameLayout
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -21,40 +24,40 @@ import com.pokedaisy.app.companion.TelemetryStore
 import com.pokedaisy.app.companion.ui.CompanionScreen
 
 /**
- * The bottom-screen companion, shown on the Thor's secondary [Display] via the
- * Android Presentation API. Hosts the reused android-companion Compose UI; a
- * Presentation is a Dialog, so it has to supply its own ViewTree lifecycle /
- * saved-state / view-model owners for Compose to run.
+ * The second screen, via the Android Presentation API: normally the
+ * companion (the Thor's bottom screen), the game with SWAP SCREENS on
+ * ([PokeDaisyActivity]'s arrangeScreens). [content] builds what it shows, in
+ * this Presentation's display context. A Presentation is a Dialog, so it
+ * supplies its own ViewTree lifecycle / saved-state / view-model owners for
+ * Compose to run - on a frame around the content, so a view that brings its
+ * own (the game's stage) keeps them when it moves back to the activity.
  */
 class DualScreenPresentation(
     /** The game's activity (a Presentation's own [getContext] is a display context, not it). */
     private val host: Context,
     display: Display,
-    private val store: TelemetryStore,
-    private val slots: com.pokedaisy.app.companion.StateSlots? = null,
-    private val settings: com.pokedaisy.app.companion.CompanionSettings? = null,
-    private val battleInput: com.pokedaisy.app.companion.BattleInput? = null,
-    private val back: com.pokedaisy.app.companion.ui.CompanionBack? = null,
-    private val clickSound: () -> Unit = {},
-    private val achievements: com.pokedaisy.app.companion.CompanionAchievements? = null,
+    private val content: (Context) -> View,
 ) : Presentation(host, display) {
 
     private val owner = ComposeHostOwner()
+    private var frame: FrameLayout? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         owner.create()
-        val view = ComposeView(context).apply {
+        frame = FrameLayout(context).apply {
             setViewTreeLifecycleOwner(owner)
             setViewTreeSavedStateRegistryOwner(owner)
             setViewTreeViewModelStoreOwner(owner)
-            setContent {
-                val snap by store.snapshot.collectAsState()
-                CompanionScreen(snap, slots, settings, battleInput, back = back, clickSound = clickSound, achievements = achievements)
-            }
+            addView(content(context).also { (it.parent as? ViewGroup)?.removeView(it) })
         }
-        setContentView(view)
+        setContentView(frame!!)
         goFullScreen()
+    }
+
+    /** Lets go of the content (the game's stage, on its way back to the activity). */
+    fun releaseContent() {
+        frame?.removeAllViews()
     }
 
     /**
@@ -97,5 +100,28 @@ class DualScreenPresentation(
     override fun onStop() {
         super.onStop()
         owner.destroy()
+    }
+
+    companion object {
+        /** The companion, for a second screen (or the main one, swapped). */
+        fun companionView(
+            context: Context,
+            store: TelemetryStore,
+            slots: com.pokedaisy.app.companion.StateSlots?,
+            settings: com.pokedaisy.app.companion.CompanionSettings?,
+            battleInput: com.pokedaisy.app.companion.BattleInput?,
+            back: com.pokedaisy.app.companion.ui.CompanionBack?,
+            clickSound: () -> Unit,
+            achievements: com.pokedaisy.app.companion.CompanionAchievements?,
+            initialTab: String = "PARTY",
+        ): View = ComposeView(context).apply {
+            setContent {
+                val snap by store.snapshot.collectAsState()
+                CompanionScreen(
+                    snap, slots, settings, battleInput, initialTab = initialTab,
+                    back = back, clickSound = clickSound, achievements = achievements,
+                )
+            }
+        }
     }
 }

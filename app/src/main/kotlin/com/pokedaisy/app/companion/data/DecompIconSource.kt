@@ -97,8 +97,11 @@ object DecompIconSource {
             android.util.Log.w("pokedaisy", "DecompIcon mon $species: tilesPtr %08x not in ROM".format(tilesPtr)); return null
         }
         val palIdx = rd(t.monIconPaletteIndices + species.toLong() * t.monPalIdxStride, 1)[0].toInt() and t.monPalIdxMask
-        val entry = rd(t.monIconPaletteTable + palIdx.toLong() * MON_PAL_ENTRY_BYTES, MON_PAL_ENTRY_BYTES)
-        val palDataPtr = Gfx.u32(entry, 0)
+        val palDataPtr = if (t.monIconPalettes != 0L) {
+            Gfx.u32(rd(t.monIconPalettes + species.toLong() * t.monIconStride, 4), 0)
+        } else {
+            Gfx.u32(rd(t.monIconPaletteTable + palIdx.toLong() * MON_PAL_ENTRY_BYTES, MON_PAL_ENTRY_BYTES), 0)
+        }
         if (!Gfx.inRom(palDataPtr)) {
             android.util.Log.w("pokedaisy", "DecompIcon mon $species: palPtr %08x not in ROM (idx=$palIdx)".format(palDataPtr)); return null
         }
