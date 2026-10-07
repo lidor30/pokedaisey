@@ -7,6 +7,7 @@
 
 #include <jni.h>
 #include <android/log.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -90,7 +91,14 @@ static void pkDrainAudio(void) {
     }
 }
 
+// Guards g.core's lifetime, not its state: the emu thread owns frames, saves and
+// teardown, but the companion's ROM readers (Pokédex, GUIDE, icons) call
+// pkReadBytes from IO threads, and one in flight while the game closed read a
+// core pkTeardown had just freed. Readers share it; init / teardown take it alone.
+static pthread_rwlock_t pk_coreLock = PTHREAD_RWLOCK_INITIALIZER;
+
 static void pkTeardown(void) {
+    pthread_rwlock_wrlock(&pk_coreLock);
     if (g.core) {
         g.core->deinit(g.core);         // unloads ROM, flushes save VFile
         g.core = NULL;
@@ -104,6 +112,7 @@ static void pkTeardown(void) {
     g.video = NULL;
     g.vw = g.vh = 0;
     g.audioAvail = 0;
+    pthread_rwlock_unlock(&pk_coreLock);
 }
 
 // The player's core, for pokedaisy_ra.c (RetroAchievements' memory reads and ROM hash).
@@ -210,12 +219,14 @@ Java_com_pokedaisy_app_MgbaCore_pkInit(JNIEnv* env, jobject thiz,
 
     core->reset(core);
 
+    pthread_rwlock_wrlock(&pk_coreLock);
     g.core = core;
     g.video = video;
     g.vw = w;
     g.vh = h;
     g.saveVf = saveVf;
     g.audioAvail = 0;
+    pthread_rwlock_unlock(&pk_coreLock);
 
     LOGI("core up: %ux%u, freq %d Hz, sample rate %d", w, h, core->frequency(core), PK_SAMPLE_RATE);
     return JNI_TRUE;
@@ -578,19 +589,23 @@ static void pk_read_range(struct mCore* core, uint32_t addr, uint8_t* dst, int l
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkReadBytes(JNIEnv* env, jobject thiz, jlong addr, jint len) {
-    if (!g.core || len <= 0 || len > (1 << 24)) {
-        return NULL;
-    }
-    jbyteArray out = (*env)->NewByteArray(env, len);
-    if (!out) {
+    if (len <= 0 || len > (1 << 24)) {
         return NULL;
     }
     uint8_t* tmp = malloc((size_t) len);
     if (!tmp) {
-        return out;
+        return NULL;
     }
-    pk_read_range(g.core, (uint32_t) addr, tmp, len);
-    (*env)->SetByteArrayRegion(env, out, 0, len, (const jbyte*) tmp);
+    pthread_rwlock_rdlock(&pk_coreLock);
+    bool ok = g.core != NULL;
+    if (ok) {
+        pk_read_range(g.core, (uint32_t) addr, tmp, len);
+    }
+    pthread_rwlock_unlock(&pk_coreLock);
+    jbyteArray out = ok ? (*env)->NewByteArray(env, len) : NULL;
+    if (out) {
+        (*env)->SetByteArrayRegion(env, out, 0, len, (const jbyte*) tmp);
+    }
     free(tmp);
     return out;
 }
@@ -616,17 +631,26 @@ Java_com_pokedaisy_app_MgbaCore_pkRenderReadBytes(JNIEnv* env, jobject thiz, jlo
     return out;
 }
 
+static jlong pk_find_magic(const jbyte* m4);
+
 // Scans IWRAM then EWRAM for a 4-byte magic; returns its GBA address or -1.
 JNIEXPORT jlong JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkFindMagic(JNIEnv* env, jobject thiz, jbyteArray jMagic) {
-    if (!pk_is_gba(g.core)) {
-        return -1;
-    }
     jbyte m4[4];
     if ((*env)->GetArrayLength(env, jMagic) < 4) {
         return -1;
     }
     (*env)->GetByteArrayRegion(env, jMagic, 0, 4, m4);
+    pthread_rwlock_rdlock(&pk_coreLock);
+    jlong found = pk_find_magic(m4);
+    pthread_rwlock_unlock(&pk_coreLock);
+    return found;
+}
+
+static jlong pk_find_magic(const jbyte* m4) {
+    if (!pk_is_gba(g.core)) {
+        return -1;
+    }
     const uint32_t regions[][2] = {
         { 0x03000000u, 0x8000u },     // IWRAM (32 KiB) — struct lives here
         { 0x02000000u, 0x40000u },    // EWRAM (256 KiB)
@@ -670,17 +694,21 @@ Java_com_pokedaisy_app_MgbaCore_pkRomCode(JNIEnv* env, jobject thiz) {
 // so its ROM can't be read whole over the bus (the Poller hashes it this way).
 JNIEXPORT jbyteArray JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRomRead(JNIEnv* env, jobject thiz, jlong off, jint len) {
-    if (!g.core || g.core->platform(g.core) != mPLATFORM_GB || off < 0 || len <= 0) {
+    if (off < 0 || len <= 0) {
         return NULL;
     }
-    struct GB* gb = g.core->board;
-    if (!gb->memory.rom || (size_t) off + (size_t) len > gb->pristineRomSize) {
-        return NULL;
+    jbyteArray out = NULL;
+    pthread_rwlock_rdlock(&pk_coreLock);
+    if (g.core && g.core->platform(g.core) == mPLATFORM_GB) {
+        struct GB* gb = g.core->board;
+        if (gb->memory.rom && (size_t) off + (size_t) len <= gb->pristineRomSize) {
+            out = (*env)->NewByteArray(env, len);
+            if (out) {
+                (*env)->SetByteArrayRegion(env, out, 0, len, (const jbyte*) gb->memory.rom + off);
+            }
+        }
     }
-    jbyteArray out = (*env)->NewByteArray(env, len);
-    if (out) {
-        (*env)->SetByteArrayRegion(env, out, 0, len, (const jbyte*) gb->memory.rom + off);
-    }
+    pthread_rwlock_unlock(&pk_coreLock);
     return out;
 }
 

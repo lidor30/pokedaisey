@@ -239,8 +239,8 @@ object QolColors {
 fun pixelFontFamily(): FontFamily {
     LocalGameFont.current?.let { return it }
     val context = LocalContext.current
-    // Pixel Operator + its Japanese fallback (PixelTypeface.kt).
-    return remember(context) { com.pokedaisy.app.pixelFontFamily(context) }
+    // Pixel Operator + its Japanese fallback (PixelTypeface.kt), one per process.
+    return com.pokedaisy.app.pixelFontFamily(context)
 }
 
 /**
@@ -362,24 +362,37 @@ fun rememberGameBackground(game: GameKind): GameBackground? {
     val context = LocalContext.current
     val gen = rememberArtGeneration()
     return remember(game, gen) {
-        // Gen 1's screens are plain white.
-        if (game == GameKind.YELLOW) {
-            return@remember GameBackground(android.graphics.Bitmap.createBitmap(intArrayOf(-1), 1, 1, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap(), true)
+        // Kept across visits: the ITEMS backdrop crossfade unmounts this one, and
+        // rebuilding it recoloured 38k pixels on the main thread each time.
+        backgroundCache[game to gen]?.let { return@remember it }
+        buildGameBackground(context, game)?.also {
+            backgroundCache.keys.removeAll { (_, g) -> g != gen }
+            backgroundCache[game to gen] = it
         }
-        backdropColors(game)?.let { to ->
-            return@remember GameBackground(recolorBackdrop(GameArt.get(context, "partybg/firered.png"), to).asImageBitmap(), false)
-        }
-        val (asset, tiled) = when (game) {
-            GameKind.EMERALD -> "partybg/emerald.png" to false
-            GameKind.HEART_AND_SOUL -> "partybg/hns.png" to false
-            GameKind.UNBOUND, GameKind.RADICAL_RED, GameKind.ODYSSEY, GameKind.AMETHYST -> "partybg/cfru_tile.png" to true
-            else -> "partybg/firered.png" to false
-        }
-        // FireRed's / Emerald's come from a ROM the player has run (RomArt):
-        // until then, the other one if that one's there.
-        val bmp = sequenceOf(asset, "partybg/firered.png", "partybg/emerald.png").firstNotNullOfOrNull { GameArt.get(context, it) }
-        bmp?.let { GameBackground(it.asImageBitmap(), tiled) }
     }
+}
+
+/** [rememberGameBackground]'s backdrops by game and art generation (main thread only). */
+private val backgroundCache = HashMap<Pair<GameKind, Int>, GameBackground>()
+
+private fun buildGameBackground(context: android.content.Context, game: GameKind): GameBackground? {
+    // Gen 1's screens are plain white.
+    if (game == GameKind.YELLOW) {
+        return GameBackground(android.graphics.Bitmap.createBitmap(intArrayOf(-1), 1, 1, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap(), true)
+    }
+    backdropColors(game)?.let { to ->
+        return GameBackground(recolorBackdrop(GameArt.get(context, "partybg/firered.png"), to).asImageBitmap(), false)
+    }
+    val (asset, tiled) = when (game) {
+        GameKind.EMERALD -> "partybg/emerald.png" to false
+        GameKind.HEART_AND_SOUL -> "partybg/hns.png" to false
+        GameKind.UNBOUND, GameKind.RADICAL_RED, GameKind.ODYSSEY, GameKind.AMETHYST -> "partybg/cfru_tile.png" to true
+        else -> "partybg/firered.png" to false
+    }
+    // FireRed's / Emerald's come from a ROM the player has run (RomArt):
+    // until then, the other one if that one's there.
+    val bmp = sequenceOf(asset, "partybg/firered.png", "partybg/emerald.png").firstNotNullOfOrNull { GameArt.get(context, it) }
+    return bmp?.let { GameBackground(it.asImageBitmap(), tiled) }
 }
 
 /**

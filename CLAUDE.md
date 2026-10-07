@@ -553,6 +553,17 @@ Settings > VERSION. Release signing: untracked `keystore.properties` → `~/.and
 (alias `pokedaisey`: the key predates the rename, kept as is)
 on this Mac (same key for every release, or updates won't install).
 
+**Game Boy / Yellow is switched off** (`TelemetrySampler.GAME_BOY_SUPPORT = false`, v1.1.2): `.gb` /
+`.gbc` aren't in `RomArchive.ROM_EXTENSIONS` (library, folder scan, frontend launch, archives) or the
+manifest's VIEW patterns, and the Poller reads a Yellow cart as unsupported. The Gen 1 reader, art and
+tables stay; flip the flag and restore the two manifest lines to bring it back (and its README row).
+**Performance guards**: fonts come only from `PixelTypeface.kt`, built once per process (v1.1.0 built
+a 1 MB typeface per `GbaText` and crashed when tabs were switched quickly); `PerformanceGuardsTest`
+checks that, plus the GL unbind before `pkDeinit` and the native core lock. `cd ui-preview && gradle
+stress` switches the companion's tabs every 2 frames and fails over its memory / time budgets (it
+skips desktop Compose 1.5's own OnPositionedDispatcher NPE, which the app's 1.6.8 doesn't have) - run
+it after touching anything a tab composes. Per-visit work belongs in process-wide caches (slot art,
+backdrops, card renders, state thumbnails), not `remember`, which a tab loses each time it leaves.
 **Unsupported ROMs**: `CompanionSupport.isSupported(file)` (FireRed/Emerald game code, ≤16 MB,
 retail LeafGreen rev 0/1 / Ruby / Sapphire rev 1/2 — `TelemetrySampler.OTHER_RETAIL_CODES`,
 read as FireRed / Emerald — or a >16 MB hack whose SHA1 is in `TelemetrySampler.SUPPORTED_HACK_SHA1S`) mirrors the

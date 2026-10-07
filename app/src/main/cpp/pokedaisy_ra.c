@@ -84,6 +84,21 @@ static jstring raStr(JNIEnv* env, const char* s) {
     return out;
 }
 
+// Calls a RaNative static callback and clears any exception it threw: a Java
+// exception left pending makes the next JNI call abort the process (CheckJNI),
+// or surfaces in whatever Kotlin frame called into rc_client.
+static void raCallback(JNIEnv* env, jmethodID method, ...) {
+    va_list args;
+    va_start(args, method);
+    (*env)->CallStaticVoidMethodV(env, ra_class, method, args);
+    va_end(args);
+    if ((*env)->ExceptionCheck(env)) {
+        LOGW("RaNative callback threw");
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+    }
+}
+
 static void raDeleteLocal(JNIEnv* env, jobject o) {
     if (o) {
         (*env)->DeleteLocalRef(env, o);
@@ -201,7 +216,7 @@ static void raServerCall(const rc_api_request_t* request, rc_client_server_callb
     jstring url = raStr(env, request->url);
     jstring post = raStr(env, request->post_data);
     jstring type = raStr(env, request->content_type);
-    (*env)->CallStaticVoidMethod(env, ra_class, ra_serverCall, (jint) id, url, post, type);
+    raCallback(env, ra_serverCall, (jint) id, url, post, type);
     raDeleteLocal(env, url);
     raDeleteLocal(env, post);
     raDeleteLocal(env, type);
@@ -211,7 +226,7 @@ static void raLog(const char* message, const rc_client_t* client) {
     (void) client;
     JNIEnv* env = raEnv();
     jstring m = raStr(env, message);
-    (*env)->CallStaticVoidMethod(env, ra_class, ra_onLog, m);
+    raCallback(env, ra_onLog, m);
     raDeleteLocal(env, m);
 }
 
@@ -265,7 +280,7 @@ static void raEvent(const rc_client_event_t* event, rc_client_t* client) {
         extra = buf;
     }
     jstring jt = raStr(env, title), jd = raStr(env, description), jb = raStr(env, badge), je = raStr(env, extra);
-    (*env)->CallStaticVoidMethod(env, ra_class, ra_onEvent, (jint) event->type, id, jt, jd, jb, je, points);
+    raCallback(env, ra_onEvent, (jint) event->type, id, jt, jd, jb, je, points);
     raDeleteLocal(env, jt);
     raDeleteLocal(env, jd);
     raDeleteLocal(env, jb);
@@ -281,7 +296,7 @@ static void raLoginDone(int result, const char* error_message, rc_client_t* clie
     jstring display = raStr(env, u ? u->display_name : NULL);
     jstring token = raStr(env, u ? u->token : NULL);
     jstring avatar = raStr(env, u ? u->avatar_url : NULL);
-    (*env)->CallStaticVoidMethod(env, ra_class, ra_onLogin, (jint) result, err, user, display, token, avatar,
+    raCallback(env, ra_onLogin, (jint) result, err, user, display, token, avatar,
                                  (jint) (u ? u->score : 0), (jint) (u ? u->score_softcore : 0));
     raDeleteLocal(env, err);
     raDeleteLocal(env, user);
@@ -303,7 +318,7 @@ static void raGameLoaded(int result, const char* error_message, rc_client_t* cli
     jstring title = raStr(env, g ? g->title : NULL);
     jstring badge = raStr(env, g ? g->badge_url : NULL);
     jstring hash = raStr(env, g ? g->hash : NULL);
-    (*env)->CallStaticVoidMethod(env, ra_class, ra_onGameLoaded, (jint) result, err, (jint) (g ? g->id : 0),
+    raCallback(env, ra_onGameLoaded, (jint) result, err, (jint) (g ? g->id : 0),
                                  title, badge, hash,
                                  (jint) s.num_core_achievements, (jint) s.num_unlocked_achievements,
                                  (jint) s.points_core, (jint) s.points_unlocked);
@@ -700,7 +715,7 @@ static void raEntriesFetched(int result, const char* error_message, rc_client_le
         rc_client_destroy_leaderboard_entry_list(list);
     }
     jstring err = raStr(env, error_message);
-    (*env)->CallStaticVoidMethod(env, ra_class, ra_onLeaderboardEntries, (jint) f->token, (jboolean) (f->aroundUser != 0),
+    raCallback(env, ra_onLeaderboardEntries, (jint) f->token, (jboolean) (f->aroundUser != 0),
                                  (jint) result, err, bytes, total, userIndex);
     raDeleteLocal(env, err);
     raDeleteLocal(env, bytes);
@@ -741,7 +756,7 @@ static void raAllProgressFetched(int result, const char* error_message, rc_clien
         bytes = raTextToBytes(env, &t);
         rc_client_destroy_all_user_progress(list);
     }
-    (*env)->CallStaticVoidMethod(env, ra_class, ra_onAllProgress, (jint) (intptr_t) userdata, (jint) result, bytes);
+    raCallback(env, ra_onAllProgress, (jint) (intptr_t) userdata, (jint) result, bytes);
     raDeleteLocal(env, bytes);
 }
 

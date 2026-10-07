@@ -27,7 +27,8 @@ object RomArchive {
     /** File extensions read as archives. */
     val EXTENSIONS = setOf("zip", "7z")
     /** What a ROM inside an archive may be called. */
-    val ROM_EXTENSIONS = setOf("gba", "agb", "bin", "gb", "gbc")
+    val ROM_EXTENSIONS = setOf("gba", "agb", "bin") +
+        (if (com.pokedaisy.app.companion.data.TelemetrySampler.GAME_BOY_SUPPORT) setOf("gb", "gbc") else emptySet())
     private const val MIN_ROM_BYTES = 0x200L
     private const val MAX_ROM_BYTES = 32L shl 20
     /** How many extracted ROMs [playable] keeps; older ones go. */
