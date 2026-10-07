@@ -1,6 +1,23 @@
-# PokeDaisy
+<div align="center">
 
-**Play Gen 3 Pokémon on the top screen. See everything about your game on the bottom one.**
+<img src="docs/images/cover.png" alt="PokeDaisy: dual-screen GBA player for the AYN Thor, Gen 3 Pokémon and ROM hacks, free and open source" width="100%">
+
+<h3>Play Gen 3 Pokémon on the top screen. See everything about your game on the bottom one.</h3>
+
+<p>
+  <a href="https://github.com/lidor30/pokedaisy/releases/latest"><img src="https://img.shields.io/github/v/release/lidor30/pokedaisy?label=release&color=2f81f7" alt="Latest PokeDaisy release"></a>
+  <a href="https://github.com/lidor30/pokedaisy/releases"><img src="https://img.shields.io/github/downloads/lidor30/pokedaisy/total?label=downloads&color=5c8a3c" alt="Total downloads"></a>
+</p>
+
+<p>
+  <strong><a href="https://github.com/lidor30/pokedaisy/releases/latest">Download</a></strong>
+  · <strong><a href="#features">Features</a></strong>
+  · <strong><a href="#supported-games">Supported games</a></strong>
+  · <strong><a href="https://github.com/lidor30/pokedaisy/issues">Report a problem</a></strong>
+  · <strong><a href="https://buymeacoffee.com/lidor30g">Buy me a coffee</a></strong>
+</p>
+
+</div>
 
 PokeDaisy is a GBA player for dual-screen Android handhelds, made for Pokémon
 FireRed, LeafGreen, Emerald, Ruby, Sapphire and popular ROM hacks. The game runs
@@ -8,14 +25,13 @@ on the top screen. The bottom screen is a live companion that reads your game
 as you play: your party, your bag, the map, battle matchups, your Pokédex, and a
 spoiler-free guide. Everything is drawn in the game's own menu style.
 
-[**Download the latest version**](https://github.com/lidor30/pokedaisy/releases/latest)
-
 ## Devices
 
 | Device                        | Status                                       |
 | ----------------------------- | -------------------------------------------- |
 | AYN Thor                      | Tested, made for it                          |
 | Retroid Pocket Duo / Duo Lite | Should work, not yet tested on real hardware |
+| Anbernic RG DS                | Should work, not yet tested on real hardware |
 
 Any Android 8.0+ device runs the games. The companion needs a second screen.
 
@@ -174,7 +190,7 @@ Bug reports, game requests and a star on the repo help just as much.
 
 ## Credits
 
-- [mGBA](https://mgba.io) by Jeffrey Pfau and contributors runs the games (MPL 2.0;
+- [mGBA](https://mgba.io) by Vicki Pfau (endrift) and contributors runs the games (MPL 2.0;
   source in [`third_party/mgba`](https://github.com/mgba-emu/mgba)).
 - [Pixel Operator](https://www.dafont.com/pixel-operator.font) font by Jayvee Enaguas (CC0).
 - [PixelMplus](https://github.com/itouhiro/PixelMplus) (M+ FONT LICENSE, M+ FONTS PROJECT) for Japanese text, converted to Pixel Operator's pixel grid by `scripts/gen_jp_font.py`.
