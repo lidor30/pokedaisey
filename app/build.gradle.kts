@@ -25,8 +25,8 @@ android {
         targetSdk = 34
         // Bump both for every GitHub release: the updater compares versionName
         // against the release tag (v<versionName>), Android needs versionCode to grow.
-        versionCode = 5
-        versionName = "1.1.0"
+        versionCode = 7
+        versionName = "1.1.2"
 
         ndk {
             // Thor is arm64; add armeabi-v7a later only if a target device needs it.
@@ -47,6 +47,12 @@ android {
             path = file("src/main/cpp/CMakeLists.txt")
             version = "3.22.1"
         }
+    }
+
+    androidResources {
+        // Stored, so the fonts are mapped straight from the APK instead of
+        // inflated into memory each time one loads (PixelTypeface.kt).
+        noCompress += "ttf"
     }
 
     signingConfigs {

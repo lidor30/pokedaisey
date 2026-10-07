@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import java.io.File
-import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.Executors
@@ -348,7 +347,7 @@ object RetroAchievements : CompanionAchievements {
         retryDelaySec = (retryDelaySec * 2).coerceAtMost(300L)
         retry = timer.schedule({
             synchronized(this) { retry = null }
-            tokenLogin()
+            runCatching { tokenLogin() }.onFailure { Log.e(TAG, "token retry failed", it) }
         }, delay, TimeUnit.SECONDS)
     }
 
@@ -466,11 +465,18 @@ object RetroAchievements : CompanionAchievements {
                 status = conn.responseCode
                 body = (if (status < 400) conn.inputStream else conn.errorStream)?.use { it.readBytes() }
                 conn.disconnect()
-            } catch (e: IOException) {
+            } catch (e: Exception) {
+                // Not just IOException: anything thrown on this pool thread kills the
+                // process, and an undelivered id leaks rc_client's request slot.
                 Log.w(TAG, "request failed: ${e.message}")
                 status = -2 // RC_API_SERVER_RESPONSE_RETRYABLE_CLIENT_ERROR
+                body = null
             }
-            deliver(id, status, body)
+            try {
+                deliver(id, status, body)
+            } catch (t: Exception) {
+                Log.e(TAG, "delivering a response failed", t)
+            }
         }
     }
 

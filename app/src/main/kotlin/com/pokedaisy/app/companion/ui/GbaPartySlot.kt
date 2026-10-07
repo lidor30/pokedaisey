@@ -473,6 +473,9 @@ internal fun rememberPartySlotAssets(st: PartySlotStyle): PartySlotAssets? {
     val context = LocalContext.current
     val gen = rememberArtGeneration()
     return remember(context, st, gen) {
+        // Shared by every slot and every visit: the grid and its 6 slots used to build 7
+        // sets, each recolouring the 256x256 font again (MBs per PARTY visit).
+        slotAssetsCache[st to gen]?.let { return@remember it }
         runCatching {
             fun load(path: String): Bitmap = GameArt.get(context, path) ?: error("no $path")
             fun frame(name: String) = load("${st.frameDir}/$name").asImageBitmap()
@@ -488,9 +491,16 @@ internal fun rememberPartySlotAssets(st: PartySlotStyle): PartySlotAssets? {
                 statusIcons = load(st.statusAsset).asImageBitmap(),
                 fontMask = load(st.fontAsset),
             )
-        }.getOrNull()
+        }.getOrNull()?.also {
+            // A new art generation replaces the old art: drop what it was built from.
+            slotAssetsCache.keys.removeAll { (_, g) -> g != gen }
+            slotAssetsCache[st to gen] = it
+        }
     }
 }
+
+/** [rememberPartySlotAssets]' sets by style and art generation (main thread only, like the drawing). */
+private val slotAssetsCache = HashMap<Pair<PartySlotStyle, Int>, PartySlotAssets>()
 
 /** Game frames per pose of [mon]'s party icon (by its HP bar), 0 = still. */
 private fun iconFrameTicks(st: PartySlotStyle, mon: MonView): Int {
