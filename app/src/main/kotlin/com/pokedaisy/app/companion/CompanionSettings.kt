@@ -96,6 +96,13 @@ interface CompanionSettings {
     val stretchGame: Boolean
     fun setStretchGame(on: Boolean)
 
+    /** Whether there's a second screen - SWAP SCREENS only shows then. */
+    val hasSecondScreen: Boolean get() = false
+
+    /** The game on the second screen and the companion on the main one - see [Prefs.swapScreens]. */
+    val swapScreens: Boolean get() = false
+    fun setSwapScreens(on: Boolean) {}
+
     /** Display name of the currently-detected game (e.g. "Pokémon Heart and
      * Soul") — see [com.pokedaisy.app.companion.data.GameKind.displayName]. */
     val gameName: String

@@ -82,9 +82,9 @@ import org.junit.Test
  * then open app/src/test/snapshots/images/. Sized like the AYN Thor's bottom
  * screen (1240x1080, landscape). See CLAUDE.md's "UI work" section.
  */
-class CompanionScreenshotTest {
+open class CompanionScreenshotTest {
     @get:Rule
-    val paparazzi = Paparazzi(
+    open val paparazzi = Paparazzi(
         deviceConfig = DeviceConfig.PIXEL_5.copy(
             screenWidth = 1240, screenHeight = 1080, orientation = ScreenOrientation.LANDSCAPE,
         ),
@@ -566,6 +566,7 @@ class CompanionScreenshotTest {
 
     // SoulGold: its own party / bag look (the bag's night sky rebuilt from the ROM), battle and map.
     @Test fun soulGoldParty() = retail("soulgold_battle", NATIVE_SOULGOLD, SG_ROM, GameKind.SOULGOLD, "PARTY", art = true)
+    @Test fun soulGoldSixParty() = retail("soulgold_party", NATIVE_SOULGOLD, SG_ROM, GameKind.SOULGOLD, "PARTY", art = true)
     @Test fun soulGoldItems() = retail("soulgold", NATIVE_SOULGOLD, SG_ROM, GameKind.SOULGOLD, "ITEMS", art = true)
     @Test fun soulGoldBattle() = retail("soulgold_battle", NATIVE_SOULGOLD, SG_ROM, GameKind.SOULGOLD, "BATTLE", art = true)
     @Test fun soulGoldMap() = retail("soulgold", NATIVE_SOULGOLD, SG_ROM, GameKind.SOULGOLD, "MAP", art = true)

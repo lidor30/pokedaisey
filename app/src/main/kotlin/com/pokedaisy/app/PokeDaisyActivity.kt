@@ -106,6 +106,14 @@ class PokeDaisyActivity : Activity() {
     /** The companion beside the game when there's no second screen (see [SidePanel]). */
     private lateinit var sidePanel: SidePanel
     private var debugMirror = false
+    /** The game's stage (game, status bar, touch pad, HUD, side panel): the activity's
+     * content, or the second screen's with SWAP SCREENS (see [syncPresentation]). */
+    private lateinit var stage: GameStageLayout
+    /** The companion as the activity's content while the screens are swapped, with its owner. */
+    private var mainCompanion: View? = null
+    private var mainCompanionOwner: ComposeHostOwner? = null
+    /** The companion a swap opens on: SETTINGS when the swap came from there. */
+    private var companionStartTab = "PARTY"
 
     // scripts/capture_fixture.sh support: if the EXTRA_DUMP_FIXTURE extra is a
     // directory path, the next successful (connected) telemetry sample dumps
@@ -253,6 +261,14 @@ class PokeDaisyActivity : Activity() {
             Prefs(this@PokeDaisyActivity).stretchGame = on
             runOnUiThread { syncGameScreen() }
         }
+        override val hasSecondScreen get() = presentation != null
+        override val swapScreens get() = Prefs(this@PokeDaisyActivity).swapScreens
+        override fun setSwapScreens(on: Boolean) {
+            Prefs(this@PokeDaisyActivity).swapScreens = on
+            // The companion that asked moves screens: it comes back on SETTINGS.
+            companionStartTab = "SETTINGS"
+            runOnUiThread { syncPresentation() }
+        }
         override val showHints get() = Prefs(this@PokeDaisyActivity).showHints
         override fun setShowHints(on: Boolean) {
             Prefs(this@PokeDaisyActivity).showHints = on
@@ -368,6 +384,7 @@ class PokeDaisyActivity : Activity() {
                 )
             }
         }
+        stage = root
         setContentView(root)
         // Compose's window-level recomposer looks for a ViewTreeLifecycleOwner
         // starting from the window's root view, not just the individual
@@ -603,7 +620,7 @@ class PokeDaisyActivity : Activity() {
         runCatching { displayManager.unregisterDisplayListener(displayListener) }
         runCatching { inputManager.unregisterInputDeviceListener(inputDeviceListener) }
         runCatching { unregisterReceiver(batteryReceiver) }
-        presentation?.dismiss()
+        presentation?.let { it.dismiss(); it.releaseContent() }
         presentation = null
         ffMusicPlayer.release()
         if (::engine.isInitialized && romKey.isNotEmpty()) {
@@ -627,33 +644,73 @@ class PokeDaisyActivity : Activity() {
         DeviceBattery.status.value = BatteryStatus(level * 100 / scale, charging)
     }
 
-    /** Show the companion on a secondary display if there is one; drop it if not. */
+    /**
+     * Puts the game and the companion on the screens: with a second screen the
+     * game here and the companion there - or the other way round with SWAP
+     * SCREENS (a device whose main display is its bottom screen); with one, the
+     * game here and the companion in its side panel. The screens swap their
+     * contents, not the activity: the stage (game view included - a
+     * GLSurfaceView makes a new GL thread when it's attached again, see
+     * EmulatorView's bindCore) moves into the second screen's window and a
+     * companion becomes this activity's content.
+     */
     private fun syncPresentation() {
         if (!::engine.isInitialized) return
-        // The Thor's bottom screen is a presentation display. Other dual-screen
-        // handhelds (Retroid Pocket Duo / Duo Lite) may expose theirs as a plain
-        // secondary display without that flag, so fall back to any valid
-        // public display other than the built-in main one.
-        val target: Display? = displayManager
-            .getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
-            .firstOrNull { it.isValid }
-            ?: displayManager.displays.firstOrNull {
-                it.isValid && it.displayId != Display.DEFAULT_DISPLAY && (it.flags and Display.FLAG_PRIVATE) == 0
-            }
+        val target: Display? = Screens.second(this)
+        val swap = target != null && Prefs(this).swapScreens && !debugMirror
         val current = presentation
+        if (current != null && target != null && current.display.displayId == target.displayId &&
+            current.isShowing && swap == (mainCompanion != null)
+        ) return
+        current?.let { it.dismiss(); it.releaseContent() }
+        presentation = null
         // One screen: the companion goes in a panel beside the game instead (not
         // with the debug mirror, which already shows it there).
         sidePanel.setEnabled(target == null && !debugMirror)
-        if (target == null) {
-            current?.dismiss()
-            presentation = null
-            return
-        }
-        if (current != null && current.display.displayId == target.displayId && current.isShowing) return
-        current?.dismiss()
+        if (swap) showMainCompanion() else showStage()
+        if (target == null) return
         presentation = runCatching {
-            DualScreenPresentation(this, target, telemetry, stateSlots, companionSettings, battleInput, companionBack, playClick, RetroAchievements).also { it.show() }
+            DualScreenPresentation(this, target) { ctx ->
+                if (swap) stage
+                else DualScreenPresentation.companionView(
+                    ctx, telemetry, stateSlots, companionSettings, battleInput, companionBack, playClick, RetroAchievements,
+                    initialTab = companionStartTab,
+                )
+            }.also { it.show() }
         }.onFailure { Log.w("pokedaisy", "presentation failed", it) }.getOrNull()
+        companionStartTab = "PARTY"
+        if (presentation == null && swap) {
+            // The game has to be somewhere: back here, the companion beside it.
+            showStage()
+            sidePanel.setEnabled(!debugMirror)
+        }
+    }
+
+    /** The game's stage as this activity's content (dropping the swapped companion). */
+    private fun showStage() {
+        if (stage.parent != null && mainCompanion == null) return
+        mainCompanion = null
+        mainCompanionOwner?.destroy()
+        mainCompanionOwner = null
+        (stage.parent as? android.view.ViewGroup)?.removeView(stage)
+        setContentView(stage)
+    }
+
+    /** The companion as this activity's content (the stage then goes to the second screen). */
+    private fun showMainCompanion() {
+        if (mainCompanion != null) return
+        val owner = ComposeHostOwner().apply { create(); resume() }
+        val view = DualScreenPresentation.companionView(
+            this, telemetry, stateSlots, companionSettings, battleInput, companionBack, playClick, RetroAchievements,
+            initialTab = companionStartTab,
+        ).apply {
+            setViewTreeLifecycleOwner(owner)
+            setViewTreeSavedStateRegistryOwner(owner)
+            setViewTreeViewModelStoreOwner(owner)
+        }
+        mainCompanionOwner = owner
+        mainCompanion = view
+        setContentView(view)
     }
 
     /** Show the status bar above the game per SETTINGS > STATUS BAR, and fit or

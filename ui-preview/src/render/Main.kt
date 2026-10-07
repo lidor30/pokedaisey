@@ -146,6 +146,11 @@ class FakeSettings(showHintsInitially: Boolean = true) : CompanionSettings {
     private var stretch = false
     override val stretchGame get() = stretch
     override fun setStretchGame(on: Boolean) { stretch = on }
+    // The Thor: SWAP SCREENS shows.
+    override val hasSecondScreen = true
+    private var swap = false
+    override val swapScreens get() = swap
+    override fun setSwapScreens(on: Boolean) { swap = on }
     override val gameName = "Pokémon FireRed"
     override val romFileName = "firered-qol.gba"
     private var tabs = com.pokedaisy.app.companion.DEFAULT_COMPANION_TABS
@@ -866,6 +871,7 @@ fun main(args: Array<String>) {
         Shot("settings-aspect-stretch", tw, th, td, activity { withAspect(true) { SettingsActivity() } }) {
             onNodeWithText("ASPECT").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         },
+        Shot("settings-swap", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("SWAP SCREENS").performScrollTo() },
         Shot("settings-theme", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("THEME").performClick() },
         Shot("settings-hotkeys", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("HOTKEYS").performClick() },
         // The list's end: LIBRARY / ONLINE (RetroAchievements' BETA tag) / APP.

@@ -21,6 +21,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -81,26 +83,46 @@ fun PartyGrid(
     // Both sit edge to edge like in the game: each slot carries its own Poke
     // Ball overhang zone above/left of its frame (the CFRU boxes are only ~2px
     // apart there too) - extra spacing would just be dead margin.
-    Column(modifier = modifier) {
-        slots.chunked(2).forEachIndexed { rowIdx, row ->
-            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                row.forEachIndexed { colIdx, mon ->
-                    val i = rowIdx * 2 + colIdx
-                    val isSelected = i == selected && mon != null
-                    val onClick = { mon?.let(onSlotClick); Unit }
-                    Box(Modifier.weight(1f).fillMaxHeight()) {
-                        if (gameStyle != null) {
-                            GbaPartySlot(gameStyle, mon, selected = isSelected, onClick = onClick, modifier = Modifier.fillMaxSize(), sound = sound)
-                        } else {
-                            PartySlot(palette, mon, selected = isSelected, onClick = onClick, modifier = Modifier.fillMaxSize(), sound = sound)
-                        }
-                        if (mon != null) badge(mon)
+    // Two columns like the game, three on a wide screen (the Thor's top screen,
+    // SWAP SCREENS), where two stretched each slot to twice its width. Decided
+    // while measuring, not with BoxWithConstraints: that composes the slots
+    // late, and FireRed's icons missed the first frame.
+    Layout(
+        modifier = modifier,
+        content = {
+            slots.forEachIndexed { i, mon ->
+                val isSelected = i == selected && mon != null
+                val onClick = { mon?.let(onSlotClick); Unit }
+                Box {
+                    if (gameStyle != null) {
+                        GbaPartySlot(gameStyle, mon, selected = isSelected, onClick = onClick, modifier = Modifier.fillMaxSize(), sound = sound)
+                    } else {
+                        PartySlot(palette, mon, selected = isSelected, onClick = onClick, modifier = Modifier.fillMaxSize(), sound = sound)
                     }
+                    if (mon != null) badge(mon)
                 }
             }
+        },
+    ) { measurables, constraints ->
+        val w = constraints.maxWidth
+        val h = constraints.maxHeight
+        val cols = if (w.toFloat() / h > WIDE_PARTY_ASPECT) 3 else 2
+        val rows = (measurables.size + cols - 1) / cols
+        // Whole pixels, the remainder spread over the first columns / rows like weights do.
+        fun edge(total: Int, parts: Int, i: Int) = total * i / parts
+        val placeables = measurables.mapIndexed { i, m ->
+            val c = i % cols
+            val r = i / cols
+            m.measure(Constraints.fixed(edge(w, cols, c + 1) - edge(w, cols, c), edge(h, rows, r + 1) - edge(h, rows, r)))
+        }
+        layout(w, h) {
+            placeables.forEachIndexed { i, p -> p.place(edge(w, cols, i % cols), edge(h, rows, i / cols)) }
         }
     }
 }
+
+/** Wider than this (width / height), the party grid goes to three columns. */
+private const val WIDE_PARTY_ASPECT = 1.6f
 
 /** A slot's tap: with the companion's click, or silent when the game makes its own sound. */
 internal fun Modifier.slotClickable(sound: Boolean, enabled: Boolean, onClick: () -> Unit): Modifier =
@@ -216,8 +238,10 @@ val RowePartyPalette = FireRedPartyPalette.copy(
 /**
  * SoulGold (headless, its party list): flat slots in a 1px grey outline - slate
  * over a black band normally, light grey over white under the cursor, dark red
- * when fainted - light text with a black shadow (black on white when
- * selected), and a frameless HP bar on grey.
+ * when fainted (pink under the cursor) - light text with a black shadow (black
+ * on white when selected), a frameless HP bar on grey (green / FFBD00 / red) and
+ * its own blue / red gender symbols. Re-sampled on a six-mon save with HP poked
+ * low and a mon fainted.
  */
 val SoulGoldPartyPalette = FireRedPartyPalette.copy(
     normal = PartySlotColors(Color(0xFF52525A), Color(0xFF4A4A63), Color(0xFF4A4A63), Color.Black, band = Color.Black,
@@ -226,8 +250,13 @@ val SoulGoldPartyPalette = FireRedPartyPalette.copy(
         text = Color.Black, textShadow = Color.White),
     fainted = PartySlotColors(Color(0xFF52525A), Color(0xFF7B2121), Color(0xFF7B2121), Color.Black, band = Color.Black,
         text = Color(0xFFD6D6CE), textShadow = Color.Black),
+    selectedFainted = PartySlotColors(Color(0xFF52525A), Color(0xFFFF9494), Color(0xFFFF9494), Color.White, band = Color.White,
+        text = Color.Black, textShadow = Color.White),
     text = Color(0xFFD6D6CE), textShadow = Color.Black,
+    male = Color(0xFF3994DE), maleShadow = Color(0xFF52525A),
+    female = Color(0xFFFF4A4A), femaleShadow = Color(0xFF52525A),
     hpGreen = HpBarColors(Color(0xFF00DE00), Color(0xFF00DE00)),
+    hpYellow = HpBarColors(Color(0xFFFFBD00), Color(0xFFFFBD00)),
     hpRed = HpBarColors(Color(0xFFFF4A4A), Color(0xFFFF4A4A)),
     hpEmpty = HpBarColors(Color(0xFF848484), Color(0xFF848484)),
 )

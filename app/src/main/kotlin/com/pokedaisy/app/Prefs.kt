@@ -140,6 +140,12 @@ class Prefs(context: Context) {
         get() = p.getBoolean("stretch_game", false)
         set(v) = p.edit().putBoolean("stretch_game", v).apply()
 
+    /** Two screens: the game on the second display and the companion on the main one -
+     * for a device whose main display is its bottom screen (see PokeDaisyActivity.syncPresentation). */
+    var swapScreens: Boolean
+        get() = p.getBoolean("swap_screens", false)
+        set(v) = p.edit().putBoolean("swap_screens", v).apply()
+
     /** Single-screen devices: the companion's side panel is locked beside the game (see [SidePanel]). */
     var sidePanelDocked: Boolean
         get() = p.getBoolean("side_panel_docked", false)

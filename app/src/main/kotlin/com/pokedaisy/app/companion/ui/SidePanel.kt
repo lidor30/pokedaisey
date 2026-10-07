@@ -54,7 +54,24 @@ fun SidePanelCompanion(content: @Composable () -> Unit) {
  * resizes the panel.
  */
 @Composable
-fun SidePanelHandle(docked: Boolean, onToggle: () -> Unit) {
+fun SidePanelHandle(docked: Boolean, onToggle: () -> Unit) = SidePanelTab(
+    if (docked) PixelIcons.lockClosed else PixelIcons.lockOpen,
+    red = docked,
+    description = if (docked) tr("Unlock the companion") else tr("Lock the companion beside the game"),
+    onClick = onToggle,
+)
+
+/** The tab on the screen's right edge, bottom, that slides the side panel in (while it's closed). */
+@Composable
+fun SidePanelOpenTab(onOpen: () -> Unit) = SidePanelTab(PixelIcons.panelOpen, red = false, tr("Open the companion"), onOpen)
+
+/** The tab outside the side panel's bottom-left corner that slides it away. */
+@Composable
+fun SidePanelCloseTab(onClose: () -> Unit) = SidePanelTab(PixelIcons.panelClose, red = false, tr("Close the companion"), onClose)
+
+/** One of the side panel's tabs: [icon] on a white title-window tab running off its right edge. */
+@Composable
+private fun SidePanelTab(icon: List<String>, red: Boolean, description: String, onClick: () -> Unit) {
     val m = rememberGbaTextMetrics()
     val u = m.u
     val noRipple = remember { MutableInteractionSource() }
@@ -65,10 +82,10 @@ fun SidePanelHandle(docked: Boolean, onToggle: () -> Unit) {
             .drawBehind {
                 drawLayeredBox(OptionColors.titleLayers.inPx(u.toPx()), OptionColors.titleFill, radius = 3 * u.toPx(), openRight = true)
             }
-            .semantics { contentDescription = if (docked) tr("Unlock the companion") else tr("Lock the companion beside the game") }
-            .soundClickable(interactionSource = noRipple, indication = null, onClick = onToggle),
+            .semantics { contentDescription = description }
+            .soundClickable(interactionSource = noRipple, indication = null, onClick = onClick),
     ) {
-        if (docked) ShadowedPixelIcon(PixelIcons.lockClosed, OptionColors.value, OptionColors.valueShadow, m)
-        else ShadowedPixelIcon(PixelIcons.lockOpen, OptionColors.label, OptionColors.labelShadow, m)
+        if (red) ShadowedPixelIcon(icon, OptionColors.value, OptionColors.valueShadow, m)
+        else ShadowedPixelIcon(icon, OptionColors.label, OptionColors.labelShadow, m)
     }
 }

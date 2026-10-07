@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
@@ -81,7 +82,15 @@ class SidePanelScreenshotTest {
 
     @Test fun over() = paparazzi.snapshot { Scene(docked = false) }
 
-    /** The tab's corner of the screen at 1:1, locked and over the game, then the tab alone at 3x. */
+    /** Closed: the game alone, the open tab on the screen's right edge. */
+    @Test fun closed() = paparazzi.snapshot {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            FakeGame(Modifier.offset(x = px(150)).size(px(1620), px(1080)))
+            Box(Modifier.align(Alignment.BottomEnd).padding(bottom = px(28))) { SidePanelOpenTab {} }
+        }
+    }
+
+    /** The lock tab's corner of the screen at 1:1, locked and over the game, then the tabs alone at 3x. */
     @Test
     fun tab() = paparazzi.snapshot {
         Row(
@@ -90,9 +99,12 @@ class SidePanelScreenshotTest {
         ) {
             Crop(docked = true)
             Crop(docked = false)
-            for (docked in listOf(true, false)) {
+            val tabs: List<@Composable () -> Unit> = listOf(
+                { SidePanelHandle(true) {} }, { SidePanelHandle(false) {} }, { SidePanelOpenTab {} }, { SidePanelCloseTab {} },
+            )
+            for (tab in tabs) {
                 Box(Modifier.size(px(CROP_W), px(CROP_H)).background(Color.Black), contentAlignment = Alignment.Center) {
-                    Box(Modifier.graphicsLayer(scaleX = 3f, scaleY = 3f)) { SidePanelHandle(docked) {} }
+                    Box(Modifier.graphicsLayer(scaleX = 3f, scaleY = 3f)) { tab() }
                 }
             }
         }
@@ -124,8 +136,12 @@ class SidePanelScreenshotTest {
                     CompanionScreen(SampleCompanion.snapshot, SampleCompanion.Slots, SampleCompanion.Settings())
                 }
             }
-            // SidePanel's HANDLE_TOP_DP (12 dp on the RP6).
+            // SidePanel's HANDLE_TOP_DP / TAB_MARGIN_DP (12 dp on the RP6), and its LOCKED_TAB_ALPHA.
             Box(Modifier.align(Alignment.TopEnd).padding(end = px(PANEL_W), top = px(28))) { SidePanelHandle(docked) {} }
+            Box(
+                Modifier.align(Alignment.BottomEnd).padding(end = px(PANEL_W), bottom = px(28))
+                    .alpha(if (docked) 0.35f else 1f),
+            ) { SidePanelCloseTab {} }
         }
     }
 

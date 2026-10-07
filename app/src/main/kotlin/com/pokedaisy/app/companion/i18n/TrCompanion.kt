@@ -13,6 +13,8 @@ internal val trCompanion: Map<String, Tr> = mapOf(
 
     // The side panel's tab on a single-screen device (SidePanelHandle).
     "Lock the companion beside the game" to Tr(ja = "コンパニオンを ゲームの よこに こてい", fr = "Fixer le compagnon à côté du jeu", de = "Begleiter neben dem Spiel fixieren", it = "Fissa il compagno accanto al gioco", es = "Fijar el compañero junto al juego"),
+    "Open the companion" to Tr(ja = "コンパニオンを ひらく", fr = "Ouvrir le compagnon", de = "Begleiter öffnen", it = "Apri il compagno", es = "Abrir el compañero"),
+    "Close the companion" to Tr(ja = "コンパニオンを とじる", fr = "Fermer le compagnon", de = "Begleiter schließen", it = "Chiudi il compagno", es = "Cerrar el compañero"),
     "Unlock the companion" to Tr(ja = "コンパニオンの こていを かいじょ", fr = "Libérer le compagnon", de = "Begleiter lösen", it = "Sblocca il compagno", es = "Soltar el compañero"),
 
     // Battle sides and the foe's state (foeHeading's halves, BattlerCard).

@@ -97,26 +97,40 @@ fun MapScreen(snapshot: SnapshotView, modifier: Modifier = Modifier) {
                 playerRegion == null || playerRegion == shown -> snapshot.location.mapSecName to null
                 else -> "" to null
             }
-            RegionMap(
-                bitmap = bitmap,
-                style = style,
-                head = regionMapBitmap(style.headAsset(snapshot.playerGender)),
-                headTile = playerTile,
-                cursor = sel?.tiles ?: if (playerRegion == shown) model.tilesOf(snapshot.regionMapSectionId) else emptyList(),
-                label = gameCase(name),
-                dungeon = dungeon?.let(::gameCase),
-                onTap = { tx, ty ->
-                    selection = if (playerTile != null && tx to ty == playerTile) null else model.select(shown, tx, ty)
-                },
-            )
-            MapButtons(
-                style = style,
-                regionLabel = if (model.images.size > 1) regionName(model.images, (shown + 1) % model.images.size) else null,
-                awayFromPlayer = selection != null || (playerRegion != null && shown != playerRegion),
-                onPlaces = { placesOpen = true },
-                onRegion = { selection = null; shownOverride = (shown + 1) % model.images.size },
-                onMe = { selection = null; shownOverride = null },
-            )
+            // The map fills the tab while that stretches it only a little (the Thor's
+            // bottom screen: ~16% taller), else keeps its own shape, centred (a wide screen).
+            val crop = remember(bitmap) { regionMapContentBounds(bitmap) }
+            BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                val mapAspect = crop.width.toFloat() / crop.height
+                val boxAspect = maxWidth / maxHeight
+                val fitted = when {
+                    maxOf(boxAspect / mapAspect, mapAspect / boxAspect) <= MAX_MAP_STRETCH -> Modifier.fillMaxSize()
+                    boxAspect > mapAspect -> Modifier.size(maxHeight * mapAspect, maxHeight)
+                    else -> Modifier.size(maxWidth, maxWidth / mapAspect)
+                }
+                Box(fitted) {
+                    RegionMap(
+                        bitmap = bitmap,
+                        style = style,
+                        head = regionMapBitmap(style.headAsset(snapshot.playerGender)),
+                        headTile = playerTile,
+                        cursor = sel?.tiles ?: if (playerRegion == shown) model.tilesOf(snapshot.regionMapSectionId) else emptyList(),
+                        label = gameCase(name),
+                        dungeon = dungeon?.let(::gameCase),
+                        onTap = { tx, ty ->
+                            selection = if (playerTile != null && tx to ty == playerTile) null else model.select(shown, tx, ty)
+                        },
+                    )
+                    MapButtons(
+                        style = style,
+                        regionLabel = if (model.images.size > 1) regionName(model.images, (shown + 1) % model.images.size) else null,
+                        awayFromPlayer = selection != null || (playerRegion != null && shown != playerRegion),
+                        onPlaces = { placesOpen = true },
+                        onRegion = { selection = null; shownOverride = (shown + 1) % model.images.size },
+                        onMe = { selection = null; shownOverride = null },
+                    )
+                }
+            }
             if (placesOpen) {
                 PlacesList(
                     model,
@@ -219,7 +233,7 @@ private fun RegionMap(
             },
     ) {
         val density = LocalDensity.current
-        // Screen pixels per map pixel: the map is stretched to the tab, not letterboxed.
+        // Screen pixels per map pixel: the map is stretched to its box (MapScreen sizes it).
         val sx = with(density) { maxWidth.toPx() } / crop.width
         val sy = with(density) { maxHeight.toPx() } / crop.height
         Canvas(
@@ -440,6 +454,9 @@ private fun BoxScope.NoRegionMap(snapshot: SnapshotView) {
 private const val CURSOR_FRAME_MS = 20 * 1000 / 60
 /** The tab's frame around the map (2 + 1 + 2 lines). */
 private val MAP_FRAME = 5.dp
+
+/** How far the map may be stretched (either way) to fill the tab before it keeps its shape instead. */
+private const val MAX_MAP_STRETCH = 1.2f
 private const val TILE = 8
 private const val HEAD = 16
 private val FR_STRIP = Color.Black.copy(alpha = 6f / 16f)

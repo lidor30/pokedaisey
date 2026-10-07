@@ -6,8 +6,6 @@ import android.opengl.GLSurfaceView
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -30,7 +28,7 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
         set(v) {
             if (field == v) return
             field = v
-            queueEvent { renderer.setStretch(v) }
+            renderer.setStretch(v)
         }
 
     init {
@@ -47,9 +45,15 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
     // overlay UI on top of it" - called from there (only when the mirror is
     // actually enabled) rather than unconditionally here.
 
+    // The frame buffer is handed to the renderer under its lock, not through
+    // queueEvent: SWAP SCREENS moves this view between the activity's window and
+    // the second screen's, and a detached GLSurfaceView's queue belongs to a GL
+    // thread that has already exited - a bind or unbind sent then was lost (and
+    // the next GL thread could read a freed buffer). See PokeDaisyActivity.arrangeScreens.
+
     /** Called once after the core is up. */
     fun bindCore(buffer: ByteBuffer, width: Int, height: Int) {
-        queueEvent { renderer.bind(buffer, width, height) }
+        renderer.bind(buffer, width, height)
     }
 
     /**
@@ -64,9 +68,8 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
      * closing back to ROM selection when "Restart Game" was added).
      */
     fun unbindCoreBlocking() {
-        val latch = CountDownLatch(1)
-        queueEvent { renderer.unbind(); latch.countDown() }
-        runCatching { latch.await(500, TimeUnit.MILLISECONDS) }
+        // Takes the lock a frame's upload holds: once this returns, no upload is reading it.
+        renderer.unbind()
     }
 
     private class FrameRenderer : Renderer {
@@ -94,7 +97,10 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
         )
         private var pos: FloatBuffer = floats(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f)
 
-        fun bind(buf: ByteBuffer, w: Int, h: Int) {
+        /** Guards [buffer] and its size: held by [bind] / [unbind] and by a frame's upload. */
+        private val lock = Any()
+
+        fun bind(buf: ByteBuffer, w: Int, h: Int) = synchronized(lock) {
             buffer = buf.also { it.order(ByteOrder.nativeOrder()) }
             texW = w
             texH = h
@@ -102,17 +108,17 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
             dirtyGeometry = true
         }
 
-        fun setStretch(on: Boolean) {
+        fun setStretch(on: Boolean) = synchronized(lock) {
             stretch = on
             dirtyGeometry = true
         }
 
         /** Drops the buffer reference; [onDrawFrame] just clears until the next [bind]. */
-        fun unbind() {
+        fun unbind() = synchronized(lock) {
             buffer = null
         }
 
-        override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) = synchronized(lock) {
             GLES20.glClearColor(0f, 0f, 0f, 1f)
             program = buildProgram(VERT, FRAG)
             aPos = GLES20.glGetAttribLocation(program, "aPos")
@@ -129,14 +135,16 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
             texAllocated = false
         }
 
-        override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) = synchronized(lock) {
             surfaceW = width
             surfaceH = height
             GLES20.glViewport(0, 0, width, height)
             dirtyGeometry = true
         }
 
-        override fun onDrawFrame(gl: GL10?) {
+        override fun onDrawFrame(gl: GL10?) = synchronized(lock) { draw() }
+
+        private fun draw() {
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             val buf = buffer ?: return
             if (texW == 0 || surfaceW == 0) return

@@ -117,6 +117,13 @@ class SettingsActivity : ComponentActivity() {
 
     private val filesRoot get() = getExternalFilesDir(null) ?: filesDir
 
+    /** The game's screen's width / height: this one, or the second screen with SWAP SCREENS on. */
+    private fun gameScreenAspect(): Float =
+        if (prefs.swapScreens) Screens.secondAspect(this) ?: screenAspect else screenAspect
+
+    /** SWAP SCREENS only means something with two. */
+    private val hasSecondScreen by lazy { Screens.hasSecond(this) }
+
     private val updates by lazy { AppUpdateFlow(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -216,7 +223,7 @@ class SettingsActivity : ComponentActivity() {
                     }
                 }
                 AspectPicker(
-                    prefs.stretchGame, screenAspect, prefs.statusBar, shot, m,
+                    prefs.stretchGame, gameScreenAspect(), prefs.statusBar, shot, m,
                     onPick = { prefs.stretchGame = it; aspectPicker = false; revision++ },
                     onDismiss = { aspectPicker = false },
                 )
@@ -279,7 +286,7 @@ class SettingsActivity : ComponentActivity() {
         val themeIdx = APP_THEMES.indexOfFirst { it.id == prefs.appTheme }.coerceAtLeast(0)
         fun onOff(on: Boolean) = if (on) tk("ON") else tk("OFF")
         // The same groups and order as the bottom screen's SETTINGS where they overlap.
-        val rows = listOf(
+        val rows = listOfNotNull(
             groupTitle(tk("FAST-FORWARD")),
             SettingRow(tk("FF SPEED"), rateLabel(prefs.ffMaxSpeed)) {
                 selector = Selector(tk("FF SPEED"), rateLabels, rateLabel(prefs.ffMaxSpeed)) {
@@ -316,6 +323,11 @@ class SettingsActivity : ComponentActivity() {
             },
             // The game at 3:2 or stretched to fill the screen; picked by preview.
             SettingRow(tk("ASPECT"), aspectLabel(prefs.stretchGame)) { aspectPicker = true },
+            // Game and companion trade screens; the game picks it up on resume.
+            SettingRow(tk("SWAP SCREENS"), onOff(prefs.swapScreens)) {
+                prefs.swapScreens = !prefs.swapScreens
+                revision++
+            }.takeIf { hasSecondScreen },
             // Changes the colors immediately, everywhere — the companion screen too.
             SettingRow(tk("THEME"), themeLabels[themeIdx]) {
                 selector = Selector(tk("THEME"), themeLabels, themeLabels[themeIdx]) {
