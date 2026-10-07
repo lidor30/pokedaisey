@@ -72,3 +72,22 @@ tasks.register<JavaExec>("render") {
     systemProperty("monIcons", if (monIcons.isBlank()) "" else workingDir.toPath().relativize(file(monIcons).toPath()).toString())
     systemProperty("scratch", layout.buildDirectory.dir("scratch").get().asFile.absolutePath)
 }
+
+tasks.register<JavaExec>("stress") {
+    description = "Switches the companion's tabs rapidly and fails over its memory / time budgets (src/render/Stress.kt); -Pgame=EMERALD picks the game."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("render.StressKt")
+    workingDir = rootDir.resolve("../app/src/main/assets")
+    systemProperty("java.awt.headless", "true")
+    systemProperty("game", (project.findProperty("game") as String?) ?: "FIRERED")
+    systemProperty("artRoms", (project.findProperty("artRoms") as String?) ?: "")
+    systemProperty("rom", "")
+    systemProperty("decomps", System.getenv("DECOMPS").orEmpty())
+    systemProperty("monIcons", "")
+    systemProperty("framesPerTap", (project.findProperty("framesPerTap") as String?) ?: "")
+    systemProperty("trace", (project.findProperty("trace") as String?) ?: "")
+    systemProperty("bars", (project.findProperty("bars") as String?) ?: "")
+    systemProperty("scratch", layout.buildDirectory.dir("scratch").get().asFile.absolutePath)
+    // A fixed heap, like a phone's per-app limit, so a leak fails instead of growing the heap.
+    maxHeapSize = "512m"
+}

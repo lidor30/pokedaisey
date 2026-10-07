@@ -16,7 +16,7 @@ import java.io.File
 object CompanionSupport {
     fun isSupported(rom: File): Boolean {
         // Game Boy / Color: the exact carts the GB reader knows (Pokémon Yellow).
-        if (RomIdentity.isGameBoy(rom)) return RomIdentity.sha1(rom) in TelemetrySampler.SUPPORTED_GB_SHA1S
+        if (RomIdentity.isGameBoy(rom)) return TelemetrySampler.GAME_BOY_SUPPORT && RomIdentity.sha1(rom) in TelemetrySampler.SUPPORTED_GB_SHA1S
         val code = RomIdentity.gameCode(rom) ?: return false
         val size = RomArchive.romSize(rom)
         if (code in TelemetrySampler.OTHER_RETAIL_CODES) {

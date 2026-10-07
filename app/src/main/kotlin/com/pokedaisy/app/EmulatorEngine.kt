@@ -65,6 +65,13 @@ class EmulatorEngine(
     /** Fired from the emu thread; wrap UI work in the callback yourself. */
     var onCoreReady: ((width: Int, height: Int) -> Unit)? = null
 
+    /**
+     * Fired from the emu thread right before the core is freed (its frame buffer with
+     * it): drop every reference to that buffer here, synchronously - the GL thread
+     * reading it after this is a use-after-free that kills the process.
+     */
+    var onCoreStopping: (() -> Unit)? = null
+
     /** False for a Game Boy / Color ROM: the GBA-only watchers (region map, menus, m4a songs) stay off. */
     @Volatile var gba = true
     var onStateResult: ((action: Hotkeys.Action, slot: Int, ok: Boolean) -> Unit)? = null
@@ -211,6 +218,18 @@ class EmulatorEngine(
 
     fun start(rom: File, save: File, resume: File?) {
         if (running) return
+        // A loop that outlived stop()'s join (stuck in an audio write, a slow disk)
+        // still owns the native core: a second loop's pkInit would free it under it.
+        thread?.let { old ->
+            runCatching { old.join(5000) }
+            if (old.isAlive) {
+                Log.e("pokedaisy", "emu thread still running, not starting another")
+                loadError = "The previous game is still closing, try again"
+                return
+            }
+        }
+        thread = null
+        pendingSuspend = null
         running = true
         loadError = null
         startNotice = null
@@ -222,7 +241,7 @@ class EmulatorEngine(
     fun stop() {
         running = false
         thread?.join(3000)
-        thread = null
+        if (thread?.isAlive != true) thread = null
     }
 
     /** Save to [target] on the next frame boundary, then stop the loop. */
@@ -230,7 +249,7 @@ class EmulatorEngine(
         if (!running) return
         pendingSuspend = target
         thread?.join(3000)
-        thread = null
+        if (thread?.isAlive != true) thread = null
         running = false
     }
 
@@ -246,6 +265,7 @@ class EmulatorEngine(
     }
 
     private var videoBuf: ByteBuffer? = null
+    private var raFrameFailed = false
     private var vw = 0
     private var vh = 0
 
@@ -280,11 +300,15 @@ class EmulatorEngine(
         }
         // The game's set loads after the resume (it needs the server), so the
         // resumed progress is handed over to be put back once it has.
-        RetroAchievements.onCoreStarted(resumedFrom = resumed)
+        runCatching { RetroAchievements.onCoreStarted(resumedFrom = resumed) }
+            .onFailure { Log.e("pokedaisy", "achievements start failed", it) }
 
         val sampleRate = MgbaCore.pkSampleRate()
-        val track = buildAudioTrack(sampleRate)
-        track.play()
+        // Out of audio resources (or a device mid-reroute) mustn't take the process down:
+        // the game runs without sound instead.
+        val track: AudioTrack? = runCatching { buildAudioTrack(sampleRate).also { it.play() } }
+            .onFailure { Log.e("pokedaisy", "audio track failed", it) }
+            .getOrNull()
 
         val scratch = ShortArray(4096)
         val frameNanos = 1_000_000_000L / 60L
@@ -315,7 +339,14 @@ class EmulatorEngine(
                 battleInput.tick()
                 MgbaCore.pkSetKeys(input.mask)
                 MgbaCore.pkRunFrame()
-                RetroAchievements.onFrame()
+                // Achievements never take the game down with them (a pending JNI
+                // exception from a callback would otherwise end this loop).
+                try {
+                    RetroAchievements.onFrame()
+                } catch (t: Exception) {
+                    if (!raFrameFailed) Log.e("pokedaisy", "achievements frame failed", t)
+                    raFrameFailed = true
+                }
 
                 servicePending()
 
@@ -369,12 +400,12 @@ class EmulatorEngine(
                 val wantPaused = !((speed == 1f && clip == null) || spedUp)
                 if (wantPaused != paused) {
                     paused = wantPaused
-                    if (paused) runCatching { track.pause(); track.flush() }
-                    else runCatching { track.play() }
+                    if (paused) runCatching { track?.pause(); track?.flush() }
+                    else runCatching { track?.play() }
                 }
 
                 val n = MgbaCore.pkReadAudio(scratch)
-                if (n > 0 && !paused) {
+                if (n > 0 && !paused && track != null) {
                     if (speed == 1f) {
                         track.write(scratch, 0, n)   // blocking → real-time pacing at 1x
                     } else {
@@ -427,12 +458,17 @@ class EmulatorEngine(
             Log.e("pokedaisy", "emu loop crashed", t)
             loadError = t.message ?: t.toString()
         } finally {
-            runCatching { track.stop() }
-            runCatching { track.release() }
-            RetroAchievements.onCoreStopping()
-            MgbaCore.pkDeinit()
-            RetroAchievements.onCoreStopped()
+            // A loop that died mid-game mustn't look alive, or leave a suspend for the next start.
+            running = false
+            pendingSuspend = null
+            runCatching { track?.stop() }
+            runCatching { track?.release() }
+            runCatching { RetroAchievements.onCoreStopping() }
+            // The GL thread lets go of the frame buffer before pkDeinit frees it.
+            runCatching { onCoreStopping?.invoke() }.onFailure { Log.e("pokedaisy", "core stopping hook failed", it) }
             videoBuf = null
+            MgbaCore.pkDeinit()
+            runCatching { RetroAchievements.onCoreStopped() }
         }
     }
 

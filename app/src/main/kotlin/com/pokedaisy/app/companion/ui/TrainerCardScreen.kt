@@ -37,10 +37,14 @@ import com.pokedaisy.app.companion.data.RomArt
 import com.pokedaisy.app.companion.data.TrainerCardArt
 import com.pokedaisy.app.companion.data.TrainerCardInfo
 import kotlinx.coroutines.Dispatchers
+import androidx.compose.ui.graphics.ImageBitmap
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.max
 import kotlin.math.min
+
+/** The art generation each style's [TrainerCardArt.cached] was loaded at (main thread). */
+private val cardArtGeneration = HashMap<CardStyle, Int>()
 
 /** [style]'s card art from the player's ROM ([RomArt]), once a scan has cached it; null until then. */
 @Composable
@@ -48,7 +52,12 @@ fun rememberTrainerCardArt(style: CardStyle?): TrainerCardArt.Art? {
     val context = LocalContext.current
     val generation = rememberArtGeneration()
     return produceState(style?.let(TrainerCardArt::cached), style, generation) {
-        value = style?.let { s -> withContext(Dispatchers.IO) { runCatching { TrainerCardArt.load(RomArt.dir(context.filesDir), s) }.getOrNull() } }
+        // Every CompanionScreen composition used to re-read every blob, and the new Art
+        // (another identity) re-rendered the card: load only what this generation hasn't.
+        val s = style ?: run { value = null; return@produceState }
+        if (value != null && cardArtGeneration[s] == generation) return@produceState
+        value = withContext(Dispatchers.IO) { runCatching { TrainerCardArt.load(RomArt.dir(context.filesDir), s) }.getOrNull() }
+        if (value != null) cardArtGeneration[s] = generation
     }.value
 }
 
@@ -68,11 +77,14 @@ fun TrainerCardScreen(card: TrainerCardInfo, art: TrainerCardArt.Art, modifier: 
     val colon by remember { derivedStateOf { phase.value < 1f } }
     // Just the card, over the companion's own backdrop: the game's screen
     // behind it would draw a box of other stripes (and cost a scale step).
-    val image = remember(art, card, back, colon) {
+    // Both colon states, each rendered once per card: the blink used to re-render the
+    // whole card (and a new bitmap) every second on the main thread.
+    val renders = remember(art, card, back) { arrayOfNulls<ImageBitmap>(2) }
+    val image = renders[if (colon) 1 else 0] ?: run {
         val img = TrainerCardArt.render(art, card, back, colon, backdrop = false)
         val (l, t, r, b) = TrainerCardArt.cardBounds(img).toList()
         val px = IntArray((r - l) * (b - t)) { img.argb[(t + it / (r - l)) * img.width + l + it % (r - l)] }
-        Bitmap.createBitmap(px, r - l, b - t, Bitmap.Config.ARGB_8888).asImageBitmap()
+        Bitmap.createBitmap(px, r - l, b - t, Bitmap.Config.ARGB_8888).asImageBitmap().also { renders[if (colon) 1 else 0] = it }
     }
     val squash = remember { Animatable(1f) }
     val scope = rememberCoroutineScope()

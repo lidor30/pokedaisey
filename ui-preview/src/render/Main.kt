@@ -107,7 +107,7 @@ class FakeSlots : StateSlots {
     override fun requestUndoLoad() {}
 }
 
-class FakeSettings(showHintsInitially: Boolean = true) : CompanionSettings {
+class FakeSettings(showHintsInitially: Boolean = true, initialTabs: List<String>? = null) : CompanionSettings {
     private var ffSpeed = 4f
     private var ff = false
     private var music = com.pokedaisy.app.companion.FfMusicMode.STEADY
@@ -159,7 +159,7 @@ class FakeSettings(showHintsInitially: Boolean = true) : CompanionSettings {
     override fun setSwapScreens(on: Boolean) { swap = on }
     override val gameName = "Pokémon FireRed"
     override val romFileName = "firered-qol.gba"
-    private var tabs = com.pokedaisy.app.companion.DEFAULT_COMPANION_TABS
+    private var tabs = initialTabs ?: com.pokedaisy.app.companion.DEFAULT_COMPANION_TABS
     override val companionTabs get() = tabs
     override fun setCompanionTabs(tabs: List<String>) { this.tabs = tabs }
     override fun guideNoticeAccepted(game: String) = true

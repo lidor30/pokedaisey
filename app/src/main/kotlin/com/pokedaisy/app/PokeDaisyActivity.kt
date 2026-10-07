@@ -275,7 +275,10 @@ class PokeDaisyActivity : Activity() {
             Prefs(this@PokeDaisyActivity).screenFilter = filter
             runOnUiThread { syncGameScreen() }
         }
-        override val hasSecondScreen get() = presentation != null
+        // The display itself, not `presentation != null`: a swap composes the companion
+        // here before the new presentation is assigned, and the remembered rows then lost
+        // SWAP SCREENS until the page was rebuilt.
+        override val hasSecondScreen get() = Screens.second(this@PokeDaisyActivity) != null
         override val swapScreens get() = Prefs(this@PokeDaisyActivity).swapScreens
         override fun setSwapScreens(on: Boolean) {
             Prefs(this@PokeDaisyActivity).swapScreens = on
@@ -495,6 +498,10 @@ class PokeDaisyActivity : Activity() {
                     }
                 }
             }
+            // The emu thread is about to free the frame buffer (pause, close, a crashed
+            // loop): the GL thread lets go of it first. unbind takes the renderer's lock,
+            // so it's safe from this thread and returns only once no upload is reading it.
+            onCoreStopping = { view.unbindCoreBlocking() }
             onStateResult = { action, slot, ok ->
                 val msg = when (action) {
                     Hotkeys.Action.SAVE_STATE -> if (ok) tr("Saved slot {0}", slot) else tr("Slot {0}: save failed", slot)
@@ -651,6 +658,8 @@ class PokeDaisyActivity : Activity() {
         if (::engine.isInitialized && romKey.isNotEmpty()) {
             Prefs(this).setSpeedIndexFor(romKey, engine.speedIndex)
         }
+        // Before the engine frees the frame buffer the GL thread draws from.
+        view.unbindCoreBlocking()
         states?.let { engine.stopWithSuspend(it.resumeFile) } ?: engine.stop()
         view.onPause()
     }
