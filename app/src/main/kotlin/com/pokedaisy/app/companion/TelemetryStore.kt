@@ -61,4 +61,7 @@ class TelemetryStore {
 
     /** The detected game's own gMain + inBattle offset, when it has a native config. */
     fun knownGMain(): Pair<Long, Long>? = sampler.knownGMain
+
+    /** The detected game's gPartyMenu + gPlayerParty, when its config has them. */
+    fun knownPartyMenu(): Pair<Long, Long>? = sampler.knownPartyMenu
 }

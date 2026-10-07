@@ -61,4 +61,51 @@ class SoulGoldDecodeTest {
         val foeMon = decodePartyMon(ram.readCoreMemory(NATIVE_SOULGOLD.enemyParty, 96), 0, SOULGOLD_PARTY_MON)!!
         assertEquals(25 to 5, (foeMon.species and 0x7FF) to foeMon.level)
     }
+
+    @Test
+    fun `v1_2 - the same save at its own addresses`() {
+        activeGame = GameKind.SOULGOLD
+        val t = decodeNative("soulgold_v12", NATIVE_SOULGOLD_V1_2)
+        val mon = t.party.single()
+        assertEquals(155 to 6, mon.species to mon.level)
+        assertEquals(21 to 21, mon.hp to mon.maxHp)
+        assertEquals(listOf("Tackle", "Leer"), mon.moves.filter { it != 0 }.map { lookupMove(it).name })
+        assertEquals("Cherrygrove City", lookupLocation(t.regionMapSectionId).mapSecName)
+        assertEquals(3080L, t.money)
+        assertEquals("Potion", itemName(t.items.single().itemId))
+    }
+
+    @Test
+    fun `v1_2 battle - after the switch, at the action menu`() {
+        activeGame = GameKind.SOULGOLD
+        val ram = FixtureMemoryReader.load("soulgold_v12_battle")
+        val cfg = NATIVE_SOULGOLD_V1_2
+        val t = readNativeTelemetry(ram, cfg)
+        assertTrue(t.inBattle)
+        val me = t.battleMons[BATTLE_POS_PLAYER_LEFT]
+        assertEquals(155 to 6, me.species to me.level)
+        assertEquals(13 to 21, me.hp to me.maxHp) // the third Cyndaquil
+        val foe = t.battleMons[BATTLE_POS_OPPONENT_LEFT]
+        assertEquals(25 to 5, foe.species to foe.level)
+        assertEquals(3, t.party.size)
+        assertEquals(0 to BATTLE_INPUT_ACTION_SELECT, readNativeBattleInputFast(ram, cfg))
+        assertEquals(2, u16le(ram.readCoreMemory(cfg.battlerPartyIndexes, 2), 0))
+        assertEquals(2, ram.readCoreMemory(cfg.partyMenu + 9, 1)[0].toInt()) // gPartyMenu.slotId, left on the switch
+        val foeMon = decodePartyMon(ram.readCoreMemory(cfg.enemyParty, 96), 0, SOULGOLD_PARTY_MON)!!
+        assertEquals(25 to 5, (foeMon.species and 0x7FF) to foeMon.level)
+    }
+
+    @Test
+    fun `v1_2 TM75 teaches Agility`() {
+        activeGame = GameKind.SOULGOLD
+        try {
+            assertEquals("TM75 Swords Dance", itemName(SOULGOLD_V12_TM75))
+            soulGoldV12 = true
+            assertEquals("TM75 Agility", itemName(SOULGOLD_V12_TM75))
+            assertTrue(itemDescription(SOULGOLD_V12_TM75).contains("Speed"))
+            assertEquals("Potion", itemName(28))
+        } finally {
+            soulGoldV12 = false
+        }
+    }
 }

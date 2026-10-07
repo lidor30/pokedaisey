@@ -11,6 +11,10 @@ internal val trCompanion: Map<String, Tr> = mapOf(
     "no data yet" to Tr(ja = "まだ データが ありません", fr = "pas encore de données", de = "noch keine Daten", it = "ancora nessun dato", es = "aún no hay datos"),
     "starting…" to Tr(ja = "じゅんびちゅう…", fr = "démarrage…", de = "startet…", it = "avvio…", es = "iniciando…"),
 
+    // The side panel's tab on a single-screen device (SidePanelHandle).
+    "Lock the companion beside the game" to Tr(ja = "コンパニオンを ゲームの よこに こてい", fr = "Fixer le compagnon à côté du jeu", de = "Begleiter neben dem Spiel fixieren", it = "Fissa il compagno accanto al gioco", es = "Fijar el compañero junto al juego"),
+    "Unlock the companion" to Tr(ja = "コンパニオンの こていを かいじょ", fr = "Libérer le compagnon", de = "Begleiter lösen", it = "Sblocca il compagno", es = "Soltar el compañero"),
+
     // Battle sides and the foe's state (foeHeading's halves, BattlerCard).
     "YOU" to Tr(ja = "じぶん", fr = "TOI", de = "DU", it = "TU", es = "TÚ"),
     "FOE" to Tr(ja = "あいて", fr = "ENNEMI", de = "GEGNER", it = "NEMICO", es = "ENEMIGO"),

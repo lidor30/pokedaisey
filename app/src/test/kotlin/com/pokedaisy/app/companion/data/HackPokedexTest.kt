@@ -85,6 +85,13 @@ class HackPokedexTest {
     }
 
     @Test
+    fun `SoulGold v1_2 - the same save, the same dex`() {
+        val dex = state("soulgold_v12", NATIVE_SOULGOLD_V1_2)
+        assertEquals(setOf(16, 19, 155, 163, 183, 263), dex.seen)
+        assertEquals(setOf(155), dex.caught)
+    }
+
+    @Test
     fun `Seaglass - Hoenn seen 2, own 1`() {
         // Its own numbering: TORCHIC is No. 4, POOCHYENA No. 12.
         val dex = state("emerald_seaglass_dex", NATIVE_EMERALD_SEAGLASS)
@@ -175,6 +182,15 @@ class HackPokedexTest {
         val johto = PokedexSource.regionalOrder(t)!!
         assertEquals(23, johto.indexOf(25) + 1) // the game's Johto 023
         assertEquals(136, johto.indexOf(155) + 1)
+    }
+
+    @Test
+    fun `SoulGold v1_2 entries and the Johto order`() = roms("Soulgold (v1.2).gba", GameKind.SOULGOLD, POKEDEX_SOULGOLD_V1_2) { t ->
+        val pikachu = PokedexSource.entry(t, 25)!!
+        assertEquals(listOf("Static"), pikachu.abilities)
+        assertEquals("Lightning Rod", pikachu.hiddenAbility)
+        assertEquals("Fire Mouse", PokedexSource.entry(t, 155)!!.category)
+        assertEquals(136, PokedexSource.regionalOrder(t)!!.indexOf(155) + 1)
     }
 
     @Test

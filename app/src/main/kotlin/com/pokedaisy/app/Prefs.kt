@@ -140,6 +140,16 @@ class Prefs(context: Context) {
         get() = p.getBoolean("stretch_game", false)
         set(v) = p.edit().putBoolean("stretch_game", v).apply()
 
+    /** Single-screen devices: the companion's side panel is locked beside the game (see [SidePanel]). */
+    var sidePanelDocked: Boolean
+        get() = p.getBoolean("side_panel_docked", false)
+        set(v) = p.edit().putBoolean("side_panel_docked", v).apply()
+
+    /** Single-screen devices: the side panel's width, as a fraction of the screen's (see [SidePanel]). */
+    var sidePanelWidth: Float
+        get() = p.getFloat("side_panel_width", 0.5f)
+        set(v) = p.edit().putFloat("side_panel_width", v).apply()
+
     /** The companion tabs shown in the bottom screen's tab bar (see
      * [com.pokedaisy.app.companion.COMPANION_TABS]); the rest are
      * reached from its SETTINGS tab. */

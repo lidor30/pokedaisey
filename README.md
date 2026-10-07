@@ -32,8 +32,13 @@ spoiler-free guide. Everything is drawn in the game's own menu style.
 | AYN Thor                      | Tested, made for it                          |
 | Retroid Pocket Duo / Duo Lite | Should work, not yet tested on real hardware |
 | Anbernic RG DS                | Should work, not yet tested on real hardware |
+| Retroid Pocket 6              | Single screen: tested                        |
 
-Any Android 8.0+ device runs the games. The companion needs a second screen.
+Any Android 8.0+ device runs the games. On a device with one screen the
+companion is a panel beside the game: press BACK to slide it in over the game,
+tap the padlock on its edge to lock it beside the game (the game moves over),
+and drag that tab sideways to resize it. BACK closes an unlocked panel; hold
+BACK to leave the game.
 
 ## Install
 
@@ -150,7 +155,7 @@ shows a "not supported" notice).
 | Emerald Seaglass       | 3.0                     |  ✅   | ✅  |   ◐    | ✅  |   ✅    |   —   |
 | Too Many Types 2       | 1.5.2                   |  ✅   | ✅  |   —    | ✅  |   ✅    |   —   |
 | Emerald Rogue          | 2.2.1-EX                |  ✅   | ✅  |   ✅   | ✅  |    —    |   —   |
-| Pokémon SoulGold       | 1.1.4                   |  ✅   | ✅  |   ◐    | ✅  |   ✅    |   —   |
+| Pokémon SoulGold       | 1.1.4, 1.2              |  ✅   | ✅  |   ◐    | ✅  |   ✅    |   —   |
 | Pokémon R.O.W.E.       | 2.1.9.1 Experimental    |   —   |  —  |   —    |  —  |    —    |   —   |
 
 R.O.W.E. plays, but its companion is still in progress. Map ◐ means place names

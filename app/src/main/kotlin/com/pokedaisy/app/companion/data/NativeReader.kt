@@ -117,6 +117,9 @@ data class NativeConfig(
     val pokedex: PokedexTables? = null,
     // The GUIDE's ROM tables + save flag/var offsets (GuideRom.kt); null = no HERE / NEXT BOSS.
     val guideTables: GuideTables? = null,
+    // gPartyMenu, for the battle POKéMON pane's switch where the activity takes
+    // it from the config (SoulGold's releases); 0 = not here.
+    val partyMenu: Long = 0,
     // gEnemyParty (6 encrypted Pokémon structs, like gPlayerParty) for the
     // battle's FOE TEAM; 0 = not known for this game.
     val enemyParty: Long = 0,
@@ -797,6 +800,7 @@ val NATIVE_SOULGOLD = NATIVE_EMERALD.copy(
     completeWhenChoseItem = 0x0805FAC5L,
     waitForMonSelection = 0x0805FB09L,
     handleInputChooseTarget = 0x0805FEA5L,
+    partyMenu = 0x02038D24L,
     monIconTable = 0x087D4514L,           // gSpeciesInfo[0].iconSprite
     monIconStride = 0x118,
     monIconPaletteIndices = 0x087D453AL,  // gSpeciesInfo[0].iconPalIndex
@@ -809,6 +813,35 @@ val NATIVE_SOULGOLD = NATIVE_EMERALD.copy(
     pokedex = POKEDEX_SOULGOLD,
     guideTables = null,
     trainerCard = null,
+)
+
+// Pokémon SoulGold v1.2 - a rebuild of v1.1.4 (same save format: the user's
+// save loads in both). Found by matching v1.1.4's code and data in it (literal
+// pools for the RAM addresses, masked byte runs for the ROM), then checked on
+// headless captures of that save (the soulgold_v12 / soulgold_v12_battle
+// fixtures): gPlayerParty / gPlayerPartyCount / gEnemyParty / gPartyMenu moved
+// 8 bytes, the save, map, bag and battle globals didn't. The battle handlers
+// moved 0x38-0x3C bytes, ScriptContext_SetupScript is 0x08236D5C, gSpeciesInfo
+// grew to 0x120-byte entries (8 bytes added past the fields read here), and the
+// ROM tables shifted a few KB - their contents are v1.1.4's but TM75 (Agility,
+// was Swords Dance; see ActiveTables' soulGoldV12).
+val NATIVE_SOULGOLD_V1_2 = NATIVE_SOULGOLD.copy(
+    playerParty = 0x02039024L,
+    playerPartyCount = 0x020394D8L,
+    enemyParty = 0x02038DE4L,
+    partyMenu = 0x02038D2CL,
+    handleInputChooseAction = 0x08061D09L,
+    handleInputChooseMove = 0x08060E59L,
+    completeWhenChoseItem = 0x0805FB01L,
+    waitForMonSelection = 0x0805FB45L,
+    handleInputChooseTarget = 0x0805FEE1L,
+    monIconTable = 0x087D5D3CL,           // gSpeciesInfo[0].iconSprite
+    monIconStride = 0x120,
+    monIconPaletteIndices = 0x087D5D62L,  // gSpeciesInfo[0].iconPalIndex
+    monPalIdxStride = 0x120,
+    monIconPaletteTable = 0x08F20ABCL,
+    itemIconTable = 0x08753844L,          // gItemsInfo[0].iconPic
+    pokedex = POKEDEX_SOULGOLD_V1_2,
 )
 
 // R.O.W.E. 2.1.9.1 Experimental - separate codebase from Heart and Soul/

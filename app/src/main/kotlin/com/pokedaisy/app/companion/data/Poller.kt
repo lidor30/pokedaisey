@@ -100,6 +100,7 @@ class TelemetrySampler {
         try {
             if (kind == null) detect(reader)
             activeGame = kind ?: GameKind.FIRERED
+            soulGoldV12 = nativeCfg === NATIVE_SOULGOLD_V1_2
 
             val telemetry = when (kind) {
                 GameKind.UNBOUND -> readNativeTelemetry(reader, NATIVE_UNBOUND_WITH_DEX)
@@ -219,6 +220,7 @@ class TelemetrySampler {
                 EMERALD_ROGUE_V2_2_1_EX_SHA1 -> { kind = GameKind.EMERALD_ROGUE; nativeCfg = NATIVE_EMERALD_ROGUE }
                 TMT2_V1_5_2_SHA1 -> { kind = GameKind.TMT2; nativeCfg = NATIVE_TMT2 }
                 SOULGOLD_V1_1_4_SHA1 -> { kind = GameKind.SOULGOLD; nativeCfg = NATIVE_SOULGOLD }
+                SOULGOLD_V1_2_SHA1 -> { kind = GameKind.SOULGOLD; nativeCfg = NATIVE_SOULGOLD_V1_2 }
                 else -> {
                     kind = GameKind.EMERALD
                     unsupportedHackLabel = "unrecognized Emerald-based ROM hack " +
@@ -295,6 +297,10 @@ class TelemetrySampler {
      * (not detected yet, or the QoL struct path) - for SMART FF's menu watch ([FfMenuWatch]). */
     val knownGMain: Pair<Long, Long>?
         get() = (if (kind == GameKind.UNBOUND) NATIVE_UNBOUND else nativeCfg)?.let { it.gMain to it.inBattleOff }
+
+    /** The detected game's gPartyMenu + gPlayerParty when its config has them (SoulGold), or null. */
+    val knownPartyMenu: Pair<Long, Long>?
+        get() = nativeCfg?.takeIf { it.partyMenu != 0L }?.let { it.partyMenu to it.playerParty }
 
     fun sampleBattleInputFast(reader: MemoryReader): Pair<Int, Int>? {
         // Unbound's `kind` is decided directly in detect() without ever
@@ -387,6 +393,8 @@ class TelemetrySampler {
         const val TMT2_V1_5_2_SHA1 = "3fa8e61ec1727cc51540c54677623f736a446e1b"
         // Pokémon SoulGold v1.1.4 (BPEE, 32 MB) - host-side masked hash (GPIO bytes zero).
         const val SOULGOLD_V1_1_4_SHA1 = "ea5d369cc8a31cbf1cfacb7c9470ea670f08957b"
+        // Pokémon SoulGold v1.2 - host-side masked hash (GPIO bytes zero).
+        const val SOULGOLD_V1_2_SHA1 = "805d880ee229fb6dc3ce03d7b03baf48f0d759d0"
 
         /** Every hack detect() has RAM addresses for - the >16 MB ones it
          * hashes, plus Seaglass (16 MB). [CompanionSupport] checks imports against it. */
@@ -394,7 +402,7 @@ class TelemetrySampler {
             UNBOUND_V2_1_1_1_SHA1, GAIA_V3_2_SHA1, RADICAL_RED_V4_1_SHA1, ODYSSEY_V4_1_1_SHA1,
             AMETHYST_V1_3_0_SHA1, CELIA_V1_1_4_SHA1, HEART_AND_SOUL_V2_0_6_SHA1, LAZARUS_V2_0_SHA1,
             ROWE_V2_1_9_1_SHA1, EMERALD_ROGUE_V2_2_1_EX_SHA1, TMT2_V1_5_2_SHA1, EMERALD_SEAGLASS_V3_0_SHA1,
-            SOULGOLD_V1_1_4_SHA1,
+            SOULGOLD_V1_1_4_SHA1, SOULGOLD_V1_2_SHA1,
         )
     }
 }

@@ -2,6 +2,7 @@ package com.pokedaisy.app.companion.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -239,6 +240,41 @@ object PixelIcons {
         "..KKWWWWKK..",
         "....KKKK....",
     )
+
+    /** A shut padlock: the side panel locked beside the game (see SidePanelHandle). Draw it with [ShadowedPixelIcon]. */
+    val lockClosed = listOf(
+        "................",
+        "......1111......",
+        ".....111111.....",
+        "....111..111....",
+        "....11....11....",
+        "....11....11....",
+        "....11....11....",
+        "....11....11....",
+    ) + lockBody()
+
+    /** [lockClosed] with the shackle up and open: the side panel over the game. */
+    val lockOpen = listOf(
+        "......1111......",
+        ".....111111.....",
+        "....111..111....",
+        "....11....11....",
+        "....11..........",
+        "....11..........",
+        "....11..........",
+        "....11..........",
+    ) + lockBody()
+
+    private fun lockBody() = listOf(
+        "..111111111111..",
+        ".11111111111111.",
+        ".111111....1111.",
+        ".111111....1111.",
+        ".1111111..11111.",
+        ".1111111..11111.",
+        ".11111111111111.",
+        "..111111111111..",
+    )
 }
 
 /** Draws a one-color [bitmap] ('1' = filled, see [PixelIcons]) centered in this composable's bounds. */
@@ -265,6 +301,27 @@ fun PixelArt(bitmap: List<String>, palette: Map<Char, Color>, modifier: Modifier
             }
         }
     }
+}
+
+/**
+ * A one-colour [bitmap] with the GBA text's shadow (one cell right, down and
+ * diagonally, like [GbaText]), one cell per GBA pixel of [m].
+ */
+@Composable
+fun ShadowedPixelIcon(bitmap: List<String>, color: Color, shadow: Color, m: GbaTextMetrics, modifier: Modifier = Modifier) {
+    val h = bitmap.size + 1
+    val w = bitmap.maxOf { it.length } + 1
+    fun on(x: Int, y: Int) = bitmap.getOrNull(y)?.getOrNull(x) == '1'
+    val shadowed = List(h) { y ->
+        String(CharArray(w) { x ->
+            when {
+                on(x, y) -> 'F'
+                on(x - 1, y) || on(x, y - 1) || on(x - 1, y - 1) -> 'S'
+                else -> '.'
+            }
+        })
+    }
+    PixelArt(shadowed, mapOf('F' to color, 'S' to shadow), modifier.size(m.u * w, m.u * h))
 }
 
 /** [PixelIcons.trophy] in gold (the badge colours), e.g. beside RetroAchievements' name. */

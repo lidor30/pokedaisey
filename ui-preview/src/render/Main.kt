@@ -524,7 +524,11 @@ fun main(args: Array<String>) {
     val g = game.name.lowercase()
     val live = liveGuide()
     // AYN Thor: bottom screen 1240x1080 (landscape), top screen 1920x1080.
-    val bw = 1240; val bh = 1080; val bd = 2.625f
+    // -PcompanionW / -PcompanionH: a single-screen device's side panel instead, at its density.
+    val panelW = System.getProperty("companionW").orEmpty().toIntOrNull()
+    val bh = System.getProperty("companionH").orEmpty().toIntOrNull() ?: 1080
+    val bw = panelW ?: 1240
+    val bd = if (panelW != null) com.pokedaisy.app.companion.ui.sidePanelDensity(bw, bh) else 2.625f
     val tw = 1920; val th = 1080; val td = 2.5f
     val shots = listOf(
         Shot("$g-party", bw, bh, bd, companion("PARTY")),

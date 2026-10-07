@@ -102,6 +102,10 @@ class PokeDaisyActivity : Activity() {
     // BACK for the companion: one per companion copy (bottom screen, debug mirror).
     private val companionBack = com.pokedaisy.app.companion.ui.CompanionBack()
     private val mirrorBack = com.pokedaisy.app.companion.ui.CompanionBack()
+    private val panelBack = com.pokedaisy.app.companion.ui.CompanionBack()
+    /** The companion beside the game when there's no second screen (see [SidePanel]). */
+    private lateinit var sidePanel: SidePanel
+    private var debugMirror = false
 
     // scripts/capture_fixture.sh support: if the EXTRA_DUMP_FIXTURE extra is a
     // directory path, the next successful (connected) telemetry sample dumps
@@ -163,7 +167,10 @@ class PokeDaisyActivity : Activity() {
         game == com.pokedaisy.app.companion.data.GameKind.EMERALD_SEAGLASS ->
             BattleInputController.SwitchAddrs(partyMenu = 0x02019964L, party = 0x02019C20L)
         game == com.pokedaisy.app.companion.data.GameKind.SOULGOLD ->
-            BattleInputController.SwitchAddrs(partyMenu = 0x02038D24L, party = 0x0203901CL, monStride = 96)
+            // Two releases at different addresses: their configs carry them.
+            telemetry.knownPartyMenu()?.let { (menu, party) ->
+                BattleInputController.SwitchAddrs(partyMenu = menu, party = party, monStride = 96)
+            }
         else -> null
     }
 
@@ -307,7 +314,7 @@ class PokeDaisyActivity : Activity() {
         // app - `adb shell touch <files-dir>/debug_mirror` turns it on,
         // deleting that file turns it back off; nothing the user has to do
         // either way. Never present in a release build regardless.
-        val debugMirror = isDebugMirrorEnabled()
+        debugMirror = isDebugMirrorEnabled()
 
         view = EmulatorView(this)
         view.holdFrame = { ::engine.isInitialized && engine.holdFrame }
@@ -373,6 +380,10 @@ class PokeDaisyActivity : Activity() {
         root.setViewTreeLifecycleOwner(owner)
         root.setViewTreeSavedStateRegistryOwner(owner)
         root.setViewTreeViewModelStoreOwner(owner)
+        sidePanel = SidePanel(root, view, touchControls, Prefs(this), panelBack, playClick) {
+            val snap by telemetry.snapshot.collectAsState()
+            CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = panelBack, clickSound = playClick, achievements = RetroAchievements)
+        }
         syncGameScreen()
 
         saveDir = SavesLocation.dir(this)
@@ -630,6 +641,9 @@ class PokeDaisyActivity : Activity() {
                 it.isValid && it.displayId != Display.DEFAULT_DISPLAY && (it.flags and Display.FLAG_PRIVATE) == 0
             }
         val current = presentation
+        // One screen: the companion goes in a panel beside the game instead (not
+        // with the debug mirror, which already shows it there).
+        sidePanel.setEnabled(target == null && !debugMirror)
         if (target == null) {
             current?.dismiss()
             presentation = null
@@ -723,6 +737,7 @@ class PokeDaisyActivity : Activity() {
 
     // BACK: a tap is the companion's back (closes what's open there, else
     // nothing - no accidental exit mid-game); hold to return to the ROM library.
+    // With one screen a tap also opens / closes the side panel (SidePanel.onBack).
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK) { event.startTracking(); return true }
         return super.onKeyDown(keyCode, event)
@@ -736,7 +751,7 @@ class PokeDaisyActivity : Activity() {
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             // Not after a hold (that's canceled) - the long press already left.
-            if (event.isTracking && !event.isCanceled) { companionBack.back(); mirrorBack.back() }
+            if (event.isTracking && !event.isCanceled && !sidePanel.onBack()) { companionBack.back(); mirrorBack.back() }
             return true
         }
         return super.onKeyUp(keyCode, event)
