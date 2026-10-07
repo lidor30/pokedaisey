@@ -21,7 +21,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -60,7 +63,13 @@ fun StatesScreen(slots: StateSlots?, tick: Long) {
         }
         return
     }
-    val list = remember(tick) { slots.list() }
+    // Listing the slots stats ~50 files on shared storage: once on the way in, then off
+    // the main thread whenever the sample ticks (every second while this tab is open).
+    var list by remember(slots) { mutableStateOf(slots.list()) }
+    val firstTick = remember(slots) { tick }
+    LaunchedEffect(slots, tick) {
+        if (tick != firstTick) list = withContext(Dispatchers.IO) { slots.list() }
+    }
     Column(modifier = Modifier.fillMaxSize()) {
         OptionTitleWindow(tr("SAVE STATES"), m, trailing = tr("SLOT {0}", slots.currentIndex))
         Spacer(Modifier.height(m.u * 4))
@@ -129,10 +138,13 @@ private fun SlotCard(
                     },
             ) {
                 if (slot.present) {
-                    val bmp by produceState<Bitmap?>(null, slot.thumbPath, slot.savedAtMillis) {
-                        value = slot.thumbPath?.let { p ->
-                            withContext(Dispatchers.IO) { runCatching { BitmapFactory.decodeFile(p) }.getOrNull() }
-                        }
+                    val thumbPath = slot.thumbPath
+                    val thumbKey = thumbPath?.let { "$it@${slot.savedAtMillis}" }
+                    val bmp by produceState(thumbKey?.let(StateThumbs::get), thumbKey) {
+                        if (value != null || thumbPath == null || thumbKey == null) return@produceState
+                        value = withContext(Dispatchers.IO) {
+                            runCatching { BitmapFactory.decodeFile(thumbPath) }.getOrNull()
+                        }?.also { StateThumbs.put(thumbKey, it) }
                     }
                     bmp?.let {
                         Image(
@@ -150,7 +162,7 @@ private fun SlotCard(
             Spacer(Modifier.height(u * 2))
             GbaText(
                 if (slot.present) {
-                    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(slot.savedAtMillis))
+                    remember(slot.savedAtMillis) { slotDateFormat.format(Date(slot.savedAtMillis)) }
                 } else "-",
                 OptionColors.muted, OptionColors.mutedShadow, small,
                 modifier = Modifier.padding(horizontal = u * 2),
@@ -162,4 +174,15 @@ private fun SlotCard(
             }
         }
     }
+}
+
+private val slotDateFormat: DateFormat by lazy { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT) }
+
+/** Decoded slot thumbnails by path + save time, so a STATES visit doesn't decode all ten again. */
+private object StateThumbs {
+    private val map = object : LinkedHashMap<String, Bitmap>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>?) = size > 16
+    }
+    fun get(key: String): Bitmap? = synchronized(map) { map[key] }
+    fun put(key: String, bmp: Bitmap) = synchronized(map) { map[key] = bmp }
 }

@@ -6,7 +6,18 @@ import androidx.compose.ui.text.font.FontFamily
 // Desktop stand-in for the app's PixelTypeface.kt. Skia doesn't fall back glyph
 // by glyph inside a FontFamily, so Japanese renders in the system's CJK font here
 // (bigger, not pixel art) - Paparazzi shows the real PixelMplusJP fallback.
-fun pixelFontFamily(context: android.content.Context): FontFamily = FontFamily(
+// One per process, like the app's: the Font shim reads the file's bytes on every call.
+fun pixelFontFamily(context: android.content.Context): FontFamily = family ?: FontFamily(
     Font("fonts/PixelOperator.ttf", context.assets),
     Font("fonts/PixelMplusJP.ttf", context.assets),
-)
+).also { family = it }
+
+@Volatile private var family: FontFamily? = null
+
+/** Desktop stand-in for the app's gameFontFamily: the game's font, Pixel Operator after it. */
+fun gameFontFamily(context: android.content.Context, file: java.io.File): FontFamily? = runCatching {
+    FontFamily(
+        androidx.compose.ui.text.platform.Font(file.absolutePath, file.readBytes()),
+        Font("fonts/PixelOperator.ttf", context.assets),
+    )
+}.getOrNull()

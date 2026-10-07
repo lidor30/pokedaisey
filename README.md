@@ -159,11 +159,8 @@ shows a "not supported" notice).
 | Emerald Rogue          | 2.2.1-EX                |  ✅   | ✅  |   ✅   | ✅  |    —    |   —   |
 | Pokémon SoulGold       | 1.1.4, 1.2              |  ✅   | ✅  |   ◐    | ✅  |   ✅    |   —   |
 | Pokémon R.O.W.E.       | 2.1.9.1 Experimental    |   —   |  —  |   —    |  —  |    —    |   —   |
-| Pokémon Yellow (GB)    | USA/Europe              |  ✅   | ✅  |   ◐    | ✅  |    —    |   —   |
 
-Game Boy / Color games play too (mGBA's GB core); Pokémon Yellow is the first one
-the companion reads, in the game's own look: its font, icons and town map, rebuilt
-from your ROM. R.O.W.E. plays, but its companion is still in progress. Map ◐ means place names
+R.O.W.E. plays, but its companion is still in progress. Map ◐ means place names
 only, without the map picture. Battle ◐ means the battle panes work but haven't
 been checked in every kind of battle. The guides were
 written from each game's own data and may contain mistakes; the app says so the

@@ -3,6 +3,9 @@ package com.pokedaisy.app.companion.ui
 import com.pokedaisy.app.companion.i18n.tk
 import com.pokedaisy.app.companion.i18n.tr
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.EnterTransition
+import androidx.compose.ui.platform.testTag
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.LinearEasing
@@ -285,12 +288,21 @@ fun CompanionScreen(
                     current == "DEX" && dexUi.open != null -> "DEX/DETAIL"
                     else -> current
                 }
+                // When the last switch was moments ago (a player tapping through tabs), cut
+                // instead of animating: every pane still sliding out stays composed, and
+                // a run of quick taps stacked up several full tabs at once.
+                val lastSwitchNanos = remember { longArrayOf(0L) }
                 // The tab area, with RetroAchievements' live indicators in its corner.
                 Box(Modifier.weight(1f).fillMaxSize()) {
                     AnimatedContent(
                         targetState = pane,
                         transitionSpec = {
-                            if (targetState == "LOADING" || initialState == "LOADING") {
+                            val now = System.nanoTime()
+                            val rapid = now - lastSwitchNanos[0] < RAPID_SWITCH_NANOS
+                            lastSwitchNanos[0] = now
+                            if (rapid) {
+                                EnterTransition.None togetherWith ExitTransition.None
+                            } else if (targetState == "LOADING" || initialState == "LOADING") {
                                 fadeIn(tween(250)) togetherWith fadeOut(tween(200))
                             } else if (targetState.substringBefore('/') == initialState.substringBefore('/')) {
                                 // A tab's own summary opening / closing: a zoom rather than a slide.
@@ -453,7 +465,7 @@ fun CompanionScreen(
                             SettingsTabChip(selectedIdx == i, open)
                         } else {
                             val usable = !snapshot.unsupported || title == "ACHIEVEMENTS"
-                            TabChip(companionTabLabel(title), selectedIdx == i && usable, Modifier.weight(1f), enabled = usable, open)
+                            TabChip(companionTabLabel(title), selectedIdx == i && usable, Modifier.weight(1f).testTag("tab-$title"), enabled = usable, open)
                         }
                     }
                 }
@@ -501,6 +513,9 @@ private fun rememberTabMetrics() = rememberGbaTextMetrics(1.15f, wholePixels = f
 
 /** The gear chip's fixed width; SETTINGS' TOOLS row leaves the same gap so its chips line up with the bar's. */
 internal val SETTINGS_CHIP_WIDTH = 52.dp
+
+/** Tab switches closer together than this cut instead of sliding (see the tab AnimatedContent). */
+private const val RAPID_SWITCH_NANOS = 300_000_000L
 
 /** The gap between tab chips, and above the tab bar. */
 internal val TAB_GAP = 4.dp

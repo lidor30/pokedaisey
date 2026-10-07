@@ -313,8 +313,8 @@ class TelemetrySampler {
             off += len
         }
         val hash = if (off == size && size > 0) digest.digest().joinToString("") { "%02x".format(it) } else null
-        when (hash) {
-            YELLOW_SHA1 -> { kind = GameKind.YELLOW; gen1Cfg = GEN1_YELLOW }
+        when {
+            hash == YELLOW_SHA1 && GAME_BOY_SUPPORT -> { kind = GameKind.YELLOW; gen1Cfg = GEN1_YELLOW }
             else -> {
                 kind = GameKind.FIRERED
                 unsupportedHackLabel = "this Game Boy game isn't supported yet (sha1 ${hash?.take(12) ?: "unknown"}…)"
@@ -425,6 +425,14 @@ class TelemetrySampler {
 
         /** The Game Boy / Color carts the companion reads ([CompanionSupport] checks imports against it). */
         val SUPPORTED_GB_SHA1S = setOf(YELLOW_SHA1)
+
+        /**
+         * Game Boy / Color (Pokémon Yellow): off for now - the library, folder scan, frontend
+         * launch and archives don't take .gb / .gbc (RomArchive.ROM_EXTENSIONS), and a cart
+         * that arrives anyway gets the "not supported" notice. The reader, art and tables stay
+         * in place; flip this (and the manifest's .gb / .gbc VIEW patterns) to bring it back.
+         */
+        const val GAME_BOY_SUPPORT = false
 
         /** Every hack detect() has RAM addresses for - the >16 MB ones it
          * hashes, plus Seaglass (16 MB). [CompanionSupport] checks imports against it. */
