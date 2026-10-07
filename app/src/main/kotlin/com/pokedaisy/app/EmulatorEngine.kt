@@ -605,7 +605,8 @@ class EmulatorEngine(
     }
 
     private companion object {
-        /** SPEED_CYCLE steps. Index 0 (1×) is the normal, audio-on state. */
-        val SPEED_STEPS = floatArrayOf(1f, 1.5f, 2f, 3f, 4f)
+        /** SPEED_CYCLE steps. Index 0 (1×) is the normal, audio-on state.
+         *  Matches the discrete rates in FF SPEED (minus INFINITE), plus 1× / 1.5×. */
+        val SPEED_STEPS = floatArrayOf(1f, 1.5f, 2f, 3f, 4f, 5f, 6f, 8f, 10f)
     }
 }
