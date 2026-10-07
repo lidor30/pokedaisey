@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(pokedaisey C)
+project(pokedaisy C)
 
 # ---------------------------------------------------------------------------
 # Vendored mGBA (git submodule, pinned to 0.10.5) — core only.
@@ -46,16 +46,41 @@ set(SKIP_INSTALL_ALL    ON  CACHE BOOL "" FORCE)
 add_subdirectory("${MGBA_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/mgba" EXCLUDE_FROM_ALL)
 
 # ---------------------------------------------------------------------------
+# Vendored rcheevos (git submodule, pinned to v12.5.0) — RetroAchievements'
+# own client library. GBA ROM hashing only: no disc, encrypted or zip hashing.
+# ---------------------------------------------------------------------------
+get_filename_component(RCHEEVOS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../third_party/rcheevos" ABSOLUTE)
+
+if(NOT EXISTS "${RCHEEVOS_DIR}/include/rc_client.h")
+    message(FATAL_ERROR "rcheevos submodule missing at ${RCHEEVOS_DIR} — run: git submodule update --init third_party/rcheevos")
+endif()
+
+file(GLOB RCHEEVOS_SOURCES
+    "${RCHEEVOS_DIR}/src/*.c"
+    "${RCHEEVOS_DIR}/src/rapi/*.c"
+    "${RCHEEVOS_DIR}/src/rcheevos/*.c"
+    "${RCHEEVOS_DIR}/src/rhash/hash.c"
+    "${RCHEEVOS_DIR}/src/rhash/hash_rom.c"
+    "${RCHEEVOS_DIR}/src/rhash/md5.c")
+list(FILTER RCHEEVOS_SOURCES EXCLUDE REGEX "rc_libretro\\.c$|rc_client_external\\.c$|rc_client_raintegration\\.c$")
+
+add_library(rcheevos STATIC ${RCHEEVOS_SOURCES})
+target_include_directories(rcheevos PUBLIC "${RCHEEVOS_DIR}/include")
+target_compile_definitions(rcheevos PUBLIC
+    RC_CLIENT_SUPPORTS_HASH RC_HASH_NO_DISC RC_HASH_NO_ENCRYPTED RC_HASH_NO_ZIP)
+
+# ---------------------------------------------------------------------------
 # Our JNI bridge.
 # ---------------------------------------------------------------------------
-add_library(pokedaisey SHARED pokedaisey_jni.c)
+add_library(pokedaisy SHARED pokedaisy_jni.c pokedaisy_ra.c)
 
-target_include_directories(pokedaisey PRIVATE
+target_include_directories(pokedaisy PRIVATE
     "${MGBA_DIR}/include"
     "${MGBA_DIR}/src"
     "${CMAKE_CURRENT_BINARY_DIR}/mgba/include")
 
-target_link_libraries(pokedaisey
+target_link_libraries(pokedaisy
     mgba
+    rcheevos
     android
     log)

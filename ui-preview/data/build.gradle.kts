@@ -7,9 +7,9 @@ plugins {
     id("org.jetbrains.compose")
 }
 
-val app = rootDir.resolve("../app/src/main/kotlin/com/pokedaisey/app")
+val app = rootDir.resolve("../app/src/main/kotlin/com/pokedaisy/app")
 val appSrc = fileTree(app) {
-    listOf("companion/data/**", "companion/*.kt", "MgbaCore.kt", "Prefs.kt", "GbaControls.kt", "Hotkeys.kt")
+    listOf("companion/data/**", "companion/*.kt", "companion/i18n/**", "MgbaCore.kt", "Prefs.kt", "GbaControls.kt", "Hotkeys.kt")
         .forEach { include(it) }
 }
 sourceSets["main"].kotlin.srcDir("shims")

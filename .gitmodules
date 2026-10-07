@@ -1,3 +1,6 @@
 [submodule "third_party/mgba"]
 	path = third_party/mgba
 	url = https://github.com/mgba-emu/mgba.git
+[submodule "third_party/rcheevos"]
+	path = third_party/rcheevos
+	url = https://github.com/RetroAchievements/rcheevos.git

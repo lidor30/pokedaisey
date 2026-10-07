@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the location->song-ID table PokeDaisey's FF music prefetcher/
+"""Generate the location->song-ID table PokeDaisy's FF music prefetcher/
 player use (id-only — no audio; see FfMusicRenderer.kt for how the actual
 clips get recorded, on-device, from the real ROM).
 
@@ -139,11 +139,11 @@ def main() -> None:
     class_suffix = "FireRed" if game == "firered" else "Emerald"
     out_dir = os.path.join(
         os.path.dirname(__file__), "..",
-        "app/src/main/kotlin/com/pokedaisey/app/companion/data",
+        "app/src/main/kotlin/com/pokedaisy/app/companion/data",
     )
     out_path = os.path.join(out_dir, f"MapMusic{class_suffix}.kt")
 
-    lines = [kt_header("com.pokedaisey.app.companion.data")]
+    lines = [kt_header("com.pokedaisy.app.companion.data")]
     lines.append(f"/** {class_suffix}'s songs for FfMusicRenderer to pre-record: each MAPSEC's field music and every battle theme. */")
     lines.append(f"object MapMusic{class_suffix} {{")
     lines.append(f"    /** Every MUS_VS_* battle theme. */")

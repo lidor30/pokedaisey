@@ -31,53 +31,53 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.unit.dp
-import com.pokedaisey.app.GbaControls
-import com.pokedaisey.app.Hotkeys
-import com.pokedaisey.app.LibraryActivity
-import com.pokedaisey.app.Prefs
-import com.pokedaisey.app.SettingsActivity
-import com.pokedaisey.app.SetupState
-import com.pokedaisey.app.companion.CompanionSettings
-import com.pokedaisey.app.companion.BattleInput
-import com.pokedaisey.app.companion.StateSlots
-import com.pokedaisey.app.companion.data.BATTLE_INPUT_ACTION_SELECT
-import com.pokedaisey.app.companion.data.CardStyle
-import com.pokedaisey.app.companion.data.TrainerCardArt
-import com.pokedaisey.app.companion.data.TrainerCardInfo
-import com.pokedaisey.app.companion.data.BATTLE_INPUT_MOVE_SELECT
-import com.pokedaisey.app.companion.data.BATTLE_INPUT_PARTY_OPEN
-import com.pokedaisey.app.companion.data.MoveVsFoe
-import com.pokedaisey.app.companion.data.GENDER_SYMBOL_FEMALE
-import com.pokedaisey.app.companion.data.GENDER_SYMBOL_MALE
-import com.pokedaisey.app.companion.data.GameKind
-import com.pokedaisey.app.companion.data.ItemView
-import com.pokedaisey.app.companion.data.MonView
-import com.pokedaisey.app.companion.data.MoveView
-import com.pokedaisey.app.companion.data.POCKET_ITEMS
-import com.pokedaisey.app.companion.data.POCKET_KEY_ITEMS
-import com.pokedaisey.app.companion.data.POCKET_POKE_BALLS
-import com.pokedaisey.app.companion.data.SnapshotView
-import com.pokedaisey.app.companion.data.MemoryReader
-import com.pokedaisey.app.companion.data.PokedexSource
-import com.pokedaisey.app.companion.data.NATIVE_EMERALD_RETAIL
-import com.pokedaisey.app.companion.data.NATIVE_FIRERED_REV1
-import com.pokedaisey.app.companion.data.readSaveProgress
-import com.pokedaisey.app.companion.data.TypeMatchup
-import com.pokedaisey.app.companion.data.activeGame
-import com.pokedaisey.app.companion.data.expProgress
-import com.pokedaisey.app.companion.data.gameCase
-import com.pokedaisey.app.companion.data.lookupLocation
-import com.pokedaisey.app.companion.data.speciesName
-import com.pokedaisey.app.companion.data.TYPE_NONE
-import com.pokedaisey.app.companion.data.typeIdOf
-import com.pokedaisey.app.companion.data.typeMatchups
-import com.pokedaisey.app.companion.data.withMovesVs
-import com.pokedaisey.app.companion.data.RomArt
-import com.pokedaisey.app.companion.data.RomRegionMap
-import com.pokedaisey.app.companion.data.activeRegionMap
-import com.pokedaisey.app.companion.BatteryStatus
-import com.pokedaisey.app.companion.DeviceBattery
-import com.pokedaisey.app.companion.ui.CompanionScreen
+import com.pokedaisy.app.GbaControls
+import com.pokedaisy.app.Hotkeys
+import com.pokedaisy.app.LibraryActivity
+import com.pokedaisy.app.Prefs
+import com.pokedaisy.app.SettingsActivity
+import com.pokedaisy.app.SetupState
+import com.pokedaisy.app.companion.CompanionSettings
+import com.pokedaisy.app.companion.BattleInput
+import com.pokedaisy.app.companion.StateSlots
+import com.pokedaisy.app.companion.data.BATTLE_INPUT_ACTION_SELECT
+import com.pokedaisy.app.companion.data.CardStyle
+import com.pokedaisy.app.companion.data.TrainerCardArt
+import com.pokedaisy.app.companion.data.TrainerCardInfo
+import com.pokedaisy.app.companion.data.BATTLE_INPUT_MOVE_SELECT
+import com.pokedaisy.app.companion.data.BATTLE_INPUT_PARTY_OPEN
+import com.pokedaisy.app.companion.data.MoveVsFoe
+import com.pokedaisy.app.companion.data.GENDER_SYMBOL_FEMALE
+import com.pokedaisy.app.companion.data.GENDER_SYMBOL_MALE
+import com.pokedaisy.app.companion.data.GameKind
+import com.pokedaisy.app.companion.data.ItemView
+import com.pokedaisy.app.companion.data.MonView
+import com.pokedaisy.app.companion.data.MoveView
+import com.pokedaisy.app.companion.data.POCKET_ITEMS
+import com.pokedaisy.app.companion.data.POCKET_KEY_ITEMS
+import com.pokedaisy.app.companion.data.POCKET_POKE_BALLS
+import com.pokedaisy.app.companion.data.SnapshotView
+import com.pokedaisy.app.companion.data.MemoryReader
+import com.pokedaisy.app.companion.data.PokedexSource
+import com.pokedaisy.app.companion.data.NATIVE_EMERALD_RETAIL
+import com.pokedaisy.app.companion.data.NATIVE_FIRERED_REV1
+import com.pokedaisy.app.companion.data.readSaveProgress
+import com.pokedaisy.app.companion.data.TypeMatchup
+import com.pokedaisy.app.companion.data.activeGame
+import com.pokedaisy.app.companion.data.expProgress
+import com.pokedaisy.app.companion.data.gameCase
+import com.pokedaisy.app.companion.data.lookupLocation
+import com.pokedaisy.app.companion.data.speciesName
+import com.pokedaisy.app.companion.data.TYPE_NONE
+import com.pokedaisy.app.companion.data.typeIdOf
+import com.pokedaisy.app.companion.data.typeMatchups
+import com.pokedaisy.app.companion.data.withMovesVs
+import com.pokedaisy.app.companion.data.RomArt
+import com.pokedaisy.app.companion.data.RomRegionMap
+import com.pokedaisy.app.companion.data.activeRegionMap
+import com.pokedaisy.app.companion.BatteryStatus
+import com.pokedaisy.app.companion.DeviceBattery
+import com.pokedaisy.app.companion.ui.CompanionScreen
 import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
@@ -110,7 +110,7 @@ class FakeSlots : StateSlots {
 class FakeSettings(showHintsInitially: Boolean = true) : CompanionSettings {
     private var ffSpeed = 4f
     private var ff = false
-    private var music = com.pokedaisey.app.companion.FfMusicMode.STEADY
+    private var music = com.pokedaisy.app.companion.FfMusicMode.STEADY
     private var touch = 0
     private var hints = showHintsInitially
     override val ffMaxSpeed get() = ffSpeed
@@ -118,14 +118,19 @@ class FakeSettings(showHintsInitially: Boolean = true) : CompanionSettings {
     override val ffToggled get() = ff
     override fun setFfToggled(on: Boolean) { ff = on }
     override val ffMusicMode get() = music
-    override fun setFfMusicMode(mode: com.pokedaisey.app.companion.FfMusicMode) { music = mode }
-    private var ffModeValue = com.pokedaisey.app.companion.FfMode.SMART
+    override fun setFfMusicMode(mode: com.pokedaisy.app.companion.FfMusicMode) { music = mode }
+    private var ffModeValue = com.pokedaisy.app.companion.FfMode.SMART
     override val ffMode get() = ffModeValue
-    override fun setFfMode(mode: com.pokedaisey.app.companion.FfMode) { ffModeValue = mode }
+    override fun setFfMode(mode: com.pokedaisy.app.companion.FfMode) { ffModeValue = mode }
     override val touchControlsMode get() = touch
     override fun setTouchControlsMode(v: Int) { touch = v }
-    override fun gbaControlBindings() = GbaControls.Btn.entries.associateWith { listOf("BUTTON_${it.name}") }
+    override fun gbaControlBindings() = GbaControls.Btn.entries.associateWith {
+        listOf(when (it) { GbaControls.Btn.START2 -> "BUTTON_X"; GbaControls.Btn.SELECT2 -> "BUTTON_Y"; else -> "BUTTON_${it.name}" })
+    }
     override fun setGbaControlBinding(btn: GbaControls.Btn, keyName: String) {}
+    private var hotkeysOn = true
+    override val hotkeysEnabled get() = hotkeysOn
+    override fun setHotkeysEnabled(on: Boolean) { hotkeysOn = on }
     override fun hotkeyBindings() = Hotkeys.Action.entries.associateWith { listOf("BUTTON_Y") }
     override fun setHotkeyBinding(action: Hotkeys.Action, keyName: String) {}
     override fun restartGame() {}
@@ -138,9 +143,12 @@ class FakeSettings(showHintsInitially: Boolean = true) : CompanionSettings {
     private var bar = false
     override val statusBar get() = bar
     override fun setStatusBar(on: Boolean) { bar = on }
+    private var stretch = false
+    override val stretchGame get() = stretch
+    override fun setStretchGame(on: Boolean) { stretch = on }
     override val gameName = "Pokémon FireRed"
     override val romFileName = "firered-qol.gba"
-    private var tabs = com.pokedaisey.app.companion.DEFAULT_COMPANION_TABS
+    private var tabs = com.pokedaisy.app.companion.DEFAULT_COMPANION_TABS
     override val companionTabs get() = tabs
     override fun setCompanionTabs(tabs: List<String>) { this.tabs = tabs }
     override fun guideNoticeAccepted(game: String) = true
@@ -202,7 +210,7 @@ class Shot(
 )
 
 /** The device's BACK for the shot being rendered; the `*-back` shots press it. */
-var previewBack = com.pokedaisey.app.companion.ui.CompanionBack()
+var previewBack = com.pokedaisy.app.companion.ui.CompanionBack()
 
 fun SkikoComposeUiTest.pressBack() {
     runOnIdle { previewBack.back() }
@@ -220,7 +228,7 @@ fun companion(
 ): () -> (@Composable () -> Unit) = {
     DeviceBattery.status.value = battery
     val sv = snap()
-    val back = com.pokedaisey.app.companion.ui.CompanionBack().also { previewBack = it }
+    val back = com.pokedaisy.app.companion.ui.CompanionBack().also { previewBack = it }
     val content: @Composable () -> Unit = {
         CompanionScreen(sv, FakeSlots(), FakeSettings(hints), FakeBattleInput(busy), initialTab = tab, initialMonIndex = mon, initialCardBack = cardBack, back = back)
     }
@@ -370,17 +378,19 @@ fun liveGuide(): ((SnapshotView) -> SnapshotView)? {
 }
 
 /** Canned SteamGridDB answers for the cover picker; thumbnails are local mon icons. */
-class FakeCoverSource(private val known: Boolean) : com.pokedaisey.app.CoverSource {
+class FakeCoverSource(private val known: Boolean, private val boxArt: Boolean = false, override val steamGridDb: Boolean = true) : com.pokedaisy.app.CoverSource {
     private val icon = { n: Int -> monIcon(n).orEmpty() }
+    // The RA box art: a stand-in image (the preview has no network), a bigger mon.
+    override fun raBoxArt(rom: File) = if (boxArt) com.pokedaisy.app.raBoxArtIcon(icon(6)) else null
     override fun gameFor(rom: File) =
-        if (known) com.pokedaisey.app.SteamGridDbClient.GameHit(33987, "Pokémon FireRed") else null
+        if (known) com.pokedaisy.app.SteamGridDbClient.GameHit(33987, "Pokémon FireRed") else null
     override fun search(term: String) = listOf(
         "Pokémon Amethyst", "Pokémon Amethyst Version", "Pokémon Crystal", "Pokémon Emerald",
-    ).mapIndexed { i, n -> com.pokedaisey.app.SteamGridDbClient.GameHit(1000 + i, n) }
+    ).mapIndexed { i, n -> com.pokedaisy.app.SteamGridDbClient.GameHit(1000 + i, n) }
     override fun icons(gameId: Int) = listOf(6, 3, 9, 25, 150, 1, 4, 7, 144, 145, 146, 94).mapIndexed { i, n ->
-        com.pokedaisey.app.SteamGridDbClient.Icon(
+        com.pokedaisy.app.SteamGridDbClient.Icon(
             n, icon(n), icon(n),
-            if (i < 3) com.pokedaisey.app.SteamGridDbClient.PREFERRED_AUTHOR_STEAM64 else "1",
+            if (i < 3) com.pokedaisy.app.SteamGridDbClient.PREFERRED_AUTHOR_STEAM64 else "1",
             if (i < 3) "Favourite" else "Someone$i",
         )
     }
@@ -393,7 +403,19 @@ fun withApiKey(make: () -> androidx.activity.ComponentActivity): androidx.activi
     return make()
 }
 
-fun fakeRelease() = com.pokedaisey.app.AppUpdater.Release(
+/** [make] with ASPECT = [stretch] and the STATUS BAR on, plus a savestate thumbnail for the
+ * ASPECT preview when a game frame is around: native-capture/menu-shots/thor/top.png (untracked -
+ * the Thor's top screen, `adb exec-out screencap`, cropped to the game and scaled to 240x160). */
+fun withAspect(stretch: Boolean, make: () -> androidx.activity.ComponentActivity): androidx.activity.ComponentActivity {
+    val ctx = android.content.Context()
+    Prefs(ctx).stretchGame = stretch
+    Prefs(ctx).statusBar = true
+    val shot = File("../../../../native-capture/menu-shots/thor/top.png")
+    if (shot.isFile) shot.copyTo(File(ctx.filesDir, "states/0badcafe/ss1.png").apply { parentFile.mkdirs() }, overwrite = true)
+    return make()
+}
+
+fun fakeRelease() = com.pokedaisy.app.AppUpdater.Release(
     "1.0.5",
     "- LOAD SAVE: put another save file into a game\n- INFO on every game\n- Fixes for the ROMs folder scan",
     "", 0, "",
@@ -403,7 +425,7 @@ fun fakeRelease() = com.pokedaisey.app.AppUpdater.Release(
 fun withHidden(make: () -> androidx.activity.ComponentActivity): androidx.activity.ComponentActivity {
     val ctx = android.content.Context()
     val roms = File(ctx.filesDir, "roms")
-    Prefs(ctx).hiddenRoms = setOf(File(roms, "Pokemon Gaia v3.2.gba").absolutePath, File(roms, "Radical Red 4.1.gba").absolutePath)
+    Prefs(ctx).hiddenRoms = setOf(File(roms, "Pokemon - Gaia (v3.2).gba").absolutePath, File(roms, "1636 - Pokemon Radical Red.gba").absolutePath)
     return make()
 }
 
@@ -411,8 +433,19 @@ fun withHidden(make: () -> androidx.activity.ComponentActivity): androidx.activi
 fun activity(make: () -> androidx.activity.ComponentActivity): () -> (@Composable () -> Unit) = {
     val ctx = android.content.Context()
     val roms = File(ctx.filesDir, "roms").apply { mkdirs() }
-    val names = listOf("firered-qol.gba", "Pokemon Unbound.gba", "Pokemon Emerald.gba", "Radical Red 4.1.gba", "Pokemon Gaia v3.2.gba")
-    names.forEach { File(roms, it).writeText("x") }
+    // Dump-style file names, as players have them; firered-qol stays unrecognised (a QoL build).
+    val names = listOf(
+        "firered-qol.gba", "Pokemon - Unbound (v2.1.1.1).gba", "Pokemon - Emerald Version (USA, Europe).gba",
+        "1636 - Pokemon Radical Red.gba", "Pokemon - Gaia (v3.2).gba", "Pokemon Emerald Imperium (World) (v1.3.1).gba",
+    )
+    roms.listFiles()?.forEach { it.delete() }
+    names.forEach { File(roms, it).apply { writeText("x"); setLastModified(1_700_000_000_000L) } }
+    // What GameTitles.identify would have cached for the real ROMs (the fakes don't hash to them).
+    val titles = mapOf(names[1] to "Pokémon Unbound", names[2] to "Pokémon Emerald", names[3] to "Pokémon Radical Red", names[4] to "Pokémon Gaia")
+    File(ctx.filesDir, "rom-titles.tsv").writeText(names.joinToString("") { n ->
+        val f = File(roms, n)
+        "${f.absolutePath}\t${f.length()}\t${f.lastModified()}\t${titles[n].orEmpty()}\n"
+    })
     File(ctx.filesDir, "saves").mkdirs()
     File(ctx.filesDir, "saves/firered-qol.sav").writeText("x")
     val prefs = Prefs(ctx)
@@ -420,7 +453,11 @@ fun activity(make: () -> androidx.activity.ComponentActivity): () -> (@Composabl
     prefs.libraryViewMode = 0
     prefs.romsFolder = null
     prefs.hiddenRoms = emptySet()
+    prefs.hotkeysEnabled = true
     prefs.savesDirOverride = null
+    prefs.stretchGame = false
+    prefs.statusBar = false
+    File(ctx.filesDir, "states").deleteRecursively()
     prefs.lastRomPath = File(roms, names[0]).absolutePath
     names.take(3).reversed().forEach { prefs.pushRecentRom(File(roms, it).absolutePath) }
     make().onCreate(null)
@@ -461,6 +498,13 @@ fun romArt() {
     RomArt.OUTPUTS.filter { !File(dir, it).isFile }.takeIf { it.isNotEmpty() }?.let { println("rom art missing (no ROM for it): $it") }
 }
 
+/** The game's home town, which its own region map shows (Emerald has no Pallet Town rect). */
+fun homeMapsec(game: GameKind) = when (game) {
+    GameKind.EMERALD, GameKind.EMERALD_ROGUE -> 0x00 // MAPSEC_LITTLEROOT_TOWN
+    GameKind.LAZARUS -> 0x5A // Acrisia City
+    else -> 0x58 // MAPSEC_PALLET_TOWN
+}
+
 fun main(args: Array<String>) {
     romArt()
     // A FireRed-engine hack's own region map (Unbound, Odyssey, ...) from -Prom.
@@ -472,6 +516,11 @@ fun main(args: Array<String>) {
     val only = args.getOrElse(1) { "" }.split(",").filter { it.isNotBlank() }
     val game = GameKind.valueOf(System.getProperty("game") ?: "FIRERED")
     activeGame = game
+    // -Plang=FR: the app's text in another language (saved like the LANGUAGE setting, which the activities re-apply).
+    System.getProperty("lang").orEmpty().takeIf { it.isNotBlank() }?.let { code ->
+        runCatching { com.pokedaisy.app.Prefs(android.content.Context()).appLanguage = code }
+        com.pokedaisy.app.companion.i18n.L10n.apply(code, null)
+    }
     val g = game.name.lowercase()
     val live = liveGuide()
     // AYN Thor: bottom screen 1240x1080 (landscape), top screen 1920x1080.
@@ -489,13 +538,17 @@ fun main(args: Array<String>) {
         Shot("$g-card", bw, bh, bd, companion("CARD", snap = ::card)),
         Shot("$g-card-back", bw, bh, bd, companion("CARD", cardBack = true, snap = ::card)),
         Shot("$g-map", bw, bh, bd, companion("MAP") {
-            val sec = if (game == GameKind.EMERALD || game == GameKind.EMERALD_ROGUE) 0x00 else 0x58 // MAPSEC_LITTLEROOT_TOWN / _PALLET_TOWN
+            val sec = homeMapsec(game)
             snapshot().copy(location = lookupLocation(sec), regionMapSectionId = sec)
         }),
         // The female head, partway along a long route (FireRed Route 4 / Emerald Route 104,
         // MAP_TYPE_ROUTE): the head on the tile the game puts it, the cursor round the route.
         Shot("$g-map-route", bw, bh, bd, companion("MAP") {
-            val sec = if (game == GameKind.EMERALD || game == GameKind.EMERALD_ROGUE) 0x13 else 0x68
+            val sec = when (game) {
+                GameKind.EMERALD, GameKind.EMERALD_ROGUE -> 0x13
+                GameKind.LAZARUS -> 0x67 // Erinys Path, 3 tiles wide
+                else -> 0x68
+            }
             snapshot().copy(
                 location = lookupLocation(sec), regionMapSectionId = sec, playerGender = 1, mapType = 3,
                 mapWidth = if (game == GameKind.EMERALD) 40 else 90, mapHeight = if (game == GameKind.EMERALD) 60 else 20,
@@ -504,7 +557,7 @@ fun main(args: Array<String>) {
         }),
         // A tap on the map: FireRed's Mt. Moon tile on Route 4 (two names), Emerald's Fortree City.
         Shot("$g-map-tap", bw, bh, bd, companion("MAP") {
-            val sec = if (game == GameKind.EMERALD || game == GameKind.EMERALD_ROGUE) 0x00 else 0x58
+            val sec = homeMapsec(game)
             snapshot().copy(location = lookupLocation(sec), regionMapSectionId = sec)
         }) {
             val at = if (game == GameKind.EMERALD || game == GameKind.EMERALD_ROGUE) Offset(0.45f, 0.125f) else Offset(0.4375f, 0.306f)
@@ -621,7 +674,17 @@ fun main(args: Array<String>) {
         Shot("$g-settings", bw, bh, bd, companion("SETTINGS")),
         Shot("$g-settings-ffspeed", bw, bh, bd, companion("SETTINGS")) { onNodeWithText("FF SPEED").performClick() },
         Shot("$g-settings-ffmusic", bw, bh, bd, companion("SETTINGS")) { onAllNodesWithText("FF MUSIC").onFirst().performClick() },
-        Shot("$g-settings-hotkeys", bw, bh, bd, companion("SETTINGS")) { onNodeWithText("HOTKEYS").performClick() },
+        Shot("$g-settings-hotkeys", bw, bh, bd, companion("SETTINGS")) {
+            onNodeWithText("HOTKEYS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+        },
+        Shot("$g-settings-buttons", bw, bh, bd, companion("SETTINGS")) {
+            onNodeWithText("GAME BUTTONS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+        },
+        // Off: the binds greyed out.
+        Shot("$g-settings-hotkeys-off", bw, bh, bd, companion("SETTINGS")) {
+            onNodeWithText("HOTKEYS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+            onNodeWithText("ON").performClick()
+        },
         // CLOSE GAME / RESTART GAME end the scrolling list.
         Shot("$g-settings-bottom", bw, bh, bd, companion("SETTINGS")) { onNodeWithText("RESTART GAME").performScrollTo() },
         Shot("$g-settings-close", bw, bh, bd, companion("SETTINGS")) {
@@ -647,10 +710,10 @@ fun main(args: Array<String>) {
                     it.copy(mapGroup = group, mapNum = num, regionMapSectionId = sec, location = lookupLocation(sec))
                 }
                 val content: @Composable () -> Unit = {
-                    com.pokedaisey.app.companion.ui.theme.QolTheme {
-                        val ui = androidx.compose.runtime.remember { com.pokedaisey.app.companion.ui.GuideUiState() }
-                        val source = com.pokedaisey.app.companion.ui.rememberGuide(s.game, s.pokedex, s.guideTables)
-                        if (source != null) com.pokedaisey.app.companion.ui.GuideScreen(source, ui, s)
+                    com.pokedaisy.app.companion.ui.theme.QolTheme {
+                        val ui = androidx.compose.runtime.remember { com.pokedaisy.app.companion.ui.GuideUiState() }
+                        val source = com.pokedaisy.app.companion.ui.rememberGuide(s.game, s.pokedex, s.guideTables)
+                        if (source != null) com.pokedaisy.app.companion.ui.GuideScreen(source, ui, s)
                         androidx.compose.runtime.LaunchedEffect(Unit) {
                             repeat(20) { androidx.compose.runtime.withFrameNanos { } }
                             ui.list.scrollToItem(first)
@@ -685,7 +748,7 @@ fun main(args: Array<String>) {
                 ) {
                     // 1480 px at 2.5: a 3:2 game under a bar about 90 px tall.
                     androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.width(592.dp)) {
-                        com.pokedaisey.app.companion.ui.GameStatusBar(
+                        com.pokedaisy.app.companion.ui.GameStatusBar(
                             "firered-qol", "Pallet Town", 224300, "14:05", battery = BatteryStatus(82, charging = false),
                         )
                         androidx.compose.foundation.layout.Box(
@@ -705,13 +768,13 @@ fun main(args: Array<String>) {
         Shot("library-grid-menu", tw, th * 2, td, activity { LibraryActivity() }) {
             onNodeWithContentDescription("Toggle view").performClick()
             mainClock.advanceTimeBy(500) // lay the grid out before looking for its tiles
-            onAllNodesWithText("Pokemon Emerald")[1].performSemanticsAction(SemanticsActions.OnLongClick)
+            onAllNodesWithText("Pokémon Emerald")[1].performSemanticsAction(SemanticsActions.OnLongClick)
         },
         // INFO on a game (hashes and all), and LOAD SAVE's confirm over a game that has a save.
         Shot("library-info", tw, th, td, activity {
             LibraryActivity().apply {
                 val ctx = android.content.Context()
-                gameInfo = com.pokedaisey.app.GameInfo.read(ctx, Prefs(ctx), File(ctx.filesDir, "roms/firered-qol.gba"), hashes = true)
+                gameInfo = com.pokedaisy.app.GameInfo.read(ctx, Prefs(ctx), File(ctx.filesDir, "roms/firered-qol.gba"), hashes = true)
             }
         }),
         Shot("library-load-save", tw, th, td, activity {
@@ -740,6 +803,13 @@ fun main(args: Array<String>) {
         Shot("library-cover-picker-search", tw, th, td, activity {
             LibraryActivity().apply { coverPickerFor = File("Pokemon Amethyst.gba"); coverSourceOverride = FakeCoverSource(known = false) }
         }),
+        // RetroAchievements box art: first, beside SteamGridDB's icons; alone with no SteamGridDB key.
+        Shot("library-cover-picker-boxart", tw, th, td, activity {
+            LibraryActivity().apply { coverPickerFor = File("firered-qol.gba"); coverSourceOverride = FakeCoverSource(known = true, boxArt = true) }
+        }),
+        Shot("library-cover-picker-boxart-only", tw, th, td, activity {
+            LibraryActivity().apply { coverPickerFor = File("firered-qol.gba"); coverSourceOverride = FakeCoverSource(known = false, boxArt = true, steamGridDb = false) }
+        }),
         Shot("library-cover-picker-nokey", tw, th, td, activity {
             LibraryActivity().apply { coverPickerFor = File("firered-qol.gba") }
         }),
@@ -756,7 +826,7 @@ fun main(args: Array<String>) {
             LibraryActivity().apply {
                 setup = SetupState().apply {
                     romsFolder = "/storage/XXXX-XXXX/ROMs/GBA"
-                    found = listOf("Pokemon - FireRed Version (USA, Europe) (Rev 1)", "Pokemon - Emerald Version (USA, Europe)", "Pokemon Unbound", "Radical Red 4.1")
+                    found = listOf("Pokémon FireRed", "Pokémon Emerald", "Pokémon Unbound", "Pokémon Radical Red", "Pokemon Emerald Imperium")
                 }
             }
         }),
@@ -768,8 +838,8 @@ fun main(args: Array<String>) {
                 setup = SetupState().apply {
                     step = SetupState.Step.SAVES
                     suggestions = listOf(
-                        com.pokedaisey.app.SavesLocation.Suggestion(File("/storage/XXXX-XXXX/RetroArch/saves/mGBA"), 7),
-                        com.pokedaisey.app.SavesLocation.Suggestion(File("/storage/emulated/0/ROMs/GBA"), 1),
+                        com.pokedaisy.app.SavesLocation.Suggestion(File("/storage/XXXX-XXXX/RetroArch/saves/mGBA"), 7),
+                        com.pokedaisy.app.SavesLocation.Suggestion(File("/storage/emulated/0/ROMs/GBA"), 1),
                     )
                     savesDir = "/storage/XXXX-XXXX/RetroArch/saves/mGBA"
                 }
@@ -787,10 +857,32 @@ fun main(args: Array<String>) {
             onNodeWithText("HIDDEN GAMES").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         },
         Shot("library-hidden", tw, th, td, activity { withHidden { LibraryActivity() } }),
+        // ASPECT's picker: the drawn stand-in (no savestates), then a real frame with the status bar.
+        Shot("settings-aspect", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("ASPECT").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) },
+        Shot("settings-aspect-stretch", tw, th, td, activity { withAspect(true) { SettingsActivity() } }) {
+            onNodeWithText("ASPECT").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+        },
         Shot("settings-theme", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("THEME").performClick() },
         Shot("settings-hotkeys", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("HOTKEYS").performClick() },
+        // The list's end: LIBRARY / ONLINE (RetroAchievements' BETA tag) / APP.
+        Shot("settings-home-bottom", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("RUN SETUP").performScrollTo() },
+        Shot("settings-buttons", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("GAME BUTTONS").performClick() },
+        Shot("settings-hotkeys-off", tw, th, td, activity { SettingsActivity() }) {
+            onNodeWithText("HOTKEYS").performClick(); onNodeWithText("ON").performClick()
+        },
         Shot("settings-folders", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("FOLDERS").performClick() },
         Shot("settings-coverart", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("COVER ART").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) },
+        Shot("settings-retroachievements", tw, th, td, activity { SettingsActivity() }) {
+            onNodeWithText("RetroAchievements").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+        },
+        Shot("settings-retroachievements-signedin", tw, th, td, activity {
+            com.pokedaisy.app.achievements.RetroAchievements.previewSignedIn(
+                com.pokedaisy.app.achievements.RaUser("Lidor", "Lidor", null, 0, 1234),
+            )
+            SettingsActivity()
+        }) {
+            onNodeWithText("RetroAchievements").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+        },
         // With a key saved: REPLACE ALL's confirm, then the finished run (the fake
         // ROMs match nothing, so everything is kept - no network involved).
         Shot("settings-coverart-replace", tw, th, td, activity { withApiKey { SettingsActivity() } }) {

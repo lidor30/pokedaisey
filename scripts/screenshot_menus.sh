@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Screenshots the in-game POKeMON (party), POKeDEX and BAG (items) screens of
 # every ROM in host_roms.conf via headless libmgba (native-capture/mgba_dump.c,
-# built and run inside the pokedaisey-capture image, like capture_fixture_headless.sh).
+# built and run inside the pokedaisy-capture image, like capture_fixture_headless.sh).
 # No Android, no device. Output: <out>/<key>/{party,pokedex,items}.png (+ start.png,
 # the START menu as it first opens, to sanity-check the menu layouts below).
 #
@@ -30,7 +30,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CAPTURE_DIR="$SCRIPT_DIR/../native-capture"
 BOOT_DIR="$CAPTURE_DIR/boot"
 CONF="$SCRIPT_DIR/host_roms.conf"
-IMAGE="pokedaisey-capture"
+IMAGE="pokedaisy-capture"
 OUT_DIR="$CAPTURE_DIR/menu-shots"
 SCALE=3
 WAIT_OPEN="${WAIT_OPEN:-150}"

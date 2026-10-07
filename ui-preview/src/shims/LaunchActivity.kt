@@ -1,4 +1,4 @@
-package com.pokedaisey.app
+package com.pokedaisy.app
 
 import android.content.Context
 import android.net.Uri

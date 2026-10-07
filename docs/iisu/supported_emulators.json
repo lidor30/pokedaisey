@@ -1,0 +1,919 @@
+[
+  {
+    "name": "2600 Emu",
+    "packages": [
+      "com.explusalpha.A2600Emu"
+    ]
+  },
+  {
+    "name": "AetherSX2",
+    "packages": [
+      "xyz.aethersx2.android"
+    ]
+  },
+  {
+    "name": "AetherSX2 Turnip",
+    "packages": [
+      "xyz.aethersx2.custom"
+    ]
+  },
+  {
+    "name": "Aps3E",
+    "packages": [
+      "aenu.aps3e",
+      "aenu.aps3e.premium"
+    ]
+  },
+  {
+    "name": "aPS3e ISO",
+    "packages": [
+      "aenu.aps3e"
+    ]
+  },
+  {
+    "name": "aPS3e Premium ISO",
+    "packages": [
+      "aenu.aps3e.premium"
+    ]
+  },
+  {
+    "name": "ARMSX2",
+    "packages": [
+      "come.nanodata.armsx2",
+      "come.nanodata.armsx2.debug"
+    ]
+  },
+  {
+    "name": "Artemis",
+    "packages": [
+      "com.limelight.noir"
+    ]
+  },
+  {
+    "name": "aX360e",
+    "packages": [
+      "aenu.ax360e"
+    ]
+  },
+  {
+    "name": "aX360e Free",
+    "packages": [
+      "aenu.ax360e.free"
+    ]
+  },
+  {
+    "name": "Azahar",
+    "packages": [
+      "org.azahar_emu.azahar"
+    ]
+  },
+  {
+    "name": "Azahar",
+    "packages": [
+      "org.azahar_emu.azahar",
+      "io.github.lime3ds.android"
+    ]
+  },
+  {
+    "name": "Azahar Debug",
+    "packages": [
+      "org.azahar_emu.azahar.debug"
+    ]
+  },
+  {
+    "name": "AzaharPlus",
+    "packages": [
+      "io.github.azaharplus.android"
+    ]
+  },
+  {
+    "name": "Benji Sc",
+    "packages": [
+      "org.benjisc.android"
+    ]
+  },
+  {
+    "name": "Borked3DS",
+    "packages": [
+      "io.github.borked3ds.android"
+    ]
+  },
+  {
+    "name": "C64 Emu",
+    "packages": [
+      "com.explusalpha.C64Emu"
+    ]
+  },
+  {
+    "name": "Cemu",
+    "packages": [
+      "info.cemu.cemu",
+      "info.cemu.Cemu"
+    ]
+  },
+  {
+    "name": "Cemu Fork",
+    "packages": [
+      "info.cemu.cemu.debug"
+    ]
+  },
+  {
+    "name": "Citra",
+    "packages": [
+      "org.citra.citra_emu"
+    ]
+  },
+  {
+    "name": "Citra Canary",
+    "packages": [
+      "org.citra.citra_emu.canary"
+    ]
+  },
+  {
+    "name": "Citra Enhanced",
+    "packages": [
+      "org.gamerytb.citra.canary"
+    ]
+  },
+  {
+    "name": "Citra MMJ",
+    "packages": [
+      "org.citra.emu"
+    ]
+  },
+  {
+    "name": "Citron",
+    "packages": [
+      "org.citron.citron_emu"
+    ]
+  },
+  {
+    "name": "Citron",
+    "packages": [
+      "org.citron.citron_emu",
+      "org.citron.citron_emu.ea"
+    ]
+  },
+  {
+    "name": "Citron Early Access",
+    "packages": [
+      "org.citron.citron_emu.ea"
+    ]
+  },
+  {
+    "name": "Colem",
+    "packages": [
+      "com.fms.colem",
+      "com.fms.colem.deluxe"
+    ]
+  },
+  {
+    "name": "Cytrus",
+    "packages": [
+      "org.cytrus.cytrus_emu"
+    ]
+  },
+  {
+    "name": "Dolphin",
+    "packages": [
+      "org.dolphinemu.dolphinemu"
+    ]
+  },
+  {
+    "name": "Dolphin Enhanced",
+    "packages": [
+      "org.mm.j"
+    ]
+  },
+  {
+    "name": "Dolphin MMJR",
+    "packages": [
+      "org.mm.jr"
+    ]
+  },
+  {
+    "name": "Dolphin MMJR2",
+    "packages": [
+      "org.dolphinemu.mmjr"
+    ]
+  },
+  {
+    "name": "Dolphin MMJR2",
+    "packages": [
+      "org.dolphinemu.mmjr",
+      "org.dolphinemu.handheld"
+    ]
+  },
+  {
+    "name": "Dolphin Primehack",
+    "packages": [
+      "org.shiiion.primehack"
+    ]
+  },
+  {
+    "name": "DraStic",
+    "packages": [
+      "com.dsemu.drastic"
+    ]
+  },
+  {
+    "name": "DuckStation",
+    "packages": [
+      "com.github.stenzek.duckstation"
+    ]
+  },
+  {
+    "name": "Eden",
+    "packages": [
+      "dev.eden.eden_emulator"
+    ]
+  },
+  {
+    "name": "Eden",
+    "packages": [
+      "dev.eden.eden_emulator",
+      "dev.legacy.eden_emulator"
+    ]
+  },
+  {
+    "name": "Eden Legacy",
+    "packages": [
+      "dev.legacy.eden_emulator"
+    ]
+  },
+  {
+    "name": "Eden Nightly",
+    "packages": [
+      "dev.eden.eden_emulator.nightly"
+    ]
+  },
+  {
+    "name": "Eden Nightly",
+    "packages": [
+      "dev.eden.eden_emulator.nightly",
+      "dev.eden.eden_nightly"
+    ]
+  },
+  {
+    "name": "Eden Nightly Alt",
+    "packages": [
+      "dev.eden.eden_nightly"
+    ]
+  },
+  {
+    "name": "Eden Nightly Legacy",
+    "packages": [
+      "dev.legacy.eden_emulator.nightly"
+    ]
+  },
+  {
+    "name": "Eden Optimized",
+    "packages": [
+      "com.miHoYo.Yuanshen"
+    ]
+  },
+  {
+    "name": "Eden Optimized Nightly",
+    "packages": [
+      "com.miHoYo.Yuanshen.nightly"
+    ]
+  },
+  {
+    "name": "Eka2L1",
+    "packages": [
+      "com.github.eka2l1"
+    ]
+  },
+  {
+    "name": "Epsxe",
+    "packages": [
+      "com.epsxe.ePSXe"
+    ]
+  },
+  {
+    "name": "Flycast",
+    "packages": [
+      "com.flycast.emulator"
+    ]
+  },
+  {
+    "name": "Fmsx",
+    "packages": [
+      "com.fms.fmsx",
+      "com.fms.fmsx.deluxe"
+    ]
+  },
+  {
+    "name": "Fpse",
+    "packages": [
+      "com.emulator.fpse"
+    ]
+  },
+  {
+    "name": "Fpse Ng",
+    "packages": [
+      "com.emulator.fpse64"
+    ]
+  },
+  {
+    "name": "GameHub Lite",
+    "packages": [
+      "gamehub.lite",
+      "com.antutu.ABenchMark",
+      "com.tencent.ig",
+      "com.ludashi.aibench"
+    ]
+  },
+  {
+    "name": "GameNative",
+    "packages": [
+      "app.gamenative",
+      "app.gamenative.gold"
+    ]
+  },
+  {
+    "name": "Gba Emu",
+    "packages": [
+      "com.explusalpha.GbaEmu"
+    ]
+  },
+  {
+    "name": "Gbc Emu",
+    "packages": [
+      "com.explusalpha.GbcEmu"
+    ]
+  },
+  {
+    "name": "Ines",
+    "packages": [
+      "com.fms.ines.free"
+    ]
+  },
+  {
+    "name": "Infinity",
+    "packages": [
+      "me.dt2dev.infinity"
+    ]
+  },
+  {
+    "name": "Iratajaguar",
+    "packages": [
+      "ru.vastness.altmer.iratajaguar"
+    ]
+  },
+  {
+    "name": "J2Me Loader",
+    "packages": [
+      "ru.playsoftware.j2meloader"
+    ]
+  },
+  {
+    "name": "Jl Mod",
+    "packages": [
+      "ru.woesss.j2meloader"
+    ]
+  },
+  {
+    "name": "Kenji Nx",
+    "packages": [
+      "org.kenjinx.android"
+    ]
+  },
+  {
+    "name": "Lime3DS",
+    "packages": [
+      "io.github.lime3ds.android"
+    ]
+  },
+  {
+    "name": "Linkboy",
+    "packages": [
+      "com.pixelrespawn.linkboy"
+    ]
+  },
+  {
+    "name": "Lynx Emu",
+    "packages": [
+      "com.explusalpha.LynxEmu"
+    ]
+  },
+  {
+    "name": "M64Plus FZ",
+    "packages": [
+      "org.mupen64plusae.v3.fzurita",
+      "org.mupen64plusae.v3.fzurita.pro",
+      "org.mupen64plusae.v3.fzurita.amazon"
+    ]
+  },
+  {
+    "name": "Mame4Droid",
+    "packages": [
+      "com.seleuco.mame4droid"
+    ]
+  },
+  {
+    "name": "Mame4Droid Current",
+    "packages": [
+      "com.seleuco.mame4d2024"
+    ]
+  },
+  {
+    "name": "Mandarine",
+    "packages": [
+      "io.github.mandarine3ds.mandarine"
+    ]
+  },
+  {
+    "name": "Mastergear",
+    "packages": [
+      "com.fms.mg"
+    ]
+  },
+  {
+    "name": "Md Emu",
+    "packages": [
+      "com.explusalpha.MdEmu"
+    ]
+  },
+  {
+    "name": "melonDS",
+    "packages": [
+      "me.magnum.melonds"
+    ]
+  },
+  {
+    "name": "melonDS Dev",
+    "packages": [
+      "me.magnum.melonds.dev"
+    ]
+  },
+  {
+    "name": "melonDS Dev Nightly",
+    "packages": [
+      "me.magnum.melonds.dev.nightly"
+    ]
+  },
+  {
+    "name": "melonDS Nightly",
+    "packages": [
+      "me.magnum.melonds.nightly"
+    ]
+  },
+  {
+    "name": "Msx Emu",
+    "packages": [
+      "com.explusalpha.MsxEmu"
+    ]
+  },
+  {
+    "name": "Mupen64Plus Ae",
+    "packages": [
+      "org.mupen64plusae.v3.alpha"
+    ]
+  },
+  {
+    "name": "My Boy",
+    "packages": [
+      "com.fastemulator.gba"
+    ]
+  },
+  {
+    "name": "My Oldboy",
+    "packages": [
+      "com.fastemulator.gbc"
+    ]
+  },
+  {
+    "name": "Neo Emu",
+    "packages": [
+      "com.explusalpha.NeoEmu"
+    ]
+  },
+  {
+    "name": "Nes Emu",
+    "packages": [
+      "com.explusalpha.NesEmu"
+    ]
+  },
+  {
+    "name": "Nesoid",
+    "packages": [
+      "com.androidemu.nes"
+    ]
+  },
+  {
+    "name": "NetherSX2 Turnip",
+    "packages": [
+      "xyz.aethersx2.tturnip"
+    ]
+  },
+  {
+    "name": "Ngp Emu",
+    "packages": [
+      "com.explusalpha.NgpEmu"
+    ]
+  },
+  {
+    "name": "NooDS",
+    "packages": [
+      "com.hydra.noods"
+    ]
+  },
+  {
+    "name": "Nyushu",
+    "packages": [
+      "com.andromeda.androbench2"
+    ]
+  },
+  {
+    "name": "OpenBOR",
+    "packages": [
+      "org.openbor.engine"
+    ]
+  },
+  {
+    "name": "Panda3DS",
+    "packages": [
+      "com.panda3ds.pandroid"
+    ]
+  },
+  {
+    "name": "Pce Emu",
+    "packages": [
+      "com.PceEmu"
+    ]
+  },
+  {
+    "name": "Pizza Boy Gba",
+    "packages": [
+      "it.dbtecno.pizzaboygba",
+      "it.dbtecno.pizzaboygbapro"
+    ]
+  },
+  {
+    "name": "Pizza Boy GBA",
+    "packages": [
+      "it.dbtecno.pizzaboygba"
+    ]
+  },
+  {
+    "name": "Pizza Boy GBA Pro",
+    "packages": [
+      "it.dbtecno.pizzaboygbapro"
+    ]
+  },
+  {
+    "name": "Pizza Boy Gbc",
+    "packages": [
+      "it.dbtecno.pizzaboy",
+      "it.dbtecno.pizzaboypro"
+    ]
+  },
+  {
+    "name": "Pizza Boy GBC",
+    "packages": [
+      "it.dbtecno.pizzaboy"
+    ]
+  },
+  {
+    "name": "Pizza Boy GBC Pro",
+    "packages": [
+      "it.dbtecno.pizzaboypro"
+    ]
+  },
+  {
+    "name": "Pizza Boy Sc",
+    "packages": [
+      "it.dbtecno.pizzaboyscbasic",
+      "it.dbtecno.pizzaboyscpro"
+    ]
+  },
+  {
+    "name": "Pizza Boy SC Basic",
+    "packages": [
+      "it.dbtecno.pizzaboyscbasic"
+    ]
+  },
+  {
+    "name": "Pizza Boy SC Pro",
+    "packages": [
+      "it.dbtecno.pizzaboyscpro"
+    ]
+  },
+  {
+    "name": "Play!",
+    "packages": [
+      "com.virtualapplications.play"
+    ]
+  },
+  {
+    "name": "PPSSPP",
+    "packages": [
+      "org.ppsspp.ppsspp"
+    ]
+  },
+  {
+    "name": "PPSSPP",
+    "packages": [
+      "org.ppsspp.ppsspp",
+      "org.ppsspp.ppssppgold"
+    ]
+  },
+  {
+    "name": "PPSSPP Gold",
+    "packages": [
+      "org.ppsspp.ppssppgold"
+    ]
+  },
+  {
+    "name": "Real3Doplayer",
+    "packages": [
+      "ru.vastness.altmer.real3doplayer"
+    ]
+  },
+  {
+    "name": "Redream",
+    "packages": [
+      "io.recompiled.redream"
+    ]
+  },
+  {
+    "name": "RetroArch",
+    "packages": [
+      "com.retroarch",
+      "com.retroarch.aarch64",
+      "com.retroarch.ra32"
+    ]
+  },
+  {
+    "name": "Ruffle",
+    "packages": [
+      "rs.ruffle"
+    ]
+  },
+  {
+    "name": "Saturn Emu",
+    "packages": [
+      "com.explusalpha.SaturnEmu"
+    ]
+  },
+  {
+    "name": "Scummvm",
+    "packages": [
+      "org.scummvm.scummvm",
+      "org.scummvm.scummvm.debug"
+    ]
+  },
+  {
+    "name": "ScummVM",
+    "packages": [
+      "org.scummvm.scummvm"
+    ]
+  },
+  {
+    "name": "ScummVM Debug",
+    "packages": [
+      "org.scummvm.scummvm.debug"
+    ]
+  },
+  {
+    "name": "SkyEmu",
+    "packages": [
+      "com.sky.SkyEmu"
+    ]
+  },
+  {
+    "name": "Skyline",
+    "packages": [
+      "skyline.emu"
+    ]
+  },
+  {
+    "name": "Snes9X Explus",
+    "packages": [
+      "com.explusalpha.Snes9xPlus"
+    ]
+  },
+  {
+    "name": "Speccy",
+    "packages": [
+      "com.fms.speccy",
+      "com.fms.speccy.deluxe"
+    ]
+  },
+  {
+    "name": "Sudachi",
+    "packages": [
+      "org.sudachi.sudachi_emu"
+    ]
+  },
+  {
+    "name": "Sudachi",
+    "packages": [
+      "org.sudachi.sudachi_emu",
+      "org.sudachi.sudachi_emu.ea"
+    ]
+  },
+  {
+    "name": "Sudachi Early Access",
+    "packages": [
+      "org.sudachi.sudachi_emu.ea"
+    ]
+  },
+  {
+    "name": "Sumi",
+    "packages": [
+      "com.sumi.SumiEmulator"
+    ]
+  },
+  {
+    "name": "Suyu",
+    "packages": [
+      "dev.suyu.suyu_emu"
+    ]
+  },
+  {
+    "name": "Suyu",
+    "packages": [
+      "dev.suyu.suyu_emu",
+      "dev.suyu.suyu_emu.relWithDebInfo",
+      "org.suyu.suyu_emu"
+    ]
+  },
+  {
+    "name": "Suyu Debug",
+    "packages": [
+      "dev.suyu.suyu_emu.relWithDebInfo"
+    ]
+  },
+  {
+    "name": "Suyu Legacy",
+    "packages": [
+      "org.suyu.suyu_emu"
+    ]
+  },
+  {
+    "name": "Swan Emu",
+    "packages": [
+      "com.explusalpha.SwanEmu"
+    ]
+  },
+  {
+    "name": "Swf Player",
+    "packages": [
+      "com.issess.flashplayer",
+      "com.issess.flashplayerpro"
+    ]
+  },
+  {
+    "name": "Uzuy",
+    "packages": [
+      "org.uzuy.uzuy_emu"
+    ]
+  },
+  {
+    "name": "Uzuy",
+    "packages": [
+      "org.uzuy.uzuy_emu",
+      "org.uzuy.uzuy_emu.ea",
+      "org.uzuy.uzuy_emu.mmjr"
+    ]
+  },
+  {
+    "name": "Uzuy Early Access",
+    "packages": [
+      "org.uzuy.uzuy_emu.ea"
+    ]
+  },
+  {
+    "name": "Uzuy MMJR",
+    "packages": [
+      "org.uzuy.uzuy_emu.mmjr"
+    ]
+  },
+  {
+    "name": "Virtual Virtual Boy",
+    "packages": [
+      "com.simongellis.vvb"
+    ]
+  },
+  {
+    "name": "Visual Pinball",
+    "packages": [
+      "org.vpinball.app",
+      "org.vpinball.vpinball_bgfx"
+    ]
+  },
+  {
+    "name": "Vita3K",
+    "packages": [
+      "org.vita3k.emulator"
+    ]
+  },
+  {
+    "name": "Vita3K",
+    "packages": [
+      "org.vita3k.emulator",
+      "org.vita3k.emulator.ikhoeyZX"
+    ]
+  },
+  {
+    "name": "Vita3KZX",
+    "packages": [
+      "org.vita3k.emulator.ikhoeyZX"
+    ]
+  },
+  {
+    "name": "Winlator Cmod",
+    "packages": [
+      "com.winlator.cmod"
+    ]
+  },
+  {
+    "name": "Winlator Cmod Glibc",
+    "packages": [
+      "com.winlator"
+    ]
+  },
+  {
+    "name": "Winlator Cmod PRoot",
+    "packages": [
+      "com.cmodded.winlator"
+    ]
+  },
+  {
+    "name": "Winlator-Ludashi",
+    "packages": [
+      "com.winlator.vanilla"
+    ]
+  },
+  {
+    "name": "X1 BOX",
+    "packages": [
+      "com.izzy2lost.x1box"
+    ]
+  },
+  {
+    "name": "X360 Mobile",
+    "packages": [
+      "emu.x360.mobile"
+    ]
+  },
+  {
+    "name": "YabaSanshiro",
+    "packages": [
+      "org.uoyabause.android"
+    ]
+  },
+  {
+    "name": "Yabasanshiro 2",
+    "packages": [
+      "org.devmiyax.yabasanshioro2",
+      "org.devmiyax.yabasanshioro2.pro",
+      "org.uoyabause.android",
+      "org.uoyabause.android.pro"
+    ]
+  },
+  {
+    "name": "YabaSanshiro 2",
+    "packages": [
+      "org.devmiyax.yabasanshioro2"
+    ]
+  },
+  {
+    "name": "YabaSanshiro 2 Pro",
+    "packages": [
+      "org.devmiyax.yabasanshioro2.pro"
+    ]
+  },
+  {
+    "name": "YabaSanshiro Pro",
+    "packages": [
+      "org.uoyabause.android.pro"
+    ]
+  },
+  {
+    "name": "Yuzu",
+    "packages": [
+      "org.yuzu.yuzu_emu"
+    ]
+  },
+  {
+    "name": "Yuzu EA",
+    "packages": [
+      "org.yuzu.yuzu_emu.ea"
+    ]
+  },
+  {
+    "name": "Ziunx",
+    "packages": [
+      "org.Ziunx.Ziunx_emu.ea"
+    ]
+  },
+  {
+    "name": "PokeDaisy",
+    "packages": [
+      "com.pokedaisy.app"
+    ]
+  }
+]

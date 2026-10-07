@@ -14,7 +14,7 @@ from the player's own ROM (`RomArt`), not bundled. Keep it that way.
 
 PokeDaisy was split out of the user's **private** FireRed QoL ROM-hack repo (local
 checkout `~/Projects/tests/my-rom-hacks`, where it lived as `tools/pokedaisey`
-under the name pokedaisey) on 2026-10-06, without git history. That repo still owns:
+under the misspelled name pokedaisey) on 2026-10-06, without git history. That repo still owns:
 
 - **The `gQolTelemetry` struct** the FireRed / Emerald QoL builds export
   (`include/qol_telemetry.h` via its `patches-firered/0009-*` / `patches-emerald/0001-*`,
@@ -35,23 +35,31 @@ and don't link to it.
   `tools/telemetry-viewer/assets/pokemon`. `make` exports both; outside make, export them
   yourself for `python3 scripts/gen_*.py` or `gradle render`.
 - `local.properties` (untracked): Android `sdk.dir`.
-- `third_party/mgba`: git submodule at mGBA `0.10.5` (`make submodules`).
+- `third_party/mgba`: git submodule at mGBA `0.10.5`; `third_party/rcheevos`: at `v12.5.0`
+  (`make submodules` fetches both).
 - ROMs/saves for headless captures: `scripts/host_roms.conf`. On-device paths:
-  `scripts/roms.conf` (`/sdcard/Android/data/com.pokedaisey.app/files/...`).
-- The package / applicationId was renamed from `com.pokedaisey.PokeDaiseyApp` to
-  `com.pokedaisey.app`, so Android treats it as a new app. An old install's data (`roms/`,
-  `saves/`, states, prefs) sits under the old id's `Android/data/` folder and doesn't
-  carry over by itself.
+  `scripts/roms.conf` (`/sdcard/Android/data/com.pokedaisy.app/files/...`).
+- The package / applicationId was renamed twice: `com.pokedaisey.PokeDaiseyApp` →
+  `com.pokedaisey.app` → `com.pokedaisy.app` (2026-10-07, fixing the "Daisey" misspelling
+  everywhere, prefs file and `LaunchActivity` component included; the GitHub repo became
+  `lidor30/pokedaisy`, which GitHub redirects from the old name). Each is a new app to
+  Android: an old install's data (`roms/`, `saves/`, states, prefs) sits under the old
+  id's `Android/data/` folder and doesn't carry over by itself.
 
 ## Headless captures
 
-`native-capture/mgba_dump` (see its README) runs in the `pokedaisey-capture` Docker image
+`native-capture/mgba_dump` (see its README) runs in the `pokedaisy-capture` Docker image
 (`native-capture/Dockerfile`; the capture scripts build it on first use, or run
 `make capture-image`). The image's `ENTRYPOINT` is `/bin/bash`, so always run
 `docker run <image> -c "<full command>"`. Bare args make bash treat the command as a
 script and fail with a misleading `cannot execute binary file`. Never reuse a `.ss`
 savestate against a rebuilt ROM (stored code pointers go stale). Boot from a `.srm`
-instead.
+instead. To get a battle without walking to grass: poke a tiny script
+(`setwildbattle` / `dowildbattle` / `end` bytes) into free EWRAM and `call` the game's
+`ScriptContext_SetupScript` with its address - find that function through the
+literal-pool words pointing at `gScriptCmdTable` (Lazarus: `0x0820B2B0`, see the
+`lazarus_battle` fixture's README; newer expansion's `setwildbattle` takes
+species2/level2/item2 too, and zero padding is harmless since 0x00 is `nop`).
 
 ## UI work
 
@@ -203,6 +211,30 @@ count starts from the 1-star palette. Save data: FireRed's layout + CFRU dex fla
 The tab shows the card cropped to itself (no BG2 backdrop) at the largest whole scale (5x on the
 Thor); a tap flips it (squash, like the game), and the time colon blinks via an infinite transition
 (a`delay`loop never lets Compose tests go idle, which hung ui-preview once).
+**SoulGold v1.1.4** (`NATIVE_SOULGOLD`, newer expansion, no source) breaks several vanilla
+assumptions, each a `NativeConfig` field now: its struct Pokemon is 96 bytes and plaintext
+(`SOULGOLD_PARTY_MON`: 12-char nicknames push the egg flags to +0x15, status at +0x4C, level/HP
+from +0x50), BattlePokemon is 0x98 bytes (`SOULGOLD_BATTLE_MON`), mapsec ids are u16 with mapType a
+byte later (`mapSecWide`), and the bag has 8 pockets (Items holds 150). Its art is smol-compressed:
+`RomBlob(smol = true)` blobs go through `Smol.decompressAny` (tile modes 1-6 and the tilemap mode 8),
+`scripts/smol.py` is the generator's twin. The bag's night sky (`bagbg/soulgold.png`) is a
+`BagPalette.backdropArt`, drawn still (the game scrolls it). Its Johto map is Emerald's region_map.c
+with smol art (`SG_REGION_*` -> `regionmap/soulgold.png`) and a u16 cursor grid
+(`RegionLayout(cellBytes = 2)`, two layers), placed a row higher than Emerald's: offset (1, 1). Its
+POKéDEX (`POKEDEX_SOULGOLD`): no Emerald-style nationalMagic (the game never sets one), so the tab
+opens on Johto like the game; FLAG_SYS_POKEDEX_GET is 0x98D (to open its dex headlessly).
+**No empty BATTLE tab**: the tab (and the jump to it) needs `SnapshotView.showsBattle` - in a
+battle *and* something read (a battler, the foe's party or the battle input state). A game whose
+battle memory isn't mapped stays on its tabs instead of showing a blank INFO page. Seaglass's battle
+block is Lazarus's layout (its gBattleStruct pointer 8 bytes earlier); its map is its own redrawn
+Hoenn tiles (`SGL_REGION_GFX`) on Emerald's tilemap - Emerald's tiles aren't in its ROM, so without
+a retail Emerald scanned it had no picture.
+**Lazarus's own region map** is Emerald's `region_map.c` with its own art (gcc build):
+`RomArt` rebuilds `regionmap/lazarus.png` from fingerprints (`LZ_REGION_*`, from the
+Lazarus ROM in `gen_rom_art_sigs.py`), and `gen_expansion_tables.py` writes its section
+rects + cursor grid (`regionLayoutsLazarus`). **CFRU hacks' tables** (Radical Red:
+`scripts/gen_cfru_tables.py`) are found by comparing a retail FireRed rev 0 ROM's literal
+pools word for word: CFRU repoints them, so the word at the same offset is the hack's table.
 **FireRed-engine hacks' own region maps** (Unbound, Odyssey, Gaia, Amethyst, Radical Red) come
 from`RomRegionMap` (`companion/data/RomRegionMap.kt`), not fingerprints: those hacks keep
 FireRed 1.0's `region_map.c`code and only repoint its data, so it follows that code's literal
@@ -226,8 +258,17 @@ button flips Kanto / Sevii maps, ME returns to the player. `MapSecData.kt`'s dun
 "not on the map" sections are 0,0,0,0 (they used to sit at a fake (4,4)); the grid's dungeon
 layer places them (`RegionMapModel.tilesOf`). ui-preview: `-Ponly=map` renders the tapped /
 PLACES / region states too.
+**IVs / EVs (summary STATS, battle INFO STATS)**: `decodePartyMon` reads them from the BoxPokemon itself
+into `Mon.stats` (`MonStats.kt`): EVs substruct, Misc +4's IV word (plaintext CFRU boxes: +0x38 / +0x48),
+nature = PID % 25 XOR expansion's `hiddenNatureModifier` (+0x12 bits 3-7, 0 elsewhere: Mints), stats from the
+party fields. Checked on every fixture by recomputing the stored stats from the ROM's base stats (equal, or
+1 below where EVs came after the last level-up); SoulGold's 96-byte struct didn't add up, so it gets none.
+The QoL path takes them with EXP (`withPartyExp`). Battlers get theirs by matching species / level / HP
+against the party and `Telemetry.battleFoes` (gEnemyParty, now read in wild battles too; `enemyParty` stays
+trainer-only for FOE TEAM). Hidden Power's power shows only on FIRERED/EMERALD kinds (expansion uses a flat
+60). Foe IVs sit behind SETTINGS > FOE IVS (`Prefs.showFoeIvs`, off): INFO's STATS button.
 **Battle POKéMON pane + automated input** (`BattleControlsScreen.PartyPicker`, `BattleInputController`):
-on FireRed rev 1 / Emerald and their QoL builds (`switchAddrsFor`in`PokeDaiseyActivity`; gPartyMenu
+on FireRed rev 1 / Emerald and their QoL builds (`switchAddrsFor`in`PokeDaisyActivity`; gPartyMenu
 FR `0x0203B0A0`/ EM`0x0203CEC8`, slotId at +9, same in retail and QoL), POKéMON opens the PARTY tab's own slots
 (`PartyGrid`, shared with `PartyScreen`; taps silent since the game sounds them) - the game's cursor and a BEST tag on
 `recommendedSwitch`= SUGGESTIONS' top pick with BATTLE HINTS on, else the cursor on the battler (tagged OUT), and a
@@ -258,7 +299,9 @@ field's callback2 is learned from the player moving (snapshot positions), the ba
 both persisted per ROM CRC (`Prefs.ffMenuCallbacks`). Ruby/Sapphire's inBattle byte is +0x43D.
 **SETTINGS layout**: the options come in titled groups (FAST-FORWARD / CONTROLS / COMPANION / SCREEN) in ONE
 scrolling column at the normal text size (a two-column, denser try was too small to tap - the user's call),
-ending in CLOSE GAME / RESTART GAME. TOOLS (every tab not in the tab bar) sit under the list as `TabChip`s in
+ending in CLOSE GAME / RESTART GAME (under a `Separator`). The top-screen Settings uses the same
+`GroupedRows` / `SettingRow` (`companion/ui/SettingRows.kt`), with its own groups (FAST-FORWARD / CONTROLS /
+SCREEN / LIBRARY / ONLINE / APP). Sub-pages and pick-lists get the title window's back arrow (`onBack`). TOOLS (every tab not in the tab bar) sit under the list as `TabChip`s in
 the bar's own columns (`barChips`wide, the gear's gap at the end), a second row of tabs only SETTINGS has.
 **FF steps aside on the game's region map** (SMART only):`RegionMapWatch`finds the map screens' EWRAM
 pointers per ROM (FireRed family:`sRegionMap` `0x020399D4`, found beside its `0x4796`struct
@@ -309,6 +352,53 @@ bytes), -1 = unknown); values over 999,999 are dropped. The QoL struct has no mo
 Poller's `findStructMoney` tries the FireRed QoL build's own save pointers (`0x03005018`, not
 retail's) then retail's, trusting one only once its SaveBlock1.location matches the struct's map.
 `MoneyTest` pins every fixture.
+**ASPECT** (SETTINGS on either screen, `Prefs.stretchGame`, ORIGINAL default / STRETCH): STRETCH fills
+the top screen - `EmulatorView.stretch` drops the quad's letterbox and `GameStageLayout.stretch` gives the
+game all the space under the status bar. The bottom screen flips it in place; the top-screen Settings opens
+`AspectPicker` (both choices drawn as the top screen in miniature, with the newest savestate thumbnail, else a
+drawn stand-in) and the game picks it up on resume (`syncGameScreen`).
+
+**RetroAchievements** (`achievements/RetroAchievements.kt` + `RaNative.kt`, native
+`app/src/main/cpp/pokedaisy_ra.c`): rcheevos' `rc_client` over the player's core (`pkMainCore()`,
+never `rg`), read through RA's GBA map ($0 IWRAM / $8000 EWRAM / $48000 save RAM, via
+`getMemoryBlock`); the hash is MD5 of the ROM bytes mGBA mapped (= the file, verified on the host:
+retail FireRed rev 1 = game 515, Emerald = 668, Unbound v2.1.1.1 = 17530, the QoL builds have no set).
+Kotlin does the HTTP (`User-Agent: PokeDaisy/<versionName> (Android <ver>) rcheevos/12.5`); answers
+are queued natively and `RetroAchievements.onFrame` (after every `pkRunFrame`) delivers them before
+`rc_client_do_frame`, because rc_client reads game memory while finishing a game load - with no core
+up the HTTP thread delivers (login only). Signed in = on; Prefs keep the username + token, never the
+password. Each savestate gets its progress beside it (`<state>.ra`); the resume state's is put back
+once the set loads. **Softcore only**: the server downgrades hardcore from a client it doesn't
+recognise (RA validates new emulators; one must be public 6+ months), and hardcore would also have
+to block state loads (incl. the resume-on-launch) and the automated battle input ("scripted input"
+is banned).
+UI: sign-in is top-screen Settings > RETROACHIEVEMENTS (the Presentation can't host a keyboard well); a
+token login that can't reach the server keeps the account and retries with backoff (15 s doubling to
+5 min). The companion reads it through `CompanionAchievements` (`companion/Achievements.kt`, faked in
+Paparazzi / ui-preview): the ACHIEVEMENTS tab (`AchievementsScreen.kt`, chip label CHEEVOS - the full
+word truncates; off the bar by default, under SETTINGS > TOOLS; works on unsupported ROMs too) lists
+rc_client's PROGRESS grouping, parsed from `raAchievementList` (0x1E records / 0x1F fields, strings
+built from real UTF-8 - `NewStringUTF` takes modified UTF-8 and an emoji title would abort under
+CheckJNI); `AchievementPopupHost` shows unlocks / mastery / "N OF M UNLOCKED" on load / progress /
+leaderboards / offline notices over every tab, top center; `AchievementIndicators` (bottom right of the
+tab area) shows running leaderboard trackers' values and active challenges' badges, from rc_client's
+TRACKER_* / CHALLENGE_INDICATOR_* events. The tab's LEADERBOARDS button (only when the set has boards,
+`raLeaderboardList`) lists them by set; a board's page (`openLeaderboard`) fetches the top 10 and 5
+around the player (`raFetchLeaderboard`, answered through `onLeaderboardEntries`, keyed by a token so a
+late answer for another board is dropped) and marks the player's row as the white cursor row. Badges are fetched once into
+`cacheDir/ra-badges` (`AchievementBadges.dir`; null in previews = a pixel trophy). rc_client adds a
+"Warning: Unknown Emulator" placeholder (id >= 101000001) while the server doesn't recognise the
+client; `raAchievementList` drops it, as rc_client's own summary does. Debug builds log
+`raDebugStatus` every ~600 frames (rich presence, short memory reads, achievements by state) - the
+first thing to read when an achievement doesn't fire (`adb logcat -s pokedaisy/ra`).
+An unlock plays the game's own level-up fanfare (MUS_LEVEL_UP: song 257 in FireRed's table - also
+LeafGreen's and the CFRU hacks' - 367 in Emerald's and Ruby/Sapphire's, picked by the header's game
+code; other games borrow another ROM's), rendered per ROM by `FfMusicRenderer.recordSfx` like the click
+into `sfx/<crc>-fanfare.wav` (`GameClickSound(name = FANFARE)`, ~1 s once trimmed). The Library's INFO
+has a RETROACHIEVEMENTS section: the ROM's MD5 looked up with the public `r=gameid` request, and the
+player's unlocks from `rc_client_begin_fetch_all_user_progress` for all GBA games (cached a minute).
+A leaderboard with no entries can be a counter the set only shows as a tracker: its definition never
+submits (`SUB:1=2`) - FireRed's three bonus-set boards are all like that.
 
 **Button clicks, no haptics**: companion buttons play the game's own menu click (SE_SELECT = song 5
 in every Gen 3 song table), rendered once per ROM by `FfMusicRenderer` (after MUS_DUMMY silences the
@@ -320,7 +410,7 @@ own buttons (battle FIGHT / BAG / moves / BACK: `PlatinumButton(pressesGame = tr
 game already sounds, and tap-swallowing scrims. The top-screen Library / Settings stay silent.
 
 **Device BACK**: a BACK tap (from either screen - the Presentation forwards every key to
-`PokeDaiseyActivity`) is the companion's back; a hold still leaves the game. Anything that
+`PokeDaisyActivity`) is the companion's back; a hold still leaves the game. Anything that
 opens over / inside a tab registers `CompanionBackHandler` (`companion/ui/CompanionBack.kt`,
 newest wins, like androidx's `BackHandler`, which the Presentation / Paparazzi / ui-preview
 can't host). `OptionOverlay`, `SummaryFrame` and `OptionTitleWindow(onBack)` already do, so
@@ -344,7 +434,7 @@ confirmed by compiling Rogue's headers with host `clang --target=arm-none-eabi` 
 **Frontend launch (Cocoon / iiSU / ES-DE)**: `LaunchActivity` (exported, translucent, no intent
 filter, `taskAffinity=""`) takes the ROM as intent data or a `rom`/`ROM`/`path`/`file`/`uri` extra,
 plays a readable real path in place (`RomUris.originalPath`; needs All files access on 11+), else
-copies it into `roms/` once (skipped while the bytes match), then starts `PokeDaiseyActivity` with
+copies it into `roms/` once (skipped while the bytes match), then starts `PokeDaisyActivity` with
 `EXTRA_FROM_FRONTEND` - exit is then `finishAndRemoveTask()`, back to the frontend. A different ROM
 arriving while a game is open is switched in `onNewIntent` via `loadRom()` (the activity is paused,
 so the engine already stopped/suspended) + `TelemetryStore.reset()` (the sampler caches the
@@ -364,7 +454,24 @@ name, cover and saves kept; Settings > HIDDEN GAMES shows them again); linked RO
 player's own files). Same-named imported ROMs win (covers/names are keyed by file name). Setup opened by
 RUN SETUP has a BACK (bottom-left) that returns to Settings from the first step. Folder picks
 need All files access first (`StorageAccess`); setup resumes the pick in `onResume` on return.
+**Zipped ROMs** (`RomArchive.kt`, `.zip` via java.util.zip, `.7z` via commons-compress + xz): the linked
+folder and `files/roms/` list archives as-is; `RomIdentity` / `SaveStates.crc32` / `CompanionSupport`
+stream the ROM out of them (never unpacked for that), and only playing extracts one into
+`cacheDir/rom-archives/` (`RomArchive.playable`, last 3 kept; `PokeDaisyActivity.romData` is what the
+core and the ROM readers load, `rom` stays the archive). Saves and the default library name follow the ROM
+*inside* (`RomArchive.saveNames` / `baseName`: RetroArch names a zipped game's save that way), falling back
+to a save already under the archive's own name. Imports (+, frontend copies, VIEW) unpack instead, by
+magic bytes (`RomArchive.sniff`). Library Refresh toasts what the scan found (`RomFolder.ScanResult`).
+The bottom-screen Presentation hides the system bars (`DualScreenPresentation.goFullScreen`).
 
+**Save files are sacred**: an mGBA state carries the save as it was, and loading one
+(`SAVESTATE_SAVEDATA`) writes that copy over the save file. So the auto-resume first checks
+`pkStateMatchesSave`: if the file changed since the state was made (RetroArch played it, the saves
+folder moved, a save copied in), the state is set aside as `resume.replaced` and the game boots
+from the file (a real report: a resume state from a blank first boot wiped an Unbound save to all
+0xFF). Every start also copies the save to `<saves>/pokedaisy-backups/` first (`SaveBackups`, newest
+10 distinct), which the library's RESTORE BACKUP lists. Never add a path that writes the save
+without both.
 **Library menu: LOAD SAVE / INFO / HIDE**: LOAD SAVE (`GameSaves.load`) renames the current save to
 `<rom>.backup-<yyyyMMdd-HHmmss>.<ext>` beside it and writes the picked file under the name the game reads,
 then drops `SaveStates.freshBootFile` so the next start boots from the save instead of resuming (a resume
@@ -374,6 +481,7 @@ tags are `v<versionName>`, GitHub releases with the APK attached; `AppUpdater` p
 release with an `.apk`, skipping drafts and pre-releases (publish a test build as a pre-release to keep it from users) and `AppUpdateFlow` downloads it into `cache/updates/` and opens the installer via the
 `${applicationId}.updates` FileProvider. Release builds check on every library open, debug builds only from
 Settings > VERSION. Release signing: untracked `keystore.properties` → `~/.android/pokedaisey-release.jks`
+(alias `pokedaisey`: the key predates the rename, kept as is)
 on this Mac (same key for every release, or updates won't install).
 
 **Unsupported ROMs**: `CompanionSupport.isSupported(file)` (FireRed/Emerald game code, ≤16 MB,
@@ -381,15 +489,46 @@ retail LeafGreen rev 0/1 / Ruby / Sapphire rev 1/2 — `TelemetrySampler.OTHER_R
 read as FireRed / Emerald — or a >16 MB hack whose SHA1 is in `TelemetrySampler.SUPPORTED_HACK_SHA1S`) mirrors the
 Poller's live `detect()`. The library asks "add anyway?" before importing a ROM that fails
 it; in game, `SnapshotView.unsupported` swaps every companion tab but SETTINGS for a
-"not supported" notice. Adding a hack to `detect()` means adding its hash to that set too.
+"not supported" notice. Adding a hack to `detect()` means adding its hash to that set too,
+and its name to `GameTitles.BY_SHA1` (`GameTitlesTest` checks).
 
+**Library names** (`GameTitles.kt`): a game shows as its own name ("Pokémon FireRed") - the player's
+RENAME first, then the whole-file SHA1 looked up in `GameTitles.BY_SHA1` (retail from the pret
+decomps' `*.sha1`, every supported hack), else the file name minus dump tags (`tidy`: "(USA, Europe)",
+"(v1.3.1)", "1636 - "). The QoL builds have a new hash every rebuild, so they keep their file name.
+Hashing runs off the UI thread (library resume, folder scan, import, a frontend launch's status bar),
+cached by path + size + mtime in `filesDir/rom-titles.tsv`; `GameTitles.label` only reads that cache.
 **Library covers (SteamGridDB)**: `SteamGridDbGames.forRom` matches known hacks by SHA1, then
 ≤16 MB FireRed/Emerald ROMs by game code (so retail and the QoL builds get art). The
 automatic pick is the preferred uploader's icon (`PREFERRED_AUTHOR_STEAM64`, the user's
 choice) before the top-voted one; the long-press REPLACE COVER window (`CoverPicker.kt`)
 lists every icon and can search other games. steamgriddb.com is unreachable from cloud
 sessions — use `FakeCoverSource` in ui-preview to look at the picker.
+**RetroAchievements box art** is the first source (`CoverArtSync.fetchOne`, the user's call: RA wherever it
+has box art, then SteamGridDB for the games it knows): ROM MD5 -> `r=gameid` -> the Web API's
+`API_GetGame.php` `ImageBoxArt` (square, e.g. FireRed's 320x320 `001918.png`), which needs the
+player's own **Web API key** (`Prefs.raWebApiKey`, Settings > Cover Art - not the sign-in token; RA's
+no-login calls only give the 96 px icon). It's the picker's first tile too. `Prefs.romCoverSource`
+records which source an automatic cover came from, for INFO.
 
 The app's only font is **Pixel Operator** (`assets/fonts/PixelOperator.ttf`, CC0,
 `pixelFontFamily()`). Its caps are ~0.56em (Press Start 2P, which it replaced, was
-~0.88em), so plain `Text` sizes are ~1.5x what the old font needed.
+~0.88em), so plain `Text` sizes are ~1.5x what the old font needed. Japanese glyphs fall
+back, glyph by glyph, to `PixelMplusJP.ttf` (`PixelTypeface.kt`, Typeface.CustomFallbackBuilder,
+Android 10+): PixelMplus10 (M+ FONT LICENSE) re-declared at Pixel Operator's 1600 upm by
+`scripts/gen_jp_font.py`, so both share the 100-unit pixel, and cut to Japanese only - anything
+else Pixel Operator lacks (½, ◀) still falls to the system font, as before.
+
+**Languages** (`companion/i18n/`): the app's own text in EN / JA / FR / DE / IT / ES - not game
+data (species / moves / items / types / statuses) or GUIDE content (the user's scope call).
+`tr("ENGLISH")` looks the English up in the `Tr<Area>.kt` tables (one line per entry, parsed by
+`scripts/check_translations.py`; `TranslationsTest` runs the same check), `tr("{0} LEFT", n)` for
+arguments - never a `$template` key. `tk()` marks a string the code compares (selector options,
+enum labels, GUIDE state keys) - it stays English and the OPTION pieces (OptionLine label/value,
+OptionTitleWindow, OptionButton, OptionBadge, group titles) translate what they draw. `L10n.language`
+is Compose state: a pick redraws both screens at once. Prefs.appLanguage AUTO = the ROM header's
+language letter (BPR**E**/F/D/I/S/J - every ROM the companion supports today is E) in game, the
+device's in the Library / Settings. Japanese is kana only, like Gen 3's; translations use the
+localized games' own words and stay about as short as the English (chips and buttons are sized
+for it - `LocalizedScreenshotTest` renders the main screens per language). New UI text: wrap it
+and add its five translations in the area's table.

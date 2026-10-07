@@ -15,18 +15,18 @@ val keystoreProps = rootProject.file("keystore.properties").takeIf { it.isFile }
 }
 
 android {
-    namespace = "com.pokedaisey.app"
+    namespace = "com.pokedaisy.app"
     compileSdk = 34
     ndkVersion = "28.2.13676358"
 
     defaultConfig {
-        applicationId = "com.pokedaisey.app"
+        applicationId = "com.pokedaisy.app"
         minSdk = 26
         targetSdk = 34
         // Bump both for every GitHub release: the updater compares versionName
         // against the release tag (v<versionName>), Android needs versionCode to grow.
-        versionCode = 4
-        versionName = "1.0.4"
+        versionCode = 5
+        versionName = "1.1.0"
 
         ndk {
             // Thor is arm64; add armeabi-v7a later only if a target device needs it.
@@ -116,6 +116,10 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.runtime:runtime")
+
+    // ROMs in .7z archives (RomArchive; .zip is java.util.zip). xz is 7z's LZMA / LZMA2.
+    implementation("org.apache.commons:commons-compress:1.28.0")
+    implementation("org.tukaani:xz:1.12")
 
     // Decode-logic regression tests (app/src/test) - see scripts/capture_fixture.sh
     // for how the fixtures they read (app/src/test/resources/fixtures/) get made.

@@ -7,10 +7,11 @@ plugins {
     id("org.jetbrains.compose") version "1.5.12"
 }
 
-val app = rootDir.resolve("../app/src/main/kotlin/com/pokedaisey/app")
+val app = rootDir.resolve("../app/src/main/kotlin/com/pokedaisy/app")
 val appIncludes = listOf(
     "companion/ui/**", "SettingsActivity.kt", "LibraryActivity.kt", "SavesLocation.kt",
-    "CoverArtSync.kt", "CoverSync.kt", "RomFolder.kt", "StorageAccess.kt", "SetupScreen.kt", "AppUpdater.kt", "AppUpdate.kt", "GameSaves.kt", "GameInfo.kt", "SaveStates.kt", "RomIdentity.kt", "CompanionSupport.kt", "CoverPicker.kt", "SteamGridDbGames.kt", "SteamGridDbClient.kt",
+    "CoverArtSync.kt", "CoverSync.kt", "RomFolder.kt", "StorageAccess.kt", "SetupScreen.kt", "AppUpdater.kt", "AppUpdate.kt", "GameSaves.kt", "SaveBackups.kt", "GameInfo.kt", "SaveStates.kt", "RomIdentity.kt", "RomArchive.kt", "CompanionSupport.kt", "CoverPicker.kt", "SteamGridDbGames.kt", "SteamGridDbClient.kt", "GameTitles.kt",
+    "achievements/**",
 )
 
 // Copied (not referenced in place) so the few Android-only APIs desktop
@@ -37,6 +38,8 @@ dependencies {
     implementation(compose.material3)
     implementation(compose.materialIconsExtended)
     implementation("org.json:json:20240303")
+    implementation("org.apache.commons:commons-compress:1.28.0")
+    implementation("org.tukaani:xz:1.12")
     implementation("org.jetbrains.compose.ui:ui-test-junit4-desktop:1.5.12")
 }
 
@@ -52,6 +55,8 @@ tasks.register<JavaExec>("render") {
     workingDir = rootDir.resolve("../app/src/main/assets")
     systemProperty("java.awt.headless", "true")
     systemProperty("game", (project.findProperty("game") as String?) ?: "FIRERED")
+    // -Plang=JA / FR / DE / IT / ES: the app's text in that language.
+    systemProperty("lang", (project.findProperty("lang") as String?) ?: "")
     // Optional: a ROM the GUIDE's live pages (HERE, NEXT BOSS) read from, with the
     // repo's save fixture for that game - see Main.kt's liveGuide().
     systemProperty("rom", (project.findProperty("rom") as String?) ?: "")

@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.PokeDaisey" parent="@android:style/Theme.Material.NoActionBar">
+    <style name="Theme.PokeDaisy" parent="@android:style/Theme.Material.NoActionBar">
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:statusBarColor">@android:color/black</item>
         <item name="android:navigationBarColor">@android:color/black</item>
@@ -8,7 +8,7 @@
     </style>
 
     <!-- LaunchActivity: invisible while it hands the ROM to the game. -->
-    <style name="Theme.PokeDaisey.Launch" parent="@android:style/Theme.Translucent.NoTitleBar">
+    <style name="Theme.PokeDaisy.Launch" parent="@android:style/Theme.Translucent.NoTitleBar">
         <item name="android:windowAnimationStyle">@null</item>
     </style>
 </resources>

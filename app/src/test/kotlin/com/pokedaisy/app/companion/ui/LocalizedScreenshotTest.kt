@@ -1,0 +1,126 @@
+package com.pokedaisy.app.companion.ui
+
+import app.cash.paparazzi.DeviceConfig
+import app.cash.paparazzi.Paparazzi
+import com.android.resources.ScreenOrientation
+import com.pokedaisy.app.companion.data.withMovesVs
+import com.pokedaisy.app.companion.i18n.AppLanguage
+import com.pokedaisy.app.companion.i18n.L10n
+import com.pokedaisy.app.companion.ui.theme.QolTheme
+import androidx.compose.foundation.layout.fillMaxSize
+import org.junit.After
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
+
+/**
+ * The companion's main screens in each non-English language - for checking
+ * that translations fit (German runs longest) and Japanese renders in the
+ * pixel font. Shots are named `..._<screen>_<LANG>.png`:
+ *
+ *     ./gradlew :app:recordPaparazziDebug --tests '*LocalizedScreenshotTest'
+ */
+@RunWith(Parameterized::class)
+class LocalizedScreenshotTest(private val lang: AppLanguage) {
+    companion object {
+        @JvmStatic
+        @Parameterized.Parameters(name = "{0}")
+        fun languages() = AppLanguage.entries.filter { it != AppLanguage.EN }
+    }
+
+    @get:Rule
+    val paparazzi = Paparazzi(
+        deviceConfig = DeviceConfig.PIXEL_5.copy(
+            screenWidth = 1240, screenHeight = 1080, orientation = ScreenOrientation.LANDSCAPE,
+        ),
+        theme = "android:Theme.Material.NoActionBar",
+    )
+
+    @Before
+    fun setUp() {
+        CompanionScreenshotTest().game()
+        L10n.apply(lang.code, null)
+    }
+
+    @After
+    fun tearDown() = L10n.apply("EN", null)
+
+    private fun tab(name: String) = paparazzi.snapshot(lang.code) {
+        CompanionScreen(SampleCompanion.snapshot, SampleCompanion.Slots, SampleCompanion.Settings(), initialTab = name)
+    }
+
+    @Test fun settings() = tab("SETTINGS")
+    @Test fun party() = tab("PARTY")
+    @Test fun items() = tab("ITEMS")
+    @Test fun dex() = tab("DEX")
+    @Test fun guide() = tab("GUIDE")
+    @Test fun map() = tab("MAP")
+    @Test fun states() = tab("STATES")
+
+    @Test
+    fun partyStats() = paparazzi.snapshot(lang.code) {
+        QolTheme { MonDetailScreen(SampleCompanion.snapshot.party, 0, {}, {}, initialShowStats = true) }
+    }
+
+    @Test
+    fun partyMoves() = paparazzi.snapshot(lang.code) {
+        QolTheme { MonDetailScreen(SampleCompanion.snapshot.party, 0, {}, {}) }
+    }
+
+    @Test
+    fun battleInfo() = paparazzi.snapshot(lang.code) {
+        QolTheme {
+            val party = SampleCompanion.snapshot.party
+            BattleInfoScreen(
+                listOf(party[0].withMovesVs(party[1])), listOf(party[1]), isDouble = false, showHints = true,
+                onBack = {}, onShowSuggestions = {}, onShowStats = {},
+            )
+        }
+    }
+
+    @Test
+    fun battleStats() = paparazzi.snapshot(lang.code) {
+        QolTheme {
+            val party = SampleCompanion.snapshot.party
+            BattleStatsScreen(listOf(party[0]), listOf(party[1]), "FOE", onBack = {})
+        }
+    }
+
+    /** The LANGUAGE row - "(LANGUAGE)" beside the word, so it's findable from any language - in the settings look. */
+    @Test fun languageRow() = languageShot(picker = false)
+
+    /** Its picker: each language in its own name. */
+    @Test fun languagePicker() = languageShot(picker = true)
+
+    private fun languageShot(picker: Boolean) = paparazzi.snapshot(lang.code) {
+        QolTheme {
+            val m = rememberGbaTextMetrics()
+            androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
+                OptionListWindow(m, androidx.compose.ui.Modifier.fillMaxSize()) {
+                    GroupedRows(
+                        listOf(
+                            groupTitle("COMPANION"),
+                            SettingRow("LANGUAGE", L10n.settingLabel(com.pokedaisy.app.companion.i18n.LANGUAGE_AUTO)) {},
+                            SettingRow("TAB BAR", "5 TABS") {},
+                        ),
+                        m, cursor = -1, onClick = {},
+                    )
+                }
+                if (picker) {
+                    val opts = L10n.options
+                    OptionSelector("LANGUAGE", opts.map { it.second }, opts.first().second, { it }, m, onPick = {}, onDismiss = {})
+                }
+            }
+        }
+    }
+
+    @Test
+    fun suggestions() = paparazzi.snapshot(lang.code) {
+        QolTheme {
+            val party = SampleCompanion.snapshot.party
+            SuggestionsScreen(party, foe = party[1], onBack = {}, onShowInfo = {}, active = listOf(party[0]))
+        }
+    }
+}

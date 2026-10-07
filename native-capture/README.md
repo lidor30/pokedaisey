@@ -3,13 +3,13 @@
 A standalone C program linked directly against `libmgba` — no Android, no
 JNI, no adb, no physical device or emulator. Loads a ROM (+ optional save),
 runs a scripted boot sequence, and dumps EWRAM+IWRAM to the same
-`ewram.bin`/`iwram.bin` format `PokeDaiseyActivity`'s on-device capture
+`ewram.bin`/`iwram.bin` format `PokeDaisyActivity`'s on-device capture
 (`scripts/capture_fixture.sh`) produces — so it's a drop-in alternative data
 source for the JVM decode-logic tests under `app/src/test/`.
 
 Runs identically on a Mac (via Docker Desktop) or a Linux CI runner (e.g.
 GitHub Actions) — it's just a Docker container + `libmgba-dev`, nothing
-platform- or Android-specific. See `pokedaisey_jni.c` (the Android/JNI
+platform- or Android-specific. See `pokedaisy_jni.c` (the Android/JNI
 bridge this mirrors) for why each `mCore` API call is there; this file's own
 comments cover what's specific to headless capture.
 
@@ -25,9 +25,9 @@ sequence, and writing the result into
 To run it by hand (e.g. to iterate on a new boot sequence):
 
 ```sh
-docker run --rm -v "$(pwd):/work" -w /work pokedaisey-capture \
+docker run --rm -v "$(pwd):/work" -w /work pokedaisy-capture \
     -c "gcc -O2 -Wall -o mgba_dump mgba_dump.c -I/usr/include -L/usr/lib/aarch64-linux-gnu -lmgba -lm"
-docker run --rm -v "$(pwd):/work" -w /work pokedaisey-capture \
+docker run --rm -v "$(pwd):/work" -w /work pokedaisy-capture \
     -c "./mgba_dump rom.gba save.sav < boot/default.txt"
 ```
 

@@ -2,6 +2,7 @@ package android.widget
 
 class Toast {
     fun show() {}
+    fun cancel() {}
 
     companion object {
         const val LENGTH_SHORT = 0
