@@ -783,6 +783,10 @@ fun main(args: Array<String>) {
             }
         }),
         Shot("library-list", tw, th, td, activity { LibraryActivity() }),
+        // The one-time "send crash reports?" ask (CrashReports.shouldAsk).
+        Shot("library-crash-ask", tw, th, td, activity { LibraryActivity().apply { crashAsk = true } }),
+        // Settings' APP group, CRASH REPORTS included.
+        Shot("settings-app", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("CRASH REPORTS").performScrollTo() },
         Shot("library-grid", tw, th, td, activity { LibraryActivity() }) {
             onNodeWithContentDescription("Toggle view").performClick()
         },

@@ -1,0 +1,172 @@
+# Publishes a GitHub release with the signed APK when a v<versionName> tag is pushed
+# (`make release` does that from an up-to-date main). Nothing is published unless:
+#   - the tag is on main and matches versionName in app/build.gradle.kts,
+#   - the whole CI suite passes on the tagged commit,
+#   - the ROM-backed tests pass on the self-hosted ROM runner (once ROM_RUNNER is on),
+#   - the APK is signed with the release key (its certificate matches RELEASE_CERT_SHA256).
+# Setup (secrets, variables, the runner, branch protection): docs/RELEASING.md.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Tag is on main and matches versionName
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: v
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="$(sed -n 's/^ *versionName = "\(.*\)"/\1/p' app/build.gradle.kts)"
+          if [ "v${version}" != "${tag}" ]; then
+            echo "::error::tag ${tag} doesn't match versionName ${version}"; exit 1
+          fi
+          git fetch origin main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
+            echo "::error::${tag} isn't on main - release from main only"; exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          # 1.2.0-rc.1 and the like go out as pre-releases, which the in-app updater skips.
+          if [[ "${version}" == *-* ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
+
+  checks:
+    name: CI
+    needs: verify
+    uses: ./.github/workflows/ci.yml
+
+  rom-tests:
+    name: ROM-backed tests
+    needs: verify
+    # The player's own ROM dumps can't live in this public repo or on GitHub's runners:
+    # this runs on a self-hosted runner that has them (docs/RELEASING.md). Until the
+    # ROM_RUNNER variable is 'true' it's skipped, and the release says so.
+    if: vars.ROM_RUNNER == 'true'
+    runs-on: [self-hosted, pokedaisy-roms]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Unit tests with ROMs
+        # POKEDAISY_ROM_DIR is set in the runner's own environment (its .env file).
+        run: |
+          test -n "${POKEDAISY_ROM_DIR}" || { echo "::error::POKEDAISY_ROM_DIR isn't set on this runner"; exit 1; }
+          test -d "${POKEDAISY_ROM_DIR}" || { echo "::error::${POKEDAISY_ROM_DIR} doesn't exist"; exit 1; }
+          ./gradlew :app:testDebugUnitTest --stacktrace
+      - name: Test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rom-test-reports
+          path: app/build/reports/tests/
+          retention-days: 7
+
+  publish:
+    name: Build, sign and publish
+    needs: [verify, checks, rom-tests]
+    if: >-
+      always() && needs.verify.result == 'success' && needs.checks.result == 'success' &&
+      (needs.rom-tests.result == 'success' || needs.rom-tests.result == 'skipped')
+    runs-on: ubuntu-latest
+    # Holds the signing / Firebase secrets; can also require a manual approval.
+    environment: release
+    permissions:
+      contents: write
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: NDK + CMake
+        run: sdkmanager --install "ndk;28.2.13676358" "cmake;3.22.1" "platforms;android-34" "build-tools;34.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Signing key + Firebase config (from secrets, never committed)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          for v in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            test -n "${!v}" || { echo "::error::secret ${v} isn't set (docs/RELEASING.md)"; exit 1; }
+          done
+          echo "${KEYSTORE_BASE64}" | base64 -d > "${RUNNER_TEMP}/release.jks"
+          {
+            echo "storeFile=${RUNNER_TEMP}/release.jks"
+            echo "storePassword=${KEYSTORE_PASSWORD}"
+            echo "keyAlias=${KEY_ALIAS}"
+            echo "keyPassword=${KEY_PASSWORD}"
+          } > keystore.properties
+          if [ -n "${GOOGLE_SERVICES_JSON}" ]; then
+            printf '%s' "${GOOGLE_SERVICES_JSON}" > app/google-services.json
+          else
+            echo "::warning::GOOGLE_SERVICES_JSON isn't set: this release can't send crash reports"
+          fi
+
+      - name: Release APK
+        run: ./gradlew :app:assembleRelease --stacktrace
+
+      - name: Signed with the release key
+        env:
+          RELEASE_CERT_SHA256: ${{ vars.RELEASE_CERT_SHA256 }}
+        run: |
+          apk=app/build/outputs/apk/release/app-release.apk
+          apksigner="$(ls -d "${ANDROID_HOME}"/build-tools/*/ | sort -V | tail -1)apksigner"
+          certs="$("${apksigner}" verify --print-certs "${apk}")"
+          echo "${certs}"
+          # The in-app updater only installs over the same key: a release signed with any
+          # other would strand every user on the old version.
+          if [ -n "${RELEASE_CERT_SHA256}" ]; then
+            want="$(echo "${RELEASE_CERT_SHA256}" | tr -d ':' | tr 'A-F' 'a-f')"
+            echo "${certs}" | grep -qi "SHA-256 digest: ${want}" || { echo "::error::APK isn't signed with the release key"; exit 1; }
+          else
+            echo "::warning::RELEASE_CERT_SHA256 isn't set: the signing key wasn't checked"
+          fi
+          mkdir -p dist
+          cp "${apk}" "dist/PokeDaisy-${VERSION}.apk"
+
+      - name: Native symbols to Crashlytics
+        if: hashFiles('app/google-services.json') != ''
+        run: ./gradlew :app:uploadCrashlyticsSymbolFileRelease --stacktrace
+
+      - name: Publish the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: PokeDaisy ${{ env.VERSION }}
+          files: dist/PokeDaisy-${{ env.VERSION }}.apk
+          generate_release_notes: true
+          prerelease: ${{ needs.verify.outputs.prerelease == 'true' }}
+          body: |
+            ${{ needs.rom-tests.result == 'skipped' && '> Released without the ROM-backed tests (no ROM runner configured).' || '' }}
+
+      - name: Clean up the key
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/release.jks" keystore.properties app/google-services.json

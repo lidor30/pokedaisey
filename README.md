@@ -174,6 +174,10 @@ PokeDaisy has no accounts, ads or analytics. It only goes online to:
 
 - check this page for a new version, and download it if you say so;
 - fetch cover art from SteamGridDB or RetroAchievements, only if you add your own API key.
+- send a crash report (Firebase Crashlytics) when the app crashes, **only if you turn
+  CRASH REPORTS on** in Settings. It's off until you do; after a few days of use the app
+  asks once, and never again. A report holds the device model, Android version and where
+  the app crashed. Turning it off drops any report not yet sent.
 
 Your games and saves never leave your device.
 

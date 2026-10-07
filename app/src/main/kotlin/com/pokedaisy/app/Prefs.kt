@@ -220,6 +220,21 @@ class Prefs(context: Context) {
         set(v) = p.edit().putString("hidden_roms", v.joinToString("\n")).apply()
 
     /** First-time setup finished or skipped; it only shows while this is false and the library is empty. */
+    /** Crash reports (CrashReports.kt): off until the player opts in. */
+    var crashReportsEnabled: Boolean
+        get() = p.getBoolean("crash_reports_enabled", false)
+        set(v) = p.edit().putBoolean("crash_reports_enabled", v).apply()
+
+    /** The one-time "send crash reports?" ask was shown (answered or not) - never again. */
+    var crashReportsAsked: Boolean
+        get() = p.getBoolean("crash_reports_asked", false)
+        set(v) = p.edit().putBoolean("crash_reports_asked", v).apply()
+
+    /** App opens (process starts) so far - the ask waits for the third. */
+    var appOpenCount: Int
+        get() = p.getInt("app_open_count", 0)
+        set(v) = p.edit().putInt("app_open_count", v).apply()
+
     var setupDone: Boolean
         get() = p.getBoolean("setup_done", false)
         set(v) = p.edit().putBoolean("setup_done", v).apply()

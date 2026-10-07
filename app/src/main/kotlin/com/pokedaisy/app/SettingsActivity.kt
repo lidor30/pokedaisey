@@ -360,6 +360,11 @@ class SettingsActivity : ComponentActivity() {
                     L10n.apply(prefs.appLanguage, null)
                 }
             },
+            // Opt-in crash reports (CrashReports.kt); only in builds that can send them.
+            SettingRow(tk("CRASH REPORTS"), onOff(prefs.crashReportsEnabled)) {
+                CrashReports.setEnabled(prefs, !prefs.crashReportsEnabled)
+                revision++
+            }.takeIf { CrashReports.available },
             // Tap: look for a newer release on GitHub now.
             SettingRow(tk("VERSION"), if (updates.checking) tk("CHECKING…") else BuildConfig.VERSION_NAME) { updates.check(manual = true) },
             // Back to the library, which opens the first-time setup again.

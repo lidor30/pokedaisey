@@ -429,6 +429,8 @@ fun OptionConfirm(
     m: GbaTextMetrics,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    /** The other button's label (it dismisses): CANCEL, or e.g. NO THANKS for a question. */
+    cancelLabel: String = tk("CANCEL"),
 ) {
     OptionOverlay(onDismiss, Modifier.widthIn(max = 480.dp)) {
         Column {
@@ -445,7 +447,7 @@ fun OptionConfirm(
                         horizontalArrangement = Arrangement.spacedBy(m.u * 4),
                         modifier = Modifier.fillMaxWidth().padding(horizontal = m.u * 4, vertical = m.u * 4),
                     ) {
-                        OptionButton(tk("CANCEL"), m, onClick = onDismiss, modifier = Modifier.weight(1f).height(m.rowHeight * 1.4f))
+                        OptionButton(cancelLabel, m, onClick = onDismiss, modifier = Modifier.weight(1f).height(m.rowHeight * 1.4f))
                         OptionButton(confirmLabel, m, onClick = onConfirm, emphasis = true, modifier = Modifier.weight(1f).height(m.rowHeight * 1.4f))
                     }
                 }

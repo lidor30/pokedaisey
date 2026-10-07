@@ -12,6 +12,9 @@ local.mk
 keystore.properties
 *.jks
 *.keystore
+# Firebase config for crash reports (CrashReports.kt): kept out of this public repo,
+# put it in app/ locally; the release workflow writes it from a secret.
+google-services.json
 
 # Gradle / Android build outputs
 .gradle/
@@ -32,3 +35,6 @@ build/
 __pycache__/
 .DS_Store
 .claude/settings.local.json
+
+# make release-apk output
+/dist/

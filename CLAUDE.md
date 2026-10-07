@@ -564,6 +564,16 @@ stress` switches the companion's tabs every 2 frames and fails over its memory /
 skips desktop Compose 1.5's own OnPositionedDispatcher NPE, which the app's 1.6.8 doesn't have) - run
 it after touching anything a tab composes. Per-visit work belongs in process-wide caches (slot art,
 backdrops, card renders, state thumbnails), not `remember`, which a tab loses each time it leaves.
+**Crash reports** (`CrashReports.kt`, Firebase Crashlytics + -ndk): opt-in, off by default (manifest
+`firebase_crashlytics_collection_enabled=false`); on via Settings > CRASH REPORTS or the Library's one-time ask
+(`CrashReports.shouldAsk`: third app open - `PokeDaisyApp` counts process starts - and 48 h after
+`firstInstallTime`; shown once ever, `Prefs.crashReportsAsked`). The Firebase plugins apply only when
+`app/google-services.json` exists (gitignored - public repo; the release workflow writes it from a secret), so
+forks / PR builds have `BuildConfig.CRASHLYTICS = false` and no row or ask. ui-preview stubs `CrashReports`.
+**CI / releases** (docs/RELEASING.md): `.github/workflows/ci.yml` = required PR checks (`make check`: unit tests,
+debug APK, ui-preview render + stress); ROM-backed tests skip there and run on the release's self-hosted
+`pokedaisy-roms` runner (`POKEDAISY_ROM_DIR`, forwarded to the test JVM as `romDir`). `release.yml` fires on a
+`v<versionName>` tag from `make release`, checks the signing cert against `RELEASE_CERT_SHA256` and publishes.
 **Unsupported ROMs**: `CompanionSupport.isSupported(file)` (FireRed/Emerald game code, ≤16 MB,
 retail LeafGreen rev 0/1 / Ruby / Sapphire rev 1/2 — `TelemetrySampler.OTHER_RETAIL_CODES`,
 read as FireRed / Emerald — or a >16 MB hack whose SHA1 is in `TelemetrySampler.SUPPORTED_HACK_SHA1S`) mirrors the
