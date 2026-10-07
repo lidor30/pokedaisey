@@ -9,9 +9,11 @@ import java.util.Locale
 
 /** The tables cover every tr / tk literal in the app (scripts/check_translations.py, on the JVM). */
 class TranslationsTest {
-    private val call = Regex("""\bt[rk]\(\s*"((?:[^"\\]|\\.)*)"""")
+    // Possessive runs ([^"\\]++ ... *+): a plain (?:a|b)* recurses once per character in Java's
+    // regex engine, and the generated tables' long literals overflowed the test worker's stack.
+    private val call = Regex("""\bt[rk]\(\s*"((?:[^"\\]++|\\.)*+)"""")
     // String literals first, so a "*/*" inside one isn't taken for a comment.
-    private val token = Regex(""""(?:[^"\\\n]|\\.)*"|/\*.*?\*/|//[^\n]*""", RegexOption.DOT_MATCHES_ALL)
+    private val token = Regex(""""(?:[^"\\\n]++|\\.)*+"|/\*.*?\*/|//[^\n]*""", RegexOption.DOT_MATCHES_ALL)
     private val placeholder = Regex("""\{\d+\}""")
 
     @After fun reset() = L10n.apply("EN", null)
