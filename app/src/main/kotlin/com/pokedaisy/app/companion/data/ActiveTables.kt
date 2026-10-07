@@ -27,7 +27,7 @@ package com.pokedaisy.app.companion.data
 // hacks above, via NATIVE_HEART_AND_SOUL/NATIVE_LAZARUS/NATIVE_ROWE in
 // NativeReader.kt. Heart and Soul and Lazarus now have their own
 // ROM-extracted tables (*Hns.kt / *Lazarus.kt, scripts/gen_expansion_tables.py).
-enum class GameKind { FIRERED, EMERALD, UNBOUND, GAIA, RADICAL_RED, ODYSSEY, HEART_AND_SOUL, LAZARUS, ROWE, EMERALD_ROGUE, AMETHYST, EMERALD_SEAGLASS, CELIA, TMT2, SOULGOLD }
+enum class GameKind { FIRERED, EMERALD, UNBOUND, GAIA, RADICAL_RED, ODYSSEY, HEART_AND_SOUL, LAZARUS, ROWE, EMERALD_ROGUE, AMETHYST, EMERALD_SEAGLASS, CELIA, TMT2, SOULGOLD, YELLOW }
 
 @Volatile
 var activeGame: GameKind = GameKind.FIRERED
@@ -40,6 +40,8 @@ private inline val tmt2 get() = activeGame == GameKind.TMT2
 private inline val hns get() = activeGame == GameKind.HEART_AND_SOUL
 private inline val lazarus get() = activeGame == GameKind.LAZARUS
 private inline val soulGold get() = activeGame == GameKind.SOULGOLD
+// Pokémon Yellow (Game Boy): Gen 1's own tables (gen_gen1_tables.py), keyed by National Dex number.
+private inline val yellow get() = activeGame == GameKind.YELLOW
 
 /** SoulGold v1.2 runs on v1.1.4's tables (byte for byte the same) but for one TM: its
  * TM75 teaches Agility, not Swords Dance. Set with [activeGame] by the Poller. */
@@ -70,6 +72,7 @@ private val typeNamesOdyssey: Map<Int, String> by lazy { typeNames + (9 to "Fair
 private val speciesNamesOdysseyMerged: Map<Int, String> by lazy { speciesNames + speciesNamesOdyssey }
 
 val activeSpeciesNames: Map<Int, String> get() = when {
+    yellow -> speciesNamesYellow
     unbound -> speciesNamesUnbound
     gaia -> speciesNamesGaia
     radicalRed -> speciesNamesRadicalRed
@@ -84,6 +87,7 @@ val activeSpeciesNames: Map<Int, String> get() = when {
     else -> speciesNames
 }
 val activeMoveData: Map<Int, MoveInfo> get() = when {
+    yellow -> moveDataYellow
     unbound -> moveDataUnbound
     celia -> moveDataCelia
     tmt2 -> moveDataTmt2
@@ -96,6 +100,7 @@ val activeMoveData: Map<Int, MoveInfo> get() = when {
     else -> moveData
 }
 val activeItemNames: Map<Int, String> get() = when {
+    yellow -> itemNamesYellow
     unbound -> itemNamesUnbound
     amethyst -> itemNamesAmethyst
     seaglass -> itemNamesSeaglass
@@ -109,6 +114,7 @@ val activeItemNames: Map<Int, String> get() = when {
     else -> itemNames
 }
 val activeSpeciesTypeData: Map<Int, SpeciesTypes> get() = when {
+    yellow -> speciesTypeDataYellow
     unbound -> speciesTypeDataUnbound
     tmt2 -> speciesTypeDataTmt2
     hns -> speciesTypeDataHns
@@ -121,6 +127,7 @@ val activeSpeciesTypeData: Map<Int, SpeciesTypes> get() = when {
     else -> speciesTypeData
 }
 val activeTypeEffectiveness: Map<Int, Int> get() = when {
+    yellow -> typeEffectivenessYellow
     unbound || cfruTypes -> typeEffectivenessUnbound
     // Seaglass uses the standard expansion type ids (TORCHIC is 11 = Fire), as Heart and Soul does.
     seaglass -> typeEffectivenessHns
@@ -133,6 +140,7 @@ val activeTypeEffectiveness: Map<Int, Int> get() = when {
     else -> typeEffectiveness
 }
 val activeTypeNames: Map<Int, String> get() = when {
+    yellow -> typeNamesYellow
     unbound || cfruTypes -> typeNamesUnbound
     odyssey -> typeNamesOdyssey
     seaglass -> typeNamesHns
@@ -145,6 +153,7 @@ val activeTypeNames: Map<Int, String> get() = when {
     else -> typeNames
 }
 val activeMapSecData: Map<Int, MapSecInfo> get() = when {
+    yellow -> mapSecDataYellow
     unbound -> mapSecDataUnbound
     // Seaglass keeps vanilla Hoenn mapsec ids (0x00 = Littleroot, confirmed live).
     emerald || seaglass || tmt2 -> mapSecDataEmerald
@@ -159,6 +168,7 @@ val activeMapSecData: Map<Int, MapSecInfo> get() = when {
 private val regionMapImagesSeaglass = arrayOf("seaglass")
 
 val activeRegionMapImages: Array<String> get() = when {
+    yellow -> arrayOf("yellow")   // its town map, rebuilt from the ROM (Gen1Art)
     unbound -> regionMapImagesUnbound
     seaglass -> regionMapImagesSeaglass
     emerald || tmt2 -> regionMapImagesEmerald
@@ -174,8 +184,16 @@ val activeRegionMapImages: Array<String> get() = when {
  * match it. Mon + item icons are fetched live from the running game and cached
  * (UnboundIconSource), like its region map (RomRegionMap).
  */
-val activeMonSpriteDir: String get() = if (unbound) "pokemon-unbound" else "pokemon"
-val activeItemSpriteDir: String? get() = if (unbound) "items-unbound" else "items"
+val activeMonSpriteDir: String get() = when {
+    unbound -> "pokemon-unbound"
+    yellow -> Gen1Art.YELLOW_ICONS   // its own party icons, rebuilt from the ROM
+    else -> "pokemon"
+}
+val activeItemSpriteDir: String? get() = when {
+    unbound -> "items-unbound"
+    yellow -> null   // Gen 1 has no item icons
+    else -> "items"
+}
 
 fun parseGameKind(s: String?): GameKind =
     if (s.equals("unbound", ignoreCase = true)) GameKind.UNBOUND else GameKind.FIRERED
@@ -198,4 +216,5 @@ fun GameKind.displayName(): String = when (this) {
     GameKind.CELIA -> "Celia's Stupid Romhack"
     GameKind.TMT2 -> "Too Many Types 2"
     GameKind.SOULGOLD -> "Pokémon SoulGold"
+    GameKind.YELLOW -> "Pokémon Yellow"
 }

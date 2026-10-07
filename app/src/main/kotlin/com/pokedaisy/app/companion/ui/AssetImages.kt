@@ -37,6 +37,9 @@ internal object GameArt {
     private val cache = ConcurrentHashMap<String, Bitmap>()
     private val missing = ConcurrentHashMap<String, Int>()
 
+    /** [path] if it's already decoded (no disk read). */
+    fun peek(path: String): Bitmap? = cache[path]
+
     fun get(context: Context, path: String): Bitmap? {
         cache[path]?.let { return it }
         val gen = RomArt.updates.value
@@ -93,6 +96,7 @@ private suspend fun loadMonIconSheet(context: Context, asset: String?): Bitmap? 
 /** The icon sheet if [DecompIconSource] / [UnboundIconSource] already has it decoded. */
 private fun peekMonIcon(asset: String?): Bitmap? {
     if (asset == null) return null
+    GameArt.peek(asset)?.let { return it }   // rom-art sheets (a Game Boy game's own icons)
     val id = asset.substringAfterLast('/').substringBefore('.').toIntOrNull() ?: return null
     return if (asset.startsWith("pokemon-unbound/")) UnboundIconSource.peek(id) else DecompIconSource.peek(id)
 }

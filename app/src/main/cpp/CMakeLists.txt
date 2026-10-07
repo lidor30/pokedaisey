@@ -39,7 +39,7 @@ set(USE_MINIZIP         OFF CACHE BOOL "" FORCE)
 set(USE_PNG             OFF CACHE BOOL "" FORCE)
 set(USE_ZLIB            OFF CACHE BOOL "" FORCE)
 set(M_CORE_GBA          ON  CACHE BOOL "" FORCE)
-set(M_CORE_GB           OFF CACHE BOOL "" FORCE)
+set(M_CORE_GB           ON  CACHE BOOL "" FORCE)   # Game Boy / Color (Pokémon Red/Blue/Yellow, G/S/C)
 set(BUILD_LTO           OFF CACHE BOOL "" FORCE)
 set(SKIP_INSTALL_ALL    ON  CACHE BOOL "" FORCE)
 

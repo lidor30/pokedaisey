@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.pokedaisy.app.companion.data.GameKind
+import com.pokedaisy.app.companion.data.activeGame
 import com.pokedaisy.app.companion.ui.theme.QolColors
 import com.pokedaisy.app.companion.ui.theme.gbaFocusRing
 import com.pokedaisy.app.companion.ui.theme.pixelFontFamily
@@ -69,34 +70,47 @@ import kotlin.math.max
  * top-screen Library/Settings are all built from them.
  */
 object OptionColors {
-    val hintBar = Color(0xFF007BC6)
-    val hintText = Color(0xFFFFFFFF)
-    val hintShadow = Color(0xFF636363)
-    val titleLayers = listOf(Color(0xFF63737B) to 2, Color(0xFFCED6D6) to 1)
-    val titleFill = Color(0xFFFFFFFF)
-    val titleText = Color(0xFF636363)
-    val titleShadow = Color(0xFFD6D6CE)
-    val listLayers = listOf(
+    // A Game Boy game gets its own windows instead (Gen 1: black text on white, no
+    // shadows, the text box's double line - sampled headless from Yellow's menus).
+    // Read through activeGame like the rest of the per-game look (CompanionScreen is
+    // keyed on the game, so a switch redraws).
+    private val gen1 get() = activeGame == GameKind.YELLOW
+    private val G1_BLACK = Color(0xFF181818)
+    private val G1_WHITE = Color(0xFFFFFFFF)
+    private val G1_FRAME = listOf(G1_WHITE to 2, G1_BLACK to 1, G1_WHITE to 1, G1_BLACK to 1, G1_WHITE to 1)
+
+    val hintBar get() = if (gen1) G1_BLACK else Color(0xFF007BC6)
+    val hintText get() = Color(0xFFFFFFFF)
+    val hintShadow get() = if (gen1) Color.Transparent else Color(0xFF636363)
+    val titleLayers get() = if (gen1) G1_FRAME else listOf(Color(0xFF63737B) to 2, Color(0xFFCED6D6) to 1)
+    val titleFill get() = Color(0xFFFFFFFF)
+    val titleText get() = if (gen1) G1_BLACK else Color(0xFF636363)
+    val titleShadow get() = if (gen1) Color.Transparent else Color(0xFFD6D6CE)
+    val listLayers get() = if (gen1) G1_FRAME else listOf(
         Color(0xFF293131) to 1, Color(0xFF8C8CCE) to 1, Color(0xFF736B84) to 2,
         Color(0xFFDED6DE) to 1, Color(0xFFFFFFFF) to 2,
     )
-    val listFill = Color(0xFFE0DFDF)
-    val rowSelected = Color(0xFFFFFFFF)
-    val label = Color(0xFF575656)
-    val labelShadow = Color(0xFFBCBBB4)
-    val value = Color(0xFFCB0707)
-    val valueShadow = Color(0xFFE0A564)
+    val listFill get() = if (gen1) G1_WHITE else Color(0xFFE0DFDF)
+    /** The cursor row (Gen 1 marks it with its ▶; here a light grey band). */
+    val rowSelected get() = if (gen1) Color(0xFFDCDCDC) else Color(0xFFFFFFFF)
+    val label get() = if (gen1) G1_BLACK else Color(0xFF575656)
+    val labelShadow get() = if (gen1) Color.Transparent else Color(0xFFBCBBB4)
+    val value get() = if (gen1) G1_BLACK else Color(0xFFCB0707)
+    val valueShadow get() = if (gen1) Color.Transparent else Color(0xFFE0A564)
     /** Secondary text (paths, timestamps, hints) - lighter than [label]. */
-    val muted = Color(0xFF8C8C94)
-    val mutedShadow = Color(0xFFD6D6D6)
+    val muted get() = if (gen1) Color(0xFF787878) else Color(0xFF8C8C94)
+    val mutedShadow get() = if (gen1) Color.Transparent else Color(0xFFD6D6D6)
     /** The dark outer line of [listLayers], for frames drawn around images. */
-    val frameDark = Color(0xFF293131)
-    val frameLight = Color(0xFF8C8CCE)
-    /** Text straight on a game backdrop: white with the hint bar's grey shadow. */
-    val onBackdrop = Color(0xFFFFFFFF)
-    val onBackdropShadow = Color(0xFF404850)
+    val frameDark get() = if (gen1) G1_BLACK else Color(0xFF293131)
+    val frameLight get() = if (gen1) G1_WHITE else Color(0xFF8C8CCE)
+    /** Text straight on a game backdrop: white with the hint bar's grey shadow (black on Gen 1's white). */
+    val onBackdrop get() = if (gen1) G1_BLACK else Color(0xFFFFFFFF)
+    val onBackdropShadow get() = if (gen1) Color.Transparent else Color(0xFF404850)
+    /** The tab bar's chips: the open one white over grey idle ones (Gen 1: the cursor row's grey over white). */
+    val tabSelectedFill get() = if (gen1) rowSelected else titleFill
+    val tabIdleFill get() = if (gen1) G1_WHITE else listFill
     /** The dashed line between list rows (the bag list's 6/2 dash). */
-    val divider = Color(0xFFC6C5C5)
+    val divider get() = if (gen1) Color(0xFFB0B0B0) else Color(0xFFC6C5C5)
 }
 
 /** A dashed row divider along the bottom edge, from [start] px in - the bag

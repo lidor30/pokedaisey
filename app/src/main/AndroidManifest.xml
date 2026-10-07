@@ -51,6 +51,8 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:mimeType="*/*" android:pathPattern=".*\\.gba" />
+                <data android:mimeType="*/*" android:pathPattern=".*\\.gb" />
+                <data android:mimeType="*/*" android:pathPattern=".*\\.gbc" />
             </intent-filter>
         </activity>
 

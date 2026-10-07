@@ -33,6 +33,7 @@ import com.pokedaisy.app.Hotkeys
 import com.pokedaisy.app.companion.COMPANION_TABS
 import com.pokedaisy.app.companion.CompanionSettings
 import com.pokedaisy.app.companion.FfMode
+import com.pokedaisy.app.companion.ScreenFilter
 import com.pokedaisy.app.companion.FfMusicMode
 import com.pokedaisy.app.companion.MAX_BAR_TABS
 
@@ -55,7 +56,7 @@ private val PICKABLE_KEYS = listOf(
     "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
 )
 
-private enum class Page(val title: String) { HOME(tk("OPTION")), TABS(tk("TAB BAR")), BUTTONS(tk("GAME BUTTONS")), HOTKEYS(tk("HOTKEYS")) }
+private enum class Page(val title: String) { HOME(tk("OPTION")), TABS(tk("TAB BAR")), BUTTONS(tk("GAME BUTTONS")), HOTKEYS(tk("HOTKEYS")), SHADERS(tk("SHADERS")) }
 
 /**
  * The bottom-screen SETTINGS tab, laid out like FireRed's OPTION screen over
@@ -145,6 +146,7 @@ fun CompanionSettingsScreen(
                             picking = title to { name -> settings.setHotkeyBinding(action, name); tick++ }
                         }
                     } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
+                    Page.SHADERS -> shaderRows(settings, { tick++ }, { selector = it }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                 }
             }
             OptionListWindow(m, Modifier.fillMaxWidth().weight(1f)) {
@@ -304,12 +306,27 @@ private fun homeRows(
         SettingRow(tk("STATUS BAR"), onOff(s.statusBar)) { s.setStatusBar(!s.statusBar); changed() },
         // The game at the GBA's 3:2, or stretched to fill the top screen; flips in place.
         SettingRow(tk("ASPECT"), aspectLabel(s.stretchGame)) { s.setStretchGame(!s.stretchGame); changed() },
+        // FILTER (LCD / SCANLINES / CRT) and GBA COLORS, on their own page.
+        SettingRow(tk("SHADERS"), s.screenFilter.label) { navigate(Page.SHADERS) },
         // Game and companion trade screens (this companion moves with them).
         SettingRow(tk("SWAP SCREENS"), onOff(s.swapScreens)) { s.setSwapScreens(!s.swapScreens); changed() }
             .takeIf { s.hasSecondScreen },
     )
 }
 
+
+/** SHADERS: what the game is drawn through - flips live, the game shows it at once. */
+private fun shaderRows(s: CompanionSettings, changed: () -> Unit, select: (Selector) -> Unit): List<SettingRow> {
+    val filters = ScreenFilter.entries
+    return listOf(
+        // NONE / LCD grid / SCANLINES / CRT.
+        SettingRow(tk("FILTER"), s.screenFilter.label) {
+            select(Selector(tk("FILTER"), filters.map { it.label }, s.screenFilter.label) { l -> s.setScreenFilter(filters.first { it.label == l }) })
+        },
+        // The colours as the GBA's own LCD showed them; stacks with any filter.
+        SettingRow(tk("GBA COLORS"), if (s.gbaColors) tk("ON") else tk("OFF")) { s.setGbaColors(!s.gbaColors); changed() },
+    )
+}
 
 private fun alphaBadge(mode: FfMusicMode) = if (mode.alpha) tk("ALPHA") else null
 

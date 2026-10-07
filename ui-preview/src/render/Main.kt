@@ -146,6 +146,12 @@ class FakeSettings(showHintsInitially: Boolean = true) : CompanionSettings {
     private var stretch = false
     override val stretchGame get() = stretch
     override fun setStretchGame(on: Boolean) { stretch = on }
+    private var colors = false
+    override val gbaColors get() = colors
+    override fun setGbaColors(on: Boolean) { colors = on }
+    private var filter = com.pokedaisy.app.companion.ScreenFilter.NONE
+    override val screenFilter get() = filter
+    override fun setScreenFilter(filter: com.pokedaisy.app.companion.ScreenFilter) { this.filter = filter }
     // The Thor: SWAP SCREENS shows.
     override val hasSecondScreen = true
     private var swap = false
@@ -699,6 +705,14 @@ fun main(args: Array<String>) {
         Shot("$g-settings-close", bw, bh, bd, companion("SETTINGS")) {
             onNodeWithText("CLOSE GAME").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         },
+        // SHADERS: its page (FILTER, GBA COLORS), then FILTER's pick-list.
+        Shot("$g-settings-shaders", bw, bh, bd, companion("SETTINGS")) {
+            onNodeWithText("SHADERS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+        },
+        Shot("$g-settings-shaders-filter", bw, bh, bd, companion("SETTINGS")) {
+            onNodeWithText("SHADERS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+            onNodeWithText("FILTER").performClick()
+        },
         Shot("$g-settings-tabs", bw, bh, bd, companion("SETTINGS")) { onNodeWithText("TAB BAR").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) },
         Shot("$g-settings-tabs-states", bw, bh, bd, companion("SETTINGS")) {
             onNodeWithText("TAB BAR").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
@@ -870,6 +884,13 @@ fun main(args: Array<String>) {
         Shot("settings-aspect", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("ASPECT").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) },
         Shot("settings-aspect-stretch", tw, th, td, activity { withAspect(true) { SettingsActivity() } }) {
             onNodeWithText("ASPECT").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+        },
+        Shot("settings-shaders", tw, th, td, activity { SettingsActivity() }) {
+            onNodeWithText("SHADERS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+        },
+        Shot("settings-shaders-filter", tw, th, td, activity { SettingsActivity() }) {
+            onNodeWithText("SHADERS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+            onNodeWithText("FILTER").performClick()
         },
         Shot("settings-swap", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("SWAP SCREENS").performScrollTo() },
         Shot("settings-theme", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("THEME").performClick() },

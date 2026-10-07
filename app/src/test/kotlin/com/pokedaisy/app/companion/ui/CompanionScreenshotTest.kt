@@ -574,6 +574,11 @@ open class CompanionScreenshotTest {
     @Test fun seaglassMap() = retail("emerald_seaglass", NATIVE_EMERALD_SEAGLASS, SEAGLASS_ROM, GameKind.EMERALD_SEAGLASS, "MAP", art = true)
     @Test fun seaglassBattle() =
         retail("emerald_seaglass_battle", NATIVE_EMERALD_SEAGLASS, SEAGLASS_ROM, GameKind.EMERALD_SEAGLASS, "BATTLE", art = true)
+    @Test fun yellowParty() = yellow("yellow", "PARTY")
+    @Test fun yellowItems() = yellow("yellow", "ITEMS")
+    @Test fun yellowBattle() = yellow("yellow_battle", "BATTLE")
+    @Test fun yellowMap() = yellow("yellow", "MAP")
+    @Test fun yellowSettings() = yellow("yellow", "SETTINGS")
     @Test fun soulGoldV12Party() = retail("soulgold_v12_battle", NATIVE_SOULGOLD_V1_2, SG12_ROM, GameKind.SOULGOLD, "PARTY", art = true)
     @Test fun soulGoldV12Items() = retail("soulgold_v12", NATIVE_SOULGOLD_V1_2, SG12_ROM, GameKind.SOULGOLD, "ITEMS", art = true)
     @Test fun soulGoldV12Battle() = retail("soulgold_v12_battle", NATIVE_SOULGOLD_V1_2, SG12_ROM, GameKind.SOULGOLD, "BATTLE", art = true)
@@ -581,6 +586,18 @@ open class CompanionScreenshotTest {
     @Test fun soulGoldV12DexEntry() = hackDex("soulgold_v12", NATIVE_SOULGOLD_V1_2, SG12_ROM, GameKind.SOULGOLD, 25)
     @Test fun soulGoldDex() = hackDex("soulgold", NATIVE_SOULGOLD, SG_ROM, GameKind.SOULGOLD)
     @Test fun soulGoldDexEntry() = hackDex("soulgold", NATIVE_SOULGOLD, SG_ROM, GameKind.SOULGOLD, 155)
+
+    /** Pokémon Yellow (Game Boy): the Gen 1 reader on a GB fixture (wram.bin). */
+    private fun yellow(fixture: String, tab: String) {
+        activeGame = GameKind.YELLOW
+        val rom = java.io.File(System.getProperty("user.home"), "Downloads/gbc/Pokemon-Yellow Version.gbc")
+        if (rom.isFile) com.pokedaisy.app.companion.data.Gen1Art.extractTo(rom.readBytes(), RomArt.dirOverride!!)
+        val t = com.pokedaisy.app.companion.data.readGen1Telemetry(FixtureMemoryReader.load(fixture), com.pokedaisy.app.companion.data.GEN1_YELLOW)
+        val v = buildSnapshotView(t).copy(game = GameKind.YELLOW)
+        // The icon sheets load asynchronously in the app; decode them before the snapshot.
+        (v.party + v.battlePlayer + v.battleOpponent).forEach { m -> m.iconAsset?.let { GameArt.get(paparazzi.context, it) } }
+        paparazzi.snapshot { CompanionScreen(v, SampleCompanion.Slots, SampleCompanion.Settings(), initialTab = tab) }
+    }
 
     private fun retail(
         fixture: String, cfg: NativeConfig, romFile: String, kind: GameKind, tab: String, entry: Int? = null, art: Boolean = false,
@@ -843,6 +860,10 @@ object SampleCompanion {
         override fun setStatusBar(on: Boolean) {}
         override val stretchGame = false
         override fun setStretchGame(on: Boolean) {}
+        override val gbaColors = false
+        override fun setGbaColors(on: Boolean) {}
+        override val screenFilter = com.pokedaisy.app.companion.ScreenFilter.NONE
+        override fun setScreenFilter(filter: com.pokedaisy.app.companion.ScreenFilter) {}
         override val gameName = "Pokémon FireRed"
         override val romFileName = "firered-qol.gba"
     }

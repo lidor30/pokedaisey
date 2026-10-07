@@ -25,6 +25,10 @@ THIRD-PARTY COMPONENTS
 
 - mGBA (third_party/mgba), Copyright (c) 2013-2022 Jeffrey Pfau and
   contributors, Mozilla Public License 2.0 - https://github.com/mgba-emu/mgba
+- Shaders (app/src/main/kotlin/com/pokedaisy/app/ScreenShaders.kt): LCD and
+  scanlines adapted from mGBA's, Copyright (C) 2017 Dominus Iniquitatis, MIT
+  License (the full notice is in third_party/mgba/res/shaders/lcd.shader/lcd.fs);
+  GBA colours from mGBA's gba-color shader by Pokefan531 and hunterk.
 - Pixel Operator font (app/src/main/assets/fonts), by Jayvee Enaguas,
   CC0 1.0 (public domain dedication).
 

@@ -2,6 +2,7 @@ package com.pokedaisy.app
 
 import android.content.Context
 import com.pokedaisy.app.companion.FfMode
+import com.pokedaisy.app.companion.ScreenFilter
 import com.pokedaisy.app.companion.FfMusicMode
 
 /** Tiny SharedPreferences wrapper for app-level state. */
@@ -139,6 +140,16 @@ class Prefs(context: Context) {
     var stretchGame: Boolean
         get() = p.getBoolean("stretch_game", false)
         set(v) = p.edit().putBoolean("stretch_game", v).apply()
+
+    /** Whether the game's colours are shown as the GBA's own LCD showed them ([ScreenShaders.GBA_COLOR]). */
+    var gbaColors: Boolean
+        get() = p.getBoolean("gba_colors", false)
+        set(v) = p.edit().putBoolean("gba_colors", v).apply()
+
+    /** The screen effect over the game: LCD grid, scanlines or CRT ([ScreenShaders.effectFor]). */
+    var screenFilter: ScreenFilter
+        get() = ScreenFilter.entries.firstOrNull { it.name == p.getString("screen_filter", null) } ?: ScreenFilter.NONE
+        set(v) = p.edit().putString("screen_filter", v.name).apply()
 
     /** Two screens: the game on the second display and the companion on the main one -
      * for a device whose main display is its bottom screen (see PokeDaisyActivity.syncPresentation). */

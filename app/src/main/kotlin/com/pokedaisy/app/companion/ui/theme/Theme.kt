@@ -188,7 +188,7 @@ object QolColors {
     val statusFrz = Color(0xFF56C2E6)
     val statusTox = Color(0xFF7A3EA1)
 
-    val typeColors = mapOf(
+    private val typeColorsTitled = mapOf(
         "Normal" to Color(0xFFA8A878), "Fighting" to Color(0xFFC03028), "Flying" to Color(0xFFA890F0),
         "Poison" to Color(0xFFA040A0), "Ground" to Color(0xFFE0C068), "Rock" to Color(0xFFB8A038),
         "Bug" to Color(0xFFA8B820), "Ghost" to Color(0xFF705898), "Steel" to Color(0xFFB8B8D0),
@@ -197,6 +197,10 @@ object QolColors {
         "Ice" to Color(0xFF98D8D8), "Dragon" to Color(0xFF7038F8), "Dark" to Color(0xFF705848),
         "Fairy" to Color(0xFFEE99AC),
     )
+
+    /** By the game's own type name: title-cased ("Fire"), or Gen 1's capitals ("FIRE", and its unused BIRD as Flying). */
+    val typeColors = typeColorsTitled + typeColorsTitled.mapKeys { it.key.uppercase() } +
+        ("BIRD" to typeColorsTitled.getValue("Flying"))
 
     fun statusColor(label: String): Color = when (label) {
         "SLP" -> statusSlp; "PSN" -> statusPsn; "BRN" -> statusBrn
@@ -233,9 +237,31 @@ object QolColors {
  */
 @Composable
 fun pixelFontFamily(): FontFamily {
+    LocalGameFont.current?.let { return it }
     val context = LocalContext.current
     // Pixel Operator + its Japanese fallback (PixelTypeface.kt).
     return remember(context) { com.pokedaisy.app.pixelFontFamily(context) }
+}
+
+/**
+ * The running game's own font, when it has one the app can use instead of Pixel
+ * Operator: a Game Boy game's, cut from its ROM ([com.pokedaisy.app.companion.data.Gen1Art]).
+ * Provided by CompanionScreen only, so the top-screen Library / Settings keep Pixel Operator.
+ */
+val LocalGameFont = androidx.compose.runtime.staticCompositionLocalOf<FontFamily?> { null }
+
+/** [game]'s own font from the rom-art cache, once a launch of it has written it; else null. */
+@Composable
+fun rememberGameFont(game: GameKind?): FontFamily? {
+    val context = LocalContext.current
+    val gen = com.pokedaisy.app.companion.ui.rememberArtGeneration()
+    return remember(game, gen) {
+        val path = when (game) {
+            GameKind.YELLOW -> com.pokedaisy.app.companion.data.Gen1Art.YELLOW_FONT
+            else -> null
+        } ?: return@remember null
+        com.pokedaisy.app.companion.data.RomArt.file(context.filesDir, path)?.let { com.pokedaisy.app.gameFontFamily(context, it) }
+    }
 }
 
 @Composable
@@ -336,6 +362,10 @@ fun rememberGameBackground(game: GameKind): GameBackground? {
     val context = LocalContext.current
     val gen = rememberArtGeneration()
     return remember(game, gen) {
+        // Gen 1's screens are plain white.
+        if (game == GameKind.YELLOW) {
+            return@remember GameBackground(android.graphics.Bitmap.createBitmap(intArrayOf(-1), 1, 1, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap(), true)
+        }
         backdropColors(game)?.let { to ->
             return@remember GameBackground(recolorBackdrop(GameArt.get(context, "partybg/firered.png"), to).asImageBitmap(), false)
         }

@@ -63,6 +63,10 @@ object MgbaCore {
     /** 4-char game code from the ROM header (`BPRE`, `BPEE`, …). */
     external fun pkRomCode(): String?
     external fun pkRomSize(): Long
+    /** 0 = GBA, 1 = Game Boy / Color, -1 = no core. */
+    external fun pkPlatform(): Int
+    /** A Game Boy / Color cart's ROM bytes (it's bank-switched, so not on the bus whole); null on GBA. */
+    external fun pkRomRead(off: Long, len: Int): ByteArray?
 
     // --- FF-music rendering (see FfMusicRenderer) ---
     // A second, fully independent core, never the player's real session —

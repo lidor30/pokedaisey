@@ -27,7 +27,15 @@ class GameStageLayout(
 
     private val barShown get() = bar.visibility != GONE
 
-    /** Fill the area instead of fitting 3:2 in it - see [Prefs.stretchGame]. */
+    /** The game screen's width / height: the GBA's 3:2, a Game Boy's 10:9 (set from the core). */
+    var aspect = GBA_ASPECT
+        set(v) {
+            if (field == v || v <= 0f) return
+            field = v
+            requestLayout()
+        }
+
+    /** Fill the area instead of fitting [aspect] in it - see [Prefs.stretchGame]. */
     var stretch = false
         set(v) {
             if (field == v) return
@@ -50,8 +58,8 @@ class GameStageLayout(
             gameW = areaW.coerceAtLeast(0)
             gameH = (areaH - barH).coerceAtLeast(0)
         } else {
-            gameW = min(areaW.toFloat(), (areaH - barH) * GBA_ASPECT).toInt().coerceAtLeast(0)
-            gameH = (gameW / GBA_ASPECT).toInt()
+            gameW = min(areaW.toFloat(), (areaH - barH) * aspect).toInt().coerceAtLeast(0)
+            gameH = (gameW / aspect).toInt()
         }
         game.measure(exactly(gameW), exactly(gameH))
         bar.measure(exactly(gameW), exactly(barH))

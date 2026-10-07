@@ -265,6 +265,32 @@ val SoulGoldPartyPalette = FireRedPartyPalette.copy(
 private fun flatSlot(outline: Color, fill: Color, text: Color? = null) =
     PartySlotColors(outline, fill, fill, fill, text = text, textShadow = if (text != null) Color.Transparent else null)
 
+/**
+ * Pokémon Yellow (Game Boy): the GBC party menu's few colours - black text and frames
+ * on white, no shadows, the HP bar's GBC green / orange / red on white (pokeyellow's
+ * CGB PAL_GREENBAR / YELLOWBAR / REDBAR) - and no Poké Ball (Gen 1 draws none). The
+ * cursor row is a light grey (the game marks it with its ▶).
+ */
+private val G1_BLACK = Color(0xFF181818)
+val YellowPartyPalette = FireRedPartyPalette.copy(
+    normal = PartySlotColors(G1_BLACK, Color.White, Color.White, Color.White, band = Color.White,
+        text = G1_BLACK, textShadow = Color.Transparent),
+    selected = PartySlotColors(G1_BLACK, Color(0xFFDCDCDC), Color(0xFFDCDCDC), Color(0xFFDCDCDC), band = Color(0xFFDCDCDC),
+        text = G1_BLACK, textShadow = Color.Transparent),
+    fainted = PartySlotColors(G1_BLACK, Color.White, Color.White, Color.White, band = Color.White,
+        text = G1_BLACK, textShadow = Color.Transparent),
+    text = G1_BLACK, textShadow = Color.Transparent,
+    male = G1_BLACK, maleShadow = Color.Transparent,
+    female = G1_BLACK, femaleShadow = Color.Transparent,
+    hpFrame = G1_BLACK, hpInner = Color.White,
+    hpLabel = Color.White, hpLabelShade = Color.White,
+    hpGreen = HpBarColors(Color(0xFF00FF00), Color(0xFF00FF00)),
+    hpYellow = HpBarColors(Color(0xFFFF9400), Color(0xFFFF9400)),
+    hpRed = HpBarColors(Color(0xFFFF0000), Color(0xFFFF0000)),
+    hpEmpty = HpBarColors(Color.White, Color.White),
+    ball = mapOf('K' to Color.Transparent, 'R' to Color.Transparent, 'H' to Color.Transparent, 'W' to Color.Transparent),
+)
+
 /** The generic slot's palette for [game] - add a palette here to restyle a game. */
 fun partyPaletteFor(game: GameKind): PartyPalette = when (game) {
     GameKind.EMERALD_ROGUE -> RoguePartyPalette
@@ -273,6 +299,7 @@ fun partyPaletteFor(game: GameKind): PartyPalette = when (game) {
     GameKind.EMERALD_SEAGLASS -> SeaglassPartyPalette
     GameKind.ROWE -> RowePartyPalette
     GameKind.SOULGOLD -> SoulGoldPartyPalette
+    GameKind.YELLOW -> YellowPartyPalette
     // Celia's and Too Many Types 2's slots are FireRed's own colors (only TMT2's backdrop differs).
     else -> FireRedPartyPalette
 }

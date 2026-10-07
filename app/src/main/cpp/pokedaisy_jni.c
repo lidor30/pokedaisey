@@ -11,11 +11,13 @@
 #include <string.h>
 
 #include <mgba/core/core.h>
+#include <mgba/core/config.h>
 #include <mgba/core/blip_buf.h>
 #include <mgba/core/serialize.h>
 #include <mgba-util/vfs.h>
 #include <mgba/internal/arm/arm.h>
 #include <mgba/internal/arm/isa-inlines.h>
+#include <mgba/internal/gb/gb.h>
 
 #define LOG_TAG "pokedaisy/jni"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
@@ -30,6 +32,21 @@ enum {
 };
 
 #define PK_SAMPLE_RATE 48000
+
+// Game Boy / Color ROMs run on mGBA's GB core too (M_CORE_GB). Red/Blue/Yellow
+// are SGB-enhanced, so the core would frame them in a 256x224 Super Game Boy
+// border: turn borders off, which keeps every GB game at its 160x144 screen.
+static void pk_gb_config(struct mCore* core) {
+    if (core->platform(core) != mPLATFORM_GB) {
+        return;
+    }
+    mCoreConfigSetIntValue(&core->config, "sgb.borders", 0);
+    mCoreLoadForeignConfig(core, &core->config);
+}
+
+static int pk_is_gba(const struct mCore* core) {
+    return core && core->platform(core) == mPLATFORM_GBA;
+}
 #define PK_AUDIO_SCRATCH_SAMPLES 8192   // per-channel; * 2 shorts for interleave
 
 static struct {
@@ -149,6 +166,7 @@ Java_com_pokedaisy_app_MgbaCore_pkInit(JNIEnv* env, jobject thiz,
         return JNI_FALSE;
     }
     mCoreInitConfig(core, NULL);
+    pk_gb_config(core);
 
     unsigned w, h;
     core->desiredVideoDimensions(core, &w, &h);
@@ -277,6 +295,7 @@ Java_com_pokedaisy_app_MgbaCore_pkRenderInit(JNIEnv* env, jobject thiz, jstring 
         return JNI_FALSE;
     }
     mCoreInitConfig(core, NULL);
+    pk_gb_config(core);
 
     unsigned w, h;
     core->desiredVideoDimensions(core, &w, &h);
@@ -352,6 +371,9 @@ Java_com_pokedaisy_app_MgbaCore_pkRenderReadAudio(JNIEnv* env, jobject thiz, jsh
 // everything back. Tested headless with native-capture/mgba_dump's `call`.
 #define PK_CALL_SENTINEL 0x080000C0u
 static int pk_call(struct mCore* core, uint32_t fn, uint32_t arg0) {
+    if (!pk_is_gba(core)) {
+        return 0;   // an ARM-only trick: the GB core's CPU is an SM83
+    }
     struct ARMCore* cpu = (struct ARMCore*) core->cpu;
     struct ARMRegisterFile saved = cpu->regs;
     uint32_t prefetch0 = cpu->prefetch[0], prefetch1 = cpu->prefetch[1];
@@ -399,7 +421,7 @@ Java_com_pokedaisy_app_MgbaCore_pkRenderForceSong(JNIEnv* env, jobject thiz, jlo
 // then left the music frozen (Unbound). Tested with mgba_dump's `park`.
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRenderPark(JNIEnv* env, jobject thiz, jlong spin) {
-    if (!rg.core || !rg.core->cpu) {
+    if (!rg.core || !rg.core->cpu || !pk_is_gba(rg.core)) {
         return JNI_FALSE;
     }
     struct mCore* core = rg.core;
@@ -597,7 +619,7 @@ Java_com_pokedaisy_app_MgbaCore_pkRenderReadBytes(JNIEnv* env, jobject thiz, jlo
 // Scans IWRAM then EWRAM for a 4-byte magic; returns its GBA address or -1.
 JNIEXPORT jlong JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkFindMagic(JNIEnv* env, jobject thiz, jbyteArray jMagic) {
-    if (!g.core) {
+    if (!pk_is_gba(g.core)) {
         return -1;
     }
     jbyte m4[4];
@@ -634,11 +656,41 @@ Java_com_pokedaisy_app_MgbaCore_pkRomCode(JNIEnv* env, jobject thiz) {
     if (!g.core) {
         return NULL;
     }
+    if (!pk_is_gba(g.core)) {
+        return (*env)->NewStringUTF(env, "");   // no GBA header (0xAC would be GB ROM bytes)
+    }
     char code[5] = {0};
     for (int i = 0; i < 4; i++) {
         code[i] = (char) g.core->busRead8(g.core, 0x080000ACu + i);
     }
     return (*env)->NewStringUTF(env, code);
+}
+
+// The cartridge's own bytes [off, off + len) - a Game Boy cart is bank-switched,
+// so its ROM can't be read whole over the bus (the Poller hashes it this way).
+JNIEXPORT jbyteArray JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkRomRead(JNIEnv* env, jobject thiz, jlong off, jint len) {
+    if (!g.core || g.core->platform(g.core) != mPLATFORM_GB || off < 0 || len <= 0) {
+        return NULL;
+    }
+    struct GB* gb = g.core->board;
+    if (!gb->memory.rom || (size_t) off + (size_t) len > gb->pristineRomSize) {
+        return NULL;
+    }
+    jbyteArray out = (*env)->NewByteArray(env, len);
+    if (out) {
+        (*env)->SetByteArrayRegion(env, out, 0, len, (const jbyte*) gb->memory.rom + off);
+    }
+    return out;
+}
+
+// 0 = GBA, 1 = Game Boy / Color, -1 = no core.
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkPlatform(JNIEnv* env, jobject thiz) {
+    if (!g.core) {
+        return -1;
+    }
+    return pk_is_gba(g.core) ? 0 : 1;
 }
 
 JNIEXPORT jlong JNICALL

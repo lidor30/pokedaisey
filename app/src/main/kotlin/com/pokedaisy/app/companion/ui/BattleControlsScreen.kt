@@ -485,13 +485,19 @@ internal fun PlatinumButton(
     Box(
         modifier = modifier
             .alpha(if (enabled) 1f else 0.45f)
-            // Near-black outline, then the fill with Platinum's bevel.
-            .clip(shape)
-            .background(ButtonOutline)
-            .padding(2.dp)
-            .clip(shape)
-            .background(fill)
-            .platinumBevel(fill, frame)
+            .then(
+                // Gen 1 (Yellow): a button is its text box - white inside the double line.
+                if (gen1Buttons) Modifier.drawBehind {
+                    drawLayeredBox(OptionColors.listLayers.inPx(gbaPixelPx()), OptionColors.listFill, radius = 3 * gbaPixelPx())
+                } else Modifier
+                    // Near-black outline, then the fill with Platinum's bevel.
+                    .clip(shape)
+                    .background(ButtonOutline)
+                    .padding(2.dp)
+                    .clip(shape)
+                    .background(fill)
+                    .platinumBevel(fill, frame),
+            )
             .then(
                 if (enabled) {
                     Modifier.clickable(onClick = {
@@ -522,17 +528,26 @@ private fun Modifier.platinumBevel(fill: Color, frame: Color): Modifier =
         drawContent()
     }
 
-/** White button text with a dark drop shadow, like the game's labels. */
+/** White button text with a dark drop shadow, like the game's labels (Gen 1: plain black). */
 @Composable
 internal fun ButtonLabel(text: String, fontSize: TextUnit, bold: Boolean = false) {
     val shadow = with(LocalDensity.current) { (fontSize.toPx() / 14f).coerceAtLeast(2f) }
     Text(
-        text, color = Color.White, fontSize = fontSize, maxLines = 1,
-        fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+        text, color = buttonContent, fontSize = fontSize, maxLines = 1,
+        fontWeight = if (bold && !gen1Buttons) FontWeight.Bold else FontWeight.Normal,
         // (An explicit style replaces the theme's, font included - so name the pixel font.)
-        style = TextStyle(fontFamily = pixelFontFamily(), shadow = Shadow(Color(0xFF383838), Offset(shadow, shadow), 0f)),
+        style = TextStyle(
+            fontFamily = pixelFontFamily(),
+            shadow = if (gen1Buttons) null else Shadow(Color(0xFF383838), Offset(shadow, shadow), 0f),
+        ),
     )
 }
+
+/** A Game Boy game's buttons are plain text boxes ([PlatinumButton]). */
+private val gen1Buttons get() = com.pokedaisy.app.companion.data.activeGame == com.pokedaisy.app.companion.data.GameKind.YELLOW
+
+/** What's drawn on a [PlatinumButton]: white, or Gen 1's black on its white box. */
+internal val buttonContent: Color get() = if (gen1Buttons) Color(0xFF181818) else Color.White
 
 private val ButtonOutline = Color(0xFF202020)
 private val RunDrop = 16.dp

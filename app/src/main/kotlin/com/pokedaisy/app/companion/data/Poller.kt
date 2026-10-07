@@ -19,6 +19,8 @@ class TelemetrySampler {
     private var isEmeraldStruct = false
     private var structAddr: Long = -1
     private var nativeCfg: NativeConfig? = null
+    // A Game Boy game's (Gen 1) addresses instead of [nativeCfg].
+    private var gen1Cfg: Gen1Config? = null
     private var lastError: String? = null
     private var magicProbes = 0
     // Set instead of nativeCfg for a large BPRE ROM that isn't recognized as
@@ -104,6 +106,7 @@ class TelemetrySampler {
 
             val telemetry = when (kind) {
                 GameKind.UNBOUND -> readNativeTelemetry(reader, NATIVE_UNBOUND_WITH_DEX)
+                GameKind.YELLOW -> readGen1Telemetry(reader, gen1Cfg ?: GEN1_YELLOW)
                 else -> {
                     unsupportedHackLabel?.let { return SnapshotView(connected = false, error = it, unsupported = true) }
                     val cfg = nativeCfg
@@ -136,6 +139,7 @@ class TelemetrySampler {
     }
 
     private fun detect(reader: MemoryReader) {
+        if (runCatching { MgbaCore.pkPlatform() }.getOrDefault(0) == 1) return detectGameBoy()
         val code = runCatching { MgbaCore.pkRomCode() }.getOrNull().orEmpty()
         val size = runCatching { MgbaCore.pkRomSize() }.getOrDefault(0L)
 
@@ -298,6 +302,26 @@ class TelemetrySampler {
     val knownGMain: Pair<Long, Long>?
         get() = (if (kind == GameKind.UNBOUND) NATIVE_UNBOUND else nativeCfg)?.let { it.gMain to it.inBattleOff }
 
+    /** A Game Boy / Color cart, by the whole ROM's SHA1 (read from the cart: it's bank-switched). */
+    private fun detectGameBoy() {
+        val size = runCatching { MgbaCore.pkRomSize() }.getOrDefault(0L)
+        val digest = java.security.MessageDigest.getInstance("SHA-1")
+        var off = 0L
+        while (off < size) {
+            val len = minOf(1L shl 20, size - off).toInt()
+            digest.update(MgbaCore.pkRomRead(off, len) ?: break)
+            off += len
+        }
+        val hash = if (off == size && size > 0) digest.digest().joinToString("") { "%02x".format(it) } else null
+        when (hash) {
+            YELLOW_SHA1 -> { kind = GameKind.YELLOW; gen1Cfg = GEN1_YELLOW }
+            else -> {
+                kind = GameKind.FIRERED
+                unsupportedHackLabel = "this Game Boy game isn't supported yet (sha1 ${hash?.take(12) ?: "unknown"}…)"
+            }
+        }
+    }
+
     /** The detected game's gPartyMenu + gPlayerParty when its config has them (SoulGold), or null. */
     val knownPartyMenu: Pair<Long, Long>?
         get() = nativeCfg?.takeIf { it.partyMenu != 0L }?.let { it.partyMenu to it.playerParty }
@@ -395,6 +419,12 @@ class TelemetrySampler {
         const val SOULGOLD_V1_1_4_SHA1 = "ea5d369cc8a31cbf1cfacb7c9470ea670f08957b"
         // Pokémon SoulGold v1.2 - host-side masked hash (GPIO bytes zero).
         const val SOULGOLD_V1_2_SHA1 = "805d880ee229fb6dc3ce03d7b03baf48f0d759d0"
+
+        // Pokémon Yellow (USA, Europe) - the Game Boy cart (pret/pokeyellow builds it byte for byte).
+        const val YELLOW_SHA1 = "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1"
+
+        /** The Game Boy / Color carts the companion reads ([CompanionSupport] checks imports against it). */
+        val SUPPORTED_GB_SHA1S = setOf(YELLOW_SHA1)
 
         /** Every hack detect() has RAM addresses for - the >16 MB ones it
          * hashes, plus Seaglass (16 MB). [CompanionSupport] checks imports against it. */
