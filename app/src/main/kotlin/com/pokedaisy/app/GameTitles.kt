@@ -45,6 +45,7 @@ object GameTitles {
         "3fa8e61ec1727cc51540c54677623f736a446e1b" to "Pokémon Too Many Types 2",
         "b9f4d332d30fc88c379f9e037f9eae3b2755ead4" to "Pokémon Emerald Seaglass",
         "ea5d369cc8a31cbf1cfacb7c9470ea670f08957b" to "Pokémon SoulGold",
+        "805d880ee229fb6dc3ce03d7b03baf48f0d759d0" to "Pokémon SoulGold",
     )
 
     /** Only these games' ROMs are worth hashing: every entry above is one of them. */

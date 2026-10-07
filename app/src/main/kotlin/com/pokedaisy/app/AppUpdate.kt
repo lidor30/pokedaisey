@@ -129,6 +129,12 @@ class AppUpdateFlow(private val activity: ComponentActivity) {
         val intent = Intent(Intent.ACTION_VIEW)
             .setDataAndType(uri, "application/vnd.android.package-archive")
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // Straight to Android's installer: the library's VIEW filter (any type, see the
+        // manifest) otherwise put PokeDaisy itself next to it in an "Open with" prompt.
+        @Suppress("DEPRECATION")
+        activity.packageManager.queryIntentActivities(intent, 0)
+            .firstOrNull { it.activityInfo.packageName != activity.packageName }
+            ?.let { intent.setClassName(it.activityInfo.packageName, it.activityInfo.name) }
         runCatching { activity.startActivity(intent) }
             .onSuccess { release = null }
             .onFailure { error = tr("ANDROID'S INSTALLER DIDN'T OPEN - GET THE APK FROM THE RELEASE PAGE") }

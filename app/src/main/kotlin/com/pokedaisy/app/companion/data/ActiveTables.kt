@@ -40,6 +40,12 @@ private inline val tmt2 get() = activeGame == GameKind.TMT2
 private inline val hns get() = activeGame == GameKind.HEART_AND_SOUL
 private inline val lazarus get() = activeGame == GameKind.LAZARUS
 private inline val soulGold get() = activeGame == GameKind.SOULGOLD
+
+/** SoulGold v1.2 runs on v1.1.4's tables (byte for byte the same) but for one TM: its
+ * TM75 teaches Agility, not Swords Dance. Set with [activeGame] by the Poller. */
+var soulGoldV12 = false
+private val itemNamesSoulGoldV12 by lazy { itemNamesSoulGold + (SOULGOLD_V12_TM75 to "TM75 Agility") }
+internal const val SOULGOLD_V12_TM75 = 656
 private inline val gaia get() = activeGame == GameKind.GAIA
 private inline val radicalRed get() = activeGame == GameKind.RADICAL_RED
 private inline val amethyst get() = activeGame == GameKind.AMETHYST
@@ -97,7 +103,7 @@ val activeItemNames: Map<Int, String> get() = when {
     tmt2 -> itemNamesTmt2
     hns -> itemNamesHns
     lazarus -> itemNamesLazarus
-    soulGold -> itemNamesSoulGold
+    soulGold -> if (soulGoldV12) itemNamesSoulGoldV12 else itemNamesSoulGold
     rogue -> itemNamesRogue
     radicalRed -> itemNamesRadicalRed
     else -> itemNames

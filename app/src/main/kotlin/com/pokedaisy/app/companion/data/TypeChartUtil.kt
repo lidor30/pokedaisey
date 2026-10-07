@@ -128,7 +128,7 @@ fun itemDescription(id: Int): String = when (activeGame) {
     // Each game's own text, extracted from its ROM.
     GameKind.HEART_AND_SOUL -> itemDescriptionsHns[id] ?: ""
     GameKind.LAZARUS -> itemDescriptionsLazarus[id] ?: ""
-    GameKind.SOULGOLD -> itemDescriptionsSoulGold[id] ?: ""
+    GameKind.SOULGOLD -> (if (soulGoldV12 && id == SOULGOLD_V12_TM75) "User relaxes to sharply raise its Speed." else itemDescriptionsSoulGold[id]) ?: ""
     GameKind.EMERALD_ROGUE -> itemDescriptionsRogue[id] ?: ""
     GameKind.RADICAL_RED -> itemDescriptionsRadicalRed[id] ?: ""
     // Renumbered items with no description table: vanilla text would be wrong.

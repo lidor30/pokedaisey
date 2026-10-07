@@ -43,6 +43,7 @@ import com.pokedaisy.app.companion.data.NATIVE_TMT2
 import com.pokedaisy.app.companion.data.NATIVE_EMERALD_SEAGLASS
 import com.pokedaisy.app.companion.data.NATIVE_LAZARUS
 import com.pokedaisy.app.companion.data.NATIVE_SOULGOLD
+import com.pokedaisy.app.companion.data.NATIVE_SOULGOLD_V1_2
 import com.pokedaisy.app.companion.data.NATIVE_HEART_AND_SOUL
 import com.pokedaisy.app.companion.data.NATIVE_CELIA
 import com.pokedaisy.app.companion.data.NATIVE_GAIA_V3_2
@@ -572,6 +573,11 @@ class CompanionScreenshotTest {
     @Test fun seaglassMap() = retail("emerald_seaglass", NATIVE_EMERALD_SEAGLASS, SEAGLASS_ROM, GameKind.EMERALD_SEAGLASS, "MAP", art = true)
     @Test fun seaglassBattle() =
         retail("emerald_seaglass_battle", NATIVE_EMERALD_SEAGLASS, SEAGLASS_ROM, GameKind.EMERALD_SEAGLASS, "BATTLE", art = true)
+    @Test fun soulGoldV12Party() = retail("soulgold_v12_battle", NATIVE_SOULGOLD_V1_2, SG12_ROM, GameKind.SOULGOLD, "PARTY", art = true)
+    @Test fun soulGoldV12Items() = retail("soulgold_v12", NATIVE_SOULGOLD_V1_2, SG12_ROM, GameKind.SOULGOLD, "ITEMS", art = true)
+    @Test fun soulGoldV12Battle() = retail("soulgold_v12_battle", NATIVE_SOULGOLD_V1_2, SG12_ROM, GameKind.SOULGOLD, "BATTLE", art = true)
+    @Test fun soulGoldV12Map() = retail("soulgold_v12", NATIVE_SOULGOLD_V1_2, SG12_ROM, GameKind.SOULGOLD, "MAP", art = true)
+    @Test fun soulGoldV12DexEntry() = hackDex("soulgold_v12", NATIVE_SOULGOLD_V1_2, SG12_ROM, GameKind.SOULGOLD, 25)
     @Test fun soulGoldDex() = hackDex("soulgold", NATIVE_SOULGOLD, SG_ROM, GameKind.SOULGOLD)
     @Test fun soulGoldDexEntry() = hackDex("soulgold", NATIVE_SOULGOLD, SG_ROM, GameKind.SOULGOLD, 155)
 
@@ -689,6 +695,7 @@ private const val LG_ROM = "Pokemon - LeafGreen Version (USA, Europe) (Rev 1).gb
 private const val RUBY_ROM = "Pokemon - Ruby Version (USA, Europe) (Rev 1).gba"
 private const val RR_ROM = "1636 - Pokemon Radical Red.gba"
 private const val SG_ROM = "Pokemon-SoulGold-v1.1.4.gba"
+private const val SG12_ROM = "Soulgold (v1.2).gba"
 private const val SEAGLASS_ROM = "Pokemon Emerald Seaglass (v3.0).gba"
 private const val SAPPHIRE_ROM = "Pokemon - Sapphire Version (USA, Europe) (Rev 1).gba"
 private const val HNS_ROM = "Pokémon Heart and Soul (v2.0.6).gba"

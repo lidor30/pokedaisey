@@ -174,6 +174,9 @@ GAMES = {
         # sit on the grid exactly where their entries' {x, y, w, h} say. Its map
         # art sits a row higher than Emerald's: the grid overlaid at (1, 1) covers
         # every route and town square (at Emerald's (1, 2) everything was a row low).
+        # v1.2 (sha1 805d880e...) has these same tables, byte for byte but TM75 (hand-patched in
+        # ActiveTables: soulGoldV12), at species_name1 0x087D5E23 / stride 0x120, items 0x08753834,
+        # moves 0x08777EFC, chart 0x0843E6E4, mapsecs 0x08F42978, grid 0x08F447C8 / 0x08F44480.
         region_map=dict(image="soulgold", layout=0x08F3967C, extra_layers=[0x08F39334], cell=2,
                         w=28, h=15, ox=1, oy=1, none=0x13A),
         checks=dict(species={1: "Bulbasaur", 25: "Pikachu", 152: "Chikorita", 155: "Cyndaquil"},

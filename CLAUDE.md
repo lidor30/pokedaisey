@@ -211,7 +211,8 @@ count starts from the 1-star palette. Save data: FireRed's layout + CFRU dex fla
 The tab shows the card cropped to itself (no BG2 backdrop) at the largest whole scale (5x on the
 Thor); a tap flips it (squash, like the game), and the time colon blinks via an infinite transition
 (a`delay`loop never lets Compose tests go idle, which hung ui-preview once).
-**SoulGold v1.1.4** (`NATIVE_SOULGOLD`, newer expansion, no source) breaks several vanilla
+**SoulGold v1.1.4** (`NATIVE_SOULGOLD`; v1.2 = `NATIVE_SOULGOLD_V1_2`, a rebuild at shifted addresses, same save
+format, v1.1.4's generated tables but TM75 via `soulGoldV12`; gPartyMenu comes from `NativeConfig.partyMenu`, newer expansion, no source) breaks several vanilla
 assumptions, each a `NativeConfig` field now: its struct Pokemon is 96 bytes and plaintext
 (`SOULGOLD_PARTY_MON`: 12-char nicknames push the egg flags to +0x15, status at +0x4C, level/HP
 from +0x50), BattlePokemon is 0x98 bytes (`SOULGOLD_BATTLE_MON`), mapsec ids are u16 with mapType a
@@ -409,6 +410,22 @@ the renderer can't drive borrows the newest other game's click. In Compose, use
 own buttons (battle FIGHT / BAG / moves / BACK: `PlatinumButton(pressesGame = true)`), which the
 game already sounds, and tap-swallowing scrims. The top-screen Library / Settings stay silent.
 
+**Single-screen devices** (`SidePanel.kt`, Compose pieces in `companion/ui/SidePanel.kt`; tested on the
+Retroid Pocket 6, 1920x1080): with no second display (`syncPresentation` finds none, debug mirror off) the
+companion is a panel on the right of the game's screen. A BACK tap slides it in over the game; with it open
+BACK is the companion's back, and with nothing left to go back from it closes the panel - unless it's locked.
+The tab on its edge (`SidePanelHandle`: a padlock, `ShadowedPixelIcon`) locks it beside the game (the game's right margin,
+which `GameStageLayout` honours; the touch pad moves to the game's side whenever the panel is open) and
+unlocks it; dragging the tab sideways resizes it (`DragFrame`, screen coordinates - the tab moves with the
+finger), snapping when the game is within 48 px of a whole-number scale. Default width half the screen: the
+game at exactly 4x on 1080p; also checked at 3:2 (810 px panel, all fits) and 4:3 (640 px, a few names
+truncate). The panel draws the companion at `sidePanelDensity` - the Thor's own 2.625-equivalent where it's
+big enough, else enough to give it 500 dp of width (half a 1080p screen: ~1.9, where the pixel font steps
+down to 2 screen px per font px and nothing truncates). ui-preview: `-PcompanionW=960 -PcompanionH=1080`.
+Prefs: `sidePanelDocked` (a locked panel comes back with the game), `sidePanelWidth`. The game is a
+SurfaceView: the window's hole over it is measured from where views were at the last layout, so the slide
+re-requests the transparent region every frame (`punchThrough`) - without it the panel and tab stayed
+hidden over the game.
 **Device BACK**: a BACK tap (from either screen - the Presentation forwards every key to
 `PokeDaisyActivity`) is the companion's back; a hold still leaves the game. Anything that
 opens over / inside a tab registers `CompanionBackHandler` (`companion/ui/CompanionBack.kt`,

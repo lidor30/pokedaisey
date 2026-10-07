@@ -21,6 +21,15 @@
     <!-- In-app update: hands a downloaded release APK to Android's installer (AppUpdateFlow). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Lets AppUpdateFlow find Android's installer (package visibility, 11+) and open
+         the update APK with it directly, not through an "Open with" prompt. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/vnd.android.package-archive" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"

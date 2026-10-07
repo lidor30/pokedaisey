@@ -548,6 +548,15 @@ val POKEDEX_SOULGOLD = PokedexTables(
     nationalMagic = 0xDA,
 )
 
+/** SoulGold v1.2: v1.1.4's dex moved (gSpeciesInfo 0x120 bytes per entry, the
+ * same offsets inside), the Johto list and ability names byte for byte the same. */
+val POKEDEX_SOULGOLD_V1_2 = POKEDEX_SOULGOLD.copy(
+    speciesInfo = 0x087D5CD0L,
+    abilityNames = 0x08F0FCC8L,
+    regionalOrder = 0x08F0EE78L,
+    expansion = POKEDEX_SOULGOLD.expansion!!.copy(stride = 0x120),
+)
+
 /**
  * Whether the running ROM really has these tables where [t] says: entry 1 is
  * BULBASAUR's (SEED, 7 dm, 69 hg), species 1 is dex number 1 and its front
