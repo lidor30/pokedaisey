@@ -58,7 +58,7 @@ class Prefs(context: Context) {
 
     /** Fast-forward speed cap. 0 = unlimited. */
     var ffMaxSpeed: Float
-        get() = p.getFloat("ff_max_speed", 6f)
+        get() = p.getFloat("ff_max_speed", 2f)
         set(v) = p.edit().putFloat("ff_max_speed", v).apply()
 
     /** What fast-forward sounds like. Before the modes it was an on/off

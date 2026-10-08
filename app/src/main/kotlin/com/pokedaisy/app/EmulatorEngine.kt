@@ -48,7 +48,7 @@ class EmulatorEngine(
     @Volatile private var speedIdx = 0          // index into SPEED_STEPS
 
     /** Cap for hold/toggle fast-forward. 0 = unlimited. (Phase 4: make configurable.) */
-    @Volatile var ffMaxSpeed = 6f
+    @Volatile var ffMaxSpeed = 2f
 
     /** What fast-forward sounds like (Settings: STEADY / SPED-UP / OFF). */
     @Volatile var ffMusicMode = FfMusicMode.STEADY

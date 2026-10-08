@@ -41,7 +41,7 @@ What works:
   save/load.
 - **Suspend/resume**: backgrounding writes a `resume` state and quitting the loop;
   next foreground boots and loads it (no more fresh-boot-on-resume).
-- **Speed control**: hold or toggle fast-forward (capped at 6×, `EmulatorEngine.ffMaxSpeed`,
+- **Speed control**: hold or toggle fast-forward (capped at 2× by default, Settings > FF SPEED, `EmulatorEngine.ffMaxSpeed`,
   0 = unlimited), a 1×/1.5×/2×/3×/4× cycle, and hold-to-slow-mo (½×). Audio is
   muted at any speed ≠ 1× (proper resampling is Phase 4). Frame pacing is exact
   (measured 90/120/180/240 fps for the cycle steps).

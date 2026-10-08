@@ -361,14 +361,14 @@ private fun homeRows(
             })
         },
         SettingRow(tk("TAB BAR"), tr("{0} TABS", barTabs)) { navigate(Page.TABS) },
-        // Small on / off preferences: the icons' bounce, the map cursor's blink, tab slides, the battle jump.
-        SettingRow(tk("TWEAKS"), null) { navigate(Page.TWEAKS) },
         // Move effectiveness and the foe's weak-to/resists during battle.
         SettingRow(tk("BATTLE HINTS"), onOff(s.showHints)) { s.setShowHints(!s.showHints); changed() },
         // A STATS page in battle INFO with the foe's IVs / EVs / nature.
         SettingRow(tk("FOE IVS"), onOff(s.showFoeIvs)) { s.setShowFoeIvs(!s.showFoeIvs); changed() },
         // The game's menu click on every companion button.
         SettingRow(tk("CLICK SOUND"), onOff(s.clickSound)) { s.setClickSound(!s.clickSound); changed() },
+        // Small on / off preferences: the icons' bounce, the map cursor's blink, tab slides, the battle jump.
+        SettingRow(tk("TWEAKS"), null) { navigate(Page.TWEAKS) },
         groupTitle(tk("SCREEN")),
         // Game, location, money, clock and battery: OFF, over the game, or over these tabs.
         SettingRow(tk("STATUS BAR"), statusBarLabel(s.statusBar, s.statusBarOnCompanion)) {
