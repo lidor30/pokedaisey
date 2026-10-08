@@ -1,6 +1,5 @@
 package com.pokedaisy.app
 
-import android.os.Build
 import android.util.Log
 import android.view.KeyEvent
 import java.io.File
@@ -25,17 +24,6 @@ object GbaControls {
         val prop get() = name.lowercase()
     }
 
-    /**
-     * AYN (Thor) and Retroid handhelds print A on the right face button and B on
-     * the bottom one, like the GBA, but Android reports them by Xbox position:
-     * the bottom button is BUTTON_A. A and B are not swapped for that by default
-     * (GBA A is BUTTON_A everywhere; GAME BUTTONS remaps them); X / Y still are.
-     */
-    internal val swapFaceButtons: Boolean = run {
-        val ids = listOf(Build.MANUFACTURER, Build.BRAND, Build.MODEL).map { it.orEmpty().lowercase() }
-        ids[0] == "ayn" || ids[1] == "ayn" || ids.any { "retroid" in it }
-    }
-
     private val DEFAULTS = linkedMapOf(
         "a" to "BUTTON_A, Z",
         "b" to "BUTTON_B, X",
@@ -43,10 +31,10 @@ object GbaControls {
         "r" to "BUTTON_R1, S",
         "start" to "BUTTON_START, ENTER",
         "select" to "BUTTON_SELECT, BACKSLASH, SHIFT_RIGHT",
-        // The buttons printed X (top) and Y (left): Android names them by Xbox position,
-        // so on the Nintendo-labelled handhelds the top one is BUTTON_Y, like A/B above.
-        "start2" to if (swapFaceButtons) "BUTTON_Y" else "BUTTON_X",
-        "select2" to if (swapFaceButtons) "BUTTON_X" else "BUTTON_Y",
+        // Face buttons go by Android's names (Xbox positions) on every device, even where
+        // the printed labels differ (AYN, Retroid: BUTTON_A is the bottom one); GAME BUTTONS remaps.
+        "start2" to "BUTTON_X",
+        "select2" to "BUTTON_Y",
     )
 
     private fun file(dir: File) = File(dir, "controls.properties")
