@@ -380,7 +380,7 @@ Java_com_pokedaisy_app_MgbaCore_pkRenderReadAudio(JNIEnv* env, jobject thiz, jsh
     return n;
 }
 
-// Calls Thumb function `fn` with r0 = `arg0` and returns once it has, leaving
+// Calls Thumb function `fn` with r0 = `arg0`, r1 = `arg1` and returns once it has, leaving
 // the CPU exactly as it was (registers, pipeline, halt). A frame can end
 // anywhere - mid-way through the game's own code - and a bare PC hijack
 // clobbered its live registers (Unbound then reset its sound engine). So:
@@ -388,7 +388,7 @@ Java_com_pokedaisy_app_MgbaCore_pkRenderReadAudio(JNIEnv* env, jobject thiz, jsh
 // PK_CALL_SENTINEL (an address in the ROM header, never executed), then put
 // everything back. Tested headless with native-capture/mgba_dump's `call`.
 #define PK_CALL_SENTINEL 0x080000C0u
-static int pk_call(struct mCore* core, uint32_t fn, uint32_t arg0) {
+static int pk_call(struct mCore* core, uint32_t fn, uint32_t arg0, uint32_t arg1) {
     if (!pk_is_gba(core)) {
         return 0;   // an ARM-only trick: the GB core's CPU is an SM83
     }
@@ -400,6 +400,7 @@ static int pk_call(struct mCore* core, uint32_t fn, uint32_t arg0) {
     cpu->halted = 0;
     cpu->cpsr.i = 1;
     cpu->gprs[0] = (int32_t) arg0;
+    cpu->gprs[1] = (int32_t) arg1;
     cpu->gprs[ARM_LR] = (int32_t) (PK_CALL_SENTINEL | 1);
     cpu->gprs[ARM_PC] = (int32_t) (fn & ~1u);
     _ARMSetMode(cpu, MODE_THUMB);
@@ -421,14 +422,15 @@ static int pk_call(struct mCore* core, uint32_t fn, uint32_t arg0) {
     return ok;
 }
 
-// Calls the ROM's own m4aSongNumStart(songId) at `addr` (FfMusicRenderer
-// finds it with M4aSongs) on the render core, cleanly (pk_call).
+// Calls the ROM's own m4aSongNumStart(songId, alt) at `addr` (FfMusicRenderer
+// finds it with M4aSongs) on the render core, cleanly (pk_call). `alt` picks
+// Heart and Soul's alternate soundtrack; other games' ignore r1.
 JNIEXPORT jboolean JNICALL
-Java_com_pokedaisy_app_MgbaCore_pkRenderForceSong(JNIEnv* env, jobject thiz, jlong addr, jint songId) {
+Java_com_pokedaisy_app_MgbaCore_pkRenderForceSong(JNIEnv* env, jobject thiz, jlong addr, jint songId, jint alt) {
     if (!rg.core || !rg.core->cpu) {
         return JNI_FALSE;
     }
-    return pk_call(rg.core, (uint32_t) addr, (uint32_t) songId) ? JNI_TRUE : JNI_FALSE;
+    return pk_call(rg.core, (uint32_t) addr, (uint32_t) songId, (uint32_t) alt) ? JNI_TRUE : JNI_FALSE;
 }
 
 // Parks the render core's main loop on `spin` (a Thumb `b .`) so the booted

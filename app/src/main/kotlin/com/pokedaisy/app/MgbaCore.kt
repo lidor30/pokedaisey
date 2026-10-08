@@ -90,10 +90,12 @@ object MgbaCore {
     external fun pkRenderSampleRate(): Int
     external fun pkRenderReadAudio(out: ShortArray): Int
 
-    /** Calls the ROM's own m4aSongNumStart(songId) at [addr] on the render
+    /** Calls the ROM's own m4aSongNumStart(songId, alt) at [addr] on the render
      * core and returns once it has, CPU state untouched (see the JNI side).
-     * [addr] must be right for the ROM loaded there (M4aSongs finds it). */
-    external fun pkRenderForceSong(addr: Long, songId: Int): Boolean
+     * [addr] must be right for the ROM loaded there (M4aSongs finds it); [alt]
+     * only means something to Heart and Soul's (its alternate soundtrack), but
+     * it's always set: r1 was whatever the interrupted game left there. */
+    external fun pkRenderForceSong(addr: Long, songId: Int, alt: Int): Boolean
 
     /** Parks the render core's main loop on [spin] (a Thumb `b .`) so the booted game can't
      * change the music; the sound engine keeps running from VBlank. False if it never got

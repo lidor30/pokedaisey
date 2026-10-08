@@ -13,7 +13,11 @@ package com.pokedaisy.app.companion.data
  * logic, other instruction order - which [SIGNATURES]' second entry matches
  * (literal offsets and the `bl` wildcarded). Newer pokeemerald-expansion
  * (Lazarus, SoulGold) only starts the song if the player's `ident` is
- * ID_NUMBER ("Smsh") - the third entry.
+ * ID_NUMBER ("Smsh") - the third entry. Heart and Soul's adds an alternate
+ * soundtrack: `m4aSongNumStart(n, alt)` plays song n's entry in a second table
+ * (12-byte `{u32 n, SongHeader*, u16 ms, u16 me}`, n = -1 ends it) when `alt`
+ * is set and n has one there - the fourth entry, which finds both tables. Its
+ * songs get ids with [ALT] set ([number] / [alt] split them for the call).
  */
 class M4aSongs private constructor(
     val songNumStart: Long,
@@ -25,7 +29,7 @@ class M4aSongs private constructor(
     val bgmSongIds: List<Int>,
 ) {
 
-    /** The song number playing [key] (an [FfMusicKey]), or null if it isn't in [songTable]. */
+    /** The song id playing [key] (an [FfMusicKey]; [ALT] set for an alternate song), or null if it isn't in the tables. */
     fun songId(key: String): Int? = key.removePrefix("song_").toLongOrNull(16)?.let { ids[it] }
 
     companion object {
@@ -35,19 +39,39 @@ class M4aSongs private constructor(
          * bytes, up to the `bl MPlayStart` (relative, so it matches too), table
          * load at +6. gcc (Emerald Rogue): the whole function, table load at +2.
          * Newer expansion (gcc, with the ident check): the whole function, +2.
+         * Heart and Soul (the ident check + its alternate table): the whole function,
+         * +0x38, and the alternate table's load at +0x0A.
          */
         private val SIGNATURES = listOf(
-            "00b50004074a0849400b401883885900c918890089180a680168101c00f0a2fb" to 6,
-            "00b5..4b0004400bc018828853009b18..4a9b000168d058........01bc0047" to 2,
-            "00b5..4a03045b0b9b1899884a005218..4992008858..4a416b914202d11968........01bc0047" to 2,
+            Signature("00b50004074a0849400b401883885900c918890089180a680168101c00f0a2fb", 6),
+            Signature("00b5..4b0004400bc018828853009b18..4a9b000168d058........01bc0047", 2),
+            Signature("00b5..4a03045b0b9b1899884a005218..4992008858..4a416b914202d11968........01bc0047", 2),
+            Signature(
+                "000430b5000c002916d0..4d2b685a1c12d02a0000210c3206e00c3213000c3b1b6801315c1c07d08342f6d1" +
+                    "4b005b189b000433eb1802e0..4bc000c31899884a005218..4992008858..4a416b914202d11968........30bc01bc0047",
+                0x38, altLdr = 0x0A,
+            ),
         )
+        private class Signature(val pattern: String, val tableLdr: Int, val altLdr: Int = -1)
         private const val MAX_SONGS = 4096
 
+        /** Set on an alternate song's id: m4aSongNumStart's `alt` argument (Heart and Soul's second table). */
+        const val ALT = 1 shl 16
+
+        /** The song number to pass m4aSongNumStart for [id]. */
+        fun number(id: Int): Int = id and 0xFFFF
+
+        /** m4aSongNumStart's second argument for [id]: 1 for an alternate song, else 0. */
+        fun alt(id: Int): Int = if (id and ALT != 0) 1 else 0
+
+        /** [id] for the log: "559", or "559 (alt)". */
+        fun label(id: Int): String = if (alt(id) == 1) "${number(id)} (alt)" else "$id"
+
         fun locate(rom: ByteArray): M4aSongs? {
-            val (at, tableLdr) = SIGNATURES.firstNotNullOfOrNull { (sig, ldr) ->
-                indexOf(rom, sig, step = 2).takeIf { it >= 0 }?.let { it to ldr }
+            val (at, sig) = SIGNATURES.firstNotNullOfOrNull { sig ->
+                indexOf(rom, sig.pattern, step = 2).takeIf { it >= 0 }?.let { it to sig }
             } ?: return null
-            val table = literal(rom, at, tableLdr) ?: return null
+            val table = literal(rom, at, sig.tableLdr) ?: return null
             val t = (table - ROM).toInt()
             if (t < 0 || t >= rom.size) return null
             val ids = HashMap<Long, Int>()
@@ -56,12 +80,29 @@ class M4aSongs private constructor(
             while (n < MAX_SONGS && t + n * 8 + 8 <= rom.size) {
                 val header = u32(rom, t + n * 8)
                 if (header !in ROM until ROM + rom.size) break
-                val ms = (rom[t + n * 8 + 4].toInt() and 0xFF) or ((rom[t + n * 8 + 5].toInt() and 0xFF) shl 8)
+                val ms = u16(rom, t + n * 8 + 4)
                 if (ids.putIfAbsent(header - ROM, n) == null && ms == MUSIC_PLAYER_BGM) bgm += n
                 n++
             }
+            if (sig.altLdr >= 0) literal(rom, at, sig.altLdr)?.let { addAlternates(rom, it, ids, bgm) }
             val spin = indexOf(rom, byteArrayOf(0xFE.toByte(), 0xE7.toByte()), step = 2).takeIf { it >= 0 }?.let { ROM + it }
             return if (n > 0) M4aSongs(ROM + at + 1, table, spin, ids, bgm) else null // +1: Thumb
+        }
+
+        /** The alternate table's songs, by header, as [ALT] ids (a header the main table has keeps its id there). */
+        private fun addAlternates(rom: ByteArray, table: Long, ids: HashMap<Long, Int>, bgm: ArrayList<Int>) {
+            var e = (table - ROM).toInt()
+            if (e < 0) return
+            var count = 0
+            while (e + 12 <= rom.size && count++ < MAX_SONGS) {
+                val n = u32(rom, e)
+                if (n == 0xFFFFFFFFL || n > 0xFFFF) break
+                val header = u32(rom, e + 4)
+                if (header !in ROM until ROM + rom.size) break
+                val id = n.toInt() or ALT
+                if (ids.putIfAbsent(header - ROM, id) == null && u16(rom, e + 8) == MUSIC_PLAYER_BGM) bgm += id
+                e += 12
+            }
         }
 
         /** The word a Thumb `ldr rX, [pc, #imm]` at [fn]+[off] loads. */
@@ -95,6 +136,8 @@ class M4aSongs private constructor(
             }
             return -1
         }
+
+        private fun u16(b: ByteArray, i: Int): Int = (b[i].toInt() and 0xFF) or ((b[i + 1].toInt() and 0xFF) shl 8)
 
         private fun u32(b: ByteArray, i: Int): Long =
             (b[i].toLong() and 0xFF) or ((b[i + 1].toLong() and 0xFF) shl 8) or

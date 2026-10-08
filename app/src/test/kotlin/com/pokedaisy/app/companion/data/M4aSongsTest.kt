@@ -61,4 +61,21 @@ class M4aSongsTest {
         assertEquals(0x081A2915L, soulGold12b.songNumStart)
         assertEquals(0x09608658L, soulGold12b.songTable)
     }
+
+    @Test fun heartAndSoulAlternateSoundtrack() {
+        // Expansion's m4aSongNumStart plus a second argument: set, it plays the song's entry in
+        // an alternate table instead (the fourth signature). Headless: the title screen plays
+        // song 559 from gSongTable; `call 0x0817d4a9 559 1` switched the BGM to 0x09E2BE10.
+        val s = songs(File(File(RomFileReader.FIRERED_REV1_PATH).parentFile, "Pokémon Heart and Soul (v2.0.6).gba").path)
+        assertEquals(0x0817D4A9L, s.songNumStart)
+        assertEquals(0x09356068L, s.songTable)
+        assertEquals(559, s.songId("song_1d3a6e8"))
+        val alt = s.songId("song_1e2be10")!!
+        assertEquals(559 or M4aSongs.ALT, alt)
+        assertEquals(559, M4aSongs.number(alt))
+        assertEquals(1, M4aSongs.alt(alt))
+        assertEquals(0, M4aSongs.alt(559))
+        // Both soundtracks are rendered in the background.
+        assertTrue(559 in s.bgmSongIds && alt in s.bgmSongIds)
+    }
 }

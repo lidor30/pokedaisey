@@ -205,7 +205,7 @@ class FfMusicRenderer(
          */
         fun record(songs: M4aSongs, songId: Int, background: Boolean): Outcome {
             repeat(ATTEMPTS) {
-                val key = start(songs, songId) ?: return Outcome.ENDED.also { Log.i("pokedaisy", "FF music: song $songId didn't start") }
+                val key = start(songs, songId) ?: return Outcome.ENDED.also { Log.i("pokedaisy", "FF music: song ${M4aSongs.label(songId)} didn't start") }
                 // A song being heard is redone if its clip predates intros; the background pass isn't.
                 if (if (background) cache.has(key) else cache.complete(key)) return Outcome.CACHED
                 val loop = M4aLoopWatch(reader)
@@ -231,7 +231,7 @@ class FfMusicRenderer(
                     if (loop.found && stopAt == buf.size) stopAt = minOf(buf.size, pos + sampleRate * 2 * LOOP_TAIL_SECONDS)
                 }
                 if (stopped) return Outcome.DEFERRED
-                if (ended) return Outcome.ENDED.also { Log.i("pokedaisy", "FF music: song $songId ends by itself - no clip") }
+                if (ended) return Outcome.ENDED.also { Log.i("pokedaisy", "FF music: song ${M4aSongs.label(songId)} ends by itself - no clip") }
                 if (pos < 0) return@repeat
                 if (loop.found) {
                     M4aLoopSplice.clip(buf, pos, frameStart[loop.startFrame], frameStart[loop.endFrame], sampleRate)?.let { (from, len) ->
@@ -239,18 +239,18 @@ class FfMusicRenderer(
                         // clip is the intro, which runs seamlessly into the clip.
                         cache.writeIntro(key, buf, from, sampleRate)
                         cache.writeClip(key, buf, from, len, sampleRate)
-                        Log.i("pokedaisy", "FF music: recorded song $songId as $key, a ${len / 2 / sampleRate.toFloat()} s loop")
+                        Log.i("pokedaisy", "FF music: recorded song ${M4aSongs.label(songId)} as $key, a ${len / 2 / sampleRate.toFloat()} s loop")
                         return Outcome.CACHED
                     }
                 }
                 if (pos >= buf.size) {
                     cache.writeIntro(key, buf, 0, sampleRate)   // kept whole: it starts at the top already
                     cache.writeClip(key, buf, 0, pos, sampleRate)
-                    Log.i("pokedaisy", "FF music: recorded song $songId as $key, no loop seen - kept ${FfMusicCache.CAPTURE_SECONDS} s")
+                    Log.i("pokedaisy", "FF music: recorded song ${M4aSongs.label(songId)} as $key, no loop seen - kept ${FfMusicCache.CAPTURE_SECONDS} s")
                     return Outcome.CACHED
                 }
             }
-            Log.w("pokedaisy", "FF music: song $songId kept getting interrupted")
+            Log.w("pokedaisy", "FF music: song ${M4aSongs.label(songId)} kept getting interrupted")
             return Outcome.FAILED
         }
 
@@ -264,9 +264,9 @@ class FfMusicRenderer(
         fun recordSfx(songs: M4aSongs, songId: Int, frames: Int, sink: GameClickSound?, label: String) {
             val fn = songs.songNumStart and 1L.inv()
             // MUS_DUMMY replaces whatever the title screen was playing with silence.
-            if (!MgbaCore.pkRenderForceSong(fn, MUS_DUMMY)) return
+            if (!MgbaCore.pkRenderForceSong(fn, MUS_DUMMY, 0)) return
             repeat(SILENCE_FRAMES) { MgbaCore.pkRenderRunFrame(); MgbaCore.pkRenderReadAudio(scratch) }
-            if (!MgbaCore.pkRenderForceSong(fn, songId)) return
+            if (!MgbaCore.pkRenderForceSong(fn, songId, 0)) return
             val buf = ShortArray(sampleRate * 2 * frames / 60 + scratch.size)
             var pos = 0
             repeat(frames) {
@@ -281,7 +281,8 @@ class FfMusicRenderer(
 
         /** Starts [songId] via the ROM's m4aSongNumStart; the key it plays under, once its tracks run. */
         private fun start(songs: M4aSongs, songId: Int): String? {
-            if (!MgbaCore.pkRenderForceSong(songs.songNumStart and 1L.inv(), songId)) return null
+            val fn = songs.songNumStart and 1L.inv()
+            if (!MgbaCore.pkRenderForceSong(fn, M4aSongs.number(songId), M4aSongs.alt(songId))) return null
             // MPlayStart clears the player's status; the next sound tick marks its tracks playing.
             repeat(START_FRAMES) {
                 MgbaCore.pkRenderRunFrame()

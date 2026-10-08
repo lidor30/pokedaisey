@@ -393,7 +393,10 @@ never paced by the audio device. STEADY loops a clean clip of the song playing (
 `FfMusicCache` per ROM CRC), keyed by the song itself: `FfMusicKey` reads the BGM player's
 `songHeader` from the m4a engine every frame (`0x03007FF0` -> SoundInfo -> player chain, BGM is
 the tail) - no per-game song table (a hand-picked FireRed "battle song" was MUS_RS_VS_TRAINER, i.e.
-Emerald's theme). `M4aSongs` matches agbcc's `m4aSongNumStart` and, masked, Emerald Rogue's gcc build of it; the render core boots 300 frames, then waits (up to 30 s) for the game's own music, since Rogue keeps the sound engine paused through ~15 s of splash screens and a forced song never starts there. Clips are **never captured from the live game** (that mix carried menu clicks
+Emerald's theme). `M4aSongs` matches agbcc's `m4aSongNumStart` and, masked, Emerald Rogue's gcc build of it, newer expansion's
+(ident check) and Heart and Soul's, which takes a second argument: set, it plays the song's entry in an alternate
+soundtrack table (its songs are `M4aSongs.ALT` ids; `pkRenderForceSong` always passes r1, which used to be whatever the
+game left there); the render core boots 300 frames, then waits (up to 30 s) for the game's own music, since Rogue keeps the sound engine paused through ~15 s of splash screens and a forced song never starts there. Clips are **never captured from the live game** (that mix carried menu clicks
 and battle sounds): `FfMusicRenderer` renders each song alone on the second core (`rg`) as the
 game starts it, calling the ROM's `m4aSongNumStart` - found by code signature (`M4aSongs`; every
 agbcc-built game and binary hack, not pokeemerald-expansion) - via `pk_call`, which runs the
