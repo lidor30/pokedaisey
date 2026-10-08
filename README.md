@@ -112,7 +112,7 @@ Settings screen. Pokémon, move and item names and the GUIDE pages stay as the g
   showed them - on the game and, if you like, the companion screen too.
 - **Controls**: remap every GBA button and hotkey, or turn hotkeys off. X and Y
   are a second START and SELECT, like the menu and registered-item buttons in the
-  DS games. On AYN and Retroid devices, A and B match the labels on the buttons.
+  DS games.
   On-screen touch controls appear when no controller is connected, and hide once
   a controller is used. Bluetooth and USB controllers (8BitDo, GameSir, Xbox, ...)
   connect while a game is running without restarting it, and HOME / guide works
