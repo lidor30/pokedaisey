@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/images/cover.png" alt="PokeDaisy: dual-screen GBA player for the AYN Thor, Gen 3 Pokémon and ROM hacks, free and open source" width="100%">
+<img src="https://pokedaisy.com/og.png" alt="PokeDaisy: dual-screen GBA player for the AYN Thor, Gen 3 Pokémon and ROM hacks, free and open source" width="100%">
 
 <h3>Play Gen 3 Pokémon on the top screen. See everything about your game on the bottom one.</h3>
 
@@ -35,7 +35,12 @@ spoiler-free guide. Everything is drawn in the game's own menu style.
 | Retroid Pocket 6              | Single screen: tested                        |
 | Android phones (portrait)     | Should work, checked in screenshots only     |
 
-Any Android 8.0+ device runs the games. On a device with one screen the
+Any Android 8.0+ device runs the games.
+
+<details>
+<summary><strong>Single-screen devices and phones</strong></summary>
+
+On a device with one screen the
 companion is a panel beside the game: press BACK to slide it in over the game,
 tap the padlock on its edge to lock it beside the game (the game moves over),
 and drag that tab sideways to resize it. BACK closes an unlocked panel; hold
@@ -45,6 +50,8 @@ Hold a phone upright and the game sits across the top with the companion docked
 under it. Drag the grip on the companion's top edge to pick its height, or tap the
 grip to step through small, normal and full. Without a controller, the touch
 controls fill the space between the game and the companion.
+
+</details>
 
 ## Install
 
@@ -63,10 +70,13 @@ You can change all of this later in Settings.
 
 **No games are included.** Use your own legally dumped ROMs.
 
-### Updates
+<details>
+<summary><strong>Updates</strong></summary>
 
 PokeDaisy checks for a new version each time you open it and offers to install
 it. You can also check from **Settings > VERSION**.
+
+</details>
 
 ## Features
 
@@ -96,11 +106,17 @@ it. You can also check from **Settings > VERSION**.
 
 Pick which tabs sit in the tab bar in the companion's Settings.
 
+<details>
+<summary><strong>Languages</strong></summary>
+
 The app's own text comes in English, Japanese, French, German, Italian and Spanish. By default it
 follows the ROM's language (the device's in the Library); pick another under LANGUAGE in either
 Settings screen. Pokémon, move and item names and the GUIDE pages stay as the game has them.
 
-### The player (top screen)
+</details>
+
+<details>
+<summary><strong>The player (top screen)</strong></summary>
 
 - **Fast-forward** with a speed cap, plus slow motion. **Smart** fast-forward
   drops to normal speed in menus and on the map, and keeps battles fast.
@@ -120,7 +136,10 @@ Settings screen. Pokémon, move and item names and the GUIDE pages stay as the g
 - **Themes**: PokéDaisy (the default, the website's light backdrop with floating logos) or one of eight game-coloured
   ones (FireRed, LeafGreen, Emerald, ...) for the library and settings, in Settings > THEME.
 
-### Library
+</details>
+
+<details>
+<summary><strong>Library</strong></summary>
 
 - List or grid view, recently played, and cover art from SteamGridDB or RetroAchievements box art (or pick your own image).
 - ROMs can be plain `.gba` files or zipped (`.zip` / `.7z`), in your ROMs folder or imported with **+**.
@@ -135,11 +154,16 @@ Settings screen. Pokémon, move and item names and the GUIDE pages stay as the g
   [technical details](docs/DEVELOPMENT.md#launch-from-a-frontend-cocoon-iisu-es-de-)
   are for other frontends.
 
-### Saves
+</details>
+
+<details>
+<summary><strong>Saves</strong></summary>
 
 Saves are standard `.sav` / `.srm` files, the same format as mGBA and RetroArch,
 so you can move them between emulators freely. A game finds its save by the ROM's
 file name (for a zipped game, the name of the ROM inside the archive, as in RetroArch).
+
+</details>
 
 ## Supported games
 
@@ -176,6 +200,9 @@ shows a "not supported" notice).
 | Pokémon R.O.W.E.       | 2.1.9.1 Experimental    |   —   |  —  |   —    |  —  |    —    |   —   |
 | Pokémon Yellow (GB)    | USA/Europe              |  ✅   | ✅  |   ◐    | ✅  |    —    |   —   |
 
+<details>
+<summary><strong>Notes on the table</strong></summary>
+
 Game Boy / Color games play too; Pokémon Yellow is the first one the companion reads,
 in the game's own look (its font, icons and town map, rebuilt from your ROM).
 R.O.W.E. plays, but its companion is still in progress. Map ◐ means place names
@@ -183,6 +210,8 @@ only, without the map picture. Battle ◐ means the battle panes work but haven'
 been checked in every kind of battle. The guides were
 written from each game's own data and may contain mistakes; the app says so the
 first time you open one.
+
+</details>
 
 Want another game supported? [Open an issue](https://github.com/lidor30/pokedaisy/issues).
 
@@ -195,9 +224,12 @@ PokeDaisy has no accounts, ads or analytics. It only goes online to:
 
 Your games and saves never leave your device.
 
-## AI tooling note
+<details>
+<summary><strong>AI tooling note</strong></summary>
 
 This project may use AI-assisted development tools, such as Claude Code, to help with code generation, refactoring, and documentation. All changes are still reviewed by the maintainer and validated with the project's existing checks before release.
+
+</details>
 
 ## Building from source
 
@@ -215,12 +247,17 @@ Bug reports, game requests and a star on the repo help just as much.
 
 ## Credits
 
+<details>
+<summary>mGBA, fonts, the pret decomps, cover art sources</summary>
+
 - [mGBA](https://mgba.io) by Vicki Pfau (endrift) and contributors runs the games (MPL 2.0;
   source in [`third_party/mgba`](https://github.com/mgba-emu/mgba)).
 - [Pixel Operator](https://www.dafont.com/pixel-operator.font) font by Jayvee Enaguas (CC0).
 - [PixelMplus](https://github.com/itouhiro/PixelMplus) (M+ FONT LICENSE, M+ FONTS PROJECT) for Japanese text, converted to Pixel Operator's pixel grid by `scripts/gen_jp_font.py`.
 - The [pret](https://github.com/pret) decompilation projects, which the game data and guides were checked against.
 - Cover art from [SteamGridDB](https://www.steamgriddb.com) and its contributors, and box art from [RetroAchievements](https://retroachievements.org).
+
+</details>
 
 ## License
 
