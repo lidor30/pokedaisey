@@ -69,6 +69,12 @@ interface CompanionSettings {
      * activity lifecycle. Caller (the UI) is expected to confirm first. */
     fun closeGame()
 
+    /** Whether the companion can step off its own screen while the game runs (two screens, not swapped). */
+    val canCloseCompanion: Boolean get() = false
+
+    /** Closes the companion's screen (the device's own launcher shows there) - BACK on the game brings it back. */
+    fun closeCompanion() {}
+
     /** Whether battle-only strategic hints (move effectiveness chips, foe
      * Weak-to/Resists/Immune-to) are shown — see [Prefs.showHints]. */
     val showHints: Boolean
@@ -82,6 +88,12 @@ interface CompanionSettings {
     val showFoeIvs: Boolean get() = false
     fun setShowFoeIvs(on: Boolean) {}
 
+    /** Whether a launch picks up where the game was left - see [Prefs.autoResume]; off, CLOSE GAME warns. */
+    val autoResume: Boolean get() = true
+
+    /** Stores a SETTINGS > TWEAKS switch ([com.pokedaisy.app.companion.ui.CompanionTweaks]) by its key. */
+    fun setTweak(key: String, on: Boolean) {}
+
     /** Whether the companion's buttons play the game's click - see [Prefs.clickSound]. */
     val clickSound: Boolean
     fun setClickSound(on: Boolean)
@@ -90,6 +102,10 @@ interface CompanionSettings {
      * above the game - see [Prefs.statusBar]. */
     val statusBar: Boolean
     fun setStatusBar(on: Boolean)
+
+    /** The status bar over the companion's tabs instead of over the game - see [Prefs.statusBarOnCompanion]. */
+    val statusBarOnCompanion: Boolean get() = false
+    fun setStatusBarOnCompanion(on: Boolean) {}
 
     /** Whether the game is stretched to fill the top screen instead of kept at
      * 3:2 - see [Prefs.stretchGame]. */
@@ -104,12 +120,38 @@ interface CompanionSettings {
     val screenFilter: ScreenFilter
     fun setScreenFilter(filter: ScreenFilter)
 
+    /** Whether SHADERS also draw over the companion - see [Prefs.companionShaders]. */
+    val companionShaders: Boolean
+    fun setCompanionShaders(on: Boolean)
+
+    /** How strong the grid filters' grid is - see [Prefs.gridStrength]. */
+    val gridStrength: GridStrength
+    fun setGridStrength(strength: GridStrength)
+
     /** Whether there's a second screen - SWAP SCREENS only shows then. */
     val hasSecondScreen: Boolean get() = false
+
+    /**
+     * A phone held upright: the companion right under the game (true; the touch pad gets the
+     * screen's bottom) or along the screen's bottom - see [Prefs.portraitCompanionUnderGame].
+     * Null when the companion isn't under the game (a second screen, or held sideways): no row.
+     */
+    val portraitUnderGame: Boolean? get() = null
+    fun setPortraitUnderGame(on: Boolean) {}
 
     /** The game on the second screen and the companion on the main one - see [Prefs.swapScreens]. */
     val swapScreens: Boolean get() = false
     fun setSwapScreens(on: Boolean) {}
+
+    /** The running game's cheats (added in the top screen's Settings > CHEATS), for SETTINGS > CHEATS. */
+    val cheats: List<com.pokedaisy.app.cheats.Cheat> get() = emptyList()
+
+    /** The CHEATS master switch - see [com.pokedaisy.app.Prefs.cheatsEnabled]. Applies at once. */
+    val cheatsEnabled: Boolean get() = false
+    fun setCheatsEnabled(on: Boolean) {}
+
+    /** Turns the game's cheat [index] (in [cheats]) on or off; the game picks it up on the next frame. */
+    fun setCheatEnabled(index: Int, on: Boolean) {}
 
     /** Display name of the currently-detected game (e.g. "Pokémon Heart and
      * Soul") — see [com.pokedaisy.app.companion.data.GameKind.displayName]. */
@@ -159,9 +201,29 @@ enum class ScreenFilter(val label: String) {
     NONE(tk("NONE")),
     /** The GBA's pixel grid. */
     LCD(tk("LCD")),
+    /** A soft grid on paper: an unlit, reflective LCD (simpletex_lcd's style). */
+    LCD_PAPER(tk("LCD PAPER")),
     SCANLINES(tk("SCANLINES")),
     /** Soft scanline beams and an RGB mask. */
     CRT(tk("CRT")),
+}
+
+/** The filter after this one, wrapping: SHADERS > FILTER steps through them on each tap (the user's
+ * call, so each look shows on the game at once - the one row that cycles past two values). */
+fun ScreenFilter.next(): ScreenFilter = ScreenFilter.entries[(ordinal + 1) % ScreenFilter.entries.size]
+
+/** Whether this filter draws a pixel grid that SHADERS > GRID tunes. */
+val ScreenFilter.hasGrid: Boolean get() = this == ScreenFilter.LCD || this == ScreenFilter.LCD_PAPER
+
+/** SHADERS > GRID: how strongly LCD / LCD PAPER draw their grid (ScreenShaders.gridFor), in the
+ * order a tap steps through them - it cycles like FILTER, so each shows on the game at once. */
+enum class GridStrength(val label: String) {
+    SOFT(tk("SOFT")),
+    MEDIUM(tk("MEDIUM")),
+    STRONG(tk("STRONG")),
+    ;
+
+    fun next(): GridStrength = entries[(ordinal + 1) % entries.size]
 }
 
 /**

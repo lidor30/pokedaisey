@@ -38,7 +38,12 @@ import com.pokedaisy.app.companion.data.GENDER_SYMBOL_FEMALE
 import com.pokedaisy.app.companion.data.GENDER_SYMBOL_MALE
 import com.pokedaisy.app.companion.data.GameKind
 import com.pokedaisy.app.companion.data.MonView
+import com.pokedaisy.app.companion.data.RomArt
 import com.pokedaisy.app.companion.data.activeGame
+import com.pokedaisy.app.companion.data.gameText
+import com.pokedaisy.app.companion.data.localText
+import com.pokedaisy.app.companion.data.romGameCode
+import com.pokedaisy.app.companion.data.romLanguage
 import com.pokedaisy.app.companion.ui.theme.QolColors
 import kotlin.math.floor
 import kotlin.math.max
@@ -304,10 +309,29 @@ fun partyPaletteFor(game: GameKind): PartyPalette = when (game) {
     else -> FireRedPartyPalette
 }
 
+/**
+ * A localized game's slot: English's layout with its language's art (RomArt's
+ * partyfr_<lang> / partyem_<lang>) and FONT_SMALL widths. Ruby / Sapphire borrow
+ * that language's Emerald art, as English Ruby / Sapphire borrow English's.
+ * Null for Japanese, whose fonts aren't the Western ones the slot draws names with.
+ */
+private fun localPartyStyle(base: PartySlotStyle, fireRed: Boolean): PartySlotStyle? {
+    val lang = when (romLanguage) { 'S' -> "es"; 'D' -> "de"; 'F' -> "fr"; 'I' -> "it"; else -> return null }
+    val widths = (if (fireRed) localText else gameText("BPE$romLanguage"))?.smallFontWidths?.takeIf { it.isNotEmpty() }
+        ?: return null
+    val dir = if (fireRed) RomArt.fireRedPartyDir(lang) else RomArt.emeraldPartyDir(lang)
+    return localStyles.getOrPut(dir) {
+        // The Poke Ball stays English's (the same sprite in every language).
+        base.copy(frameDir = dir, fontAsset = "$dir/font_small.png", statusAsset = "$dir/status_icons.png", glyphWidths = widths)
+    }
+}
+
+private val localStyles = java.util.concurrent.ConcurrentHashMap<String, PartySlotStyle>()
+
 /** The in-game party-slot look for [game], or null for games that don't have one yet. */
 fun partySlotStyleFor(game: GameKind): PartySlotStyle? = when (game) {
-    GameKind.FIRERED -> FireRedPartyStyle
-    GameKind.EMERALD -> EmeraldPartyStyle
+    GameKind.FIRERED -> if (romGameCode.isEmpty()) FireRedPartyStyle else localPartyStyle(FireRedPartyStyle, fireRed = true)
+    GameKind.EMERALD -> if (romGameCode.isEmpty()) EmeraldPartyStyle else localPartyStyle(EmeraldPartyStyle, fireRed = false)
     GameKind.HEART_AND_SOUL -> HeartAndSoulPartyStyle
     GameKind.UNBOUND -> UnboundPartyStyle
     GameKind.RADICAL_RED -> RadicalRedPartyStyle
@@ -379,7 +403,7 @@ private class SlotGeometry(w: Float, h: Float) {
 private fun PartySlot(palette: PartyPalette, mon: MonView?, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, sound: Boolean = true) {
     val density = LocalDensity.current
     // The selected icon's bob (SpriteCB_BouncePartyMonIcon): up / down every 10 frames.
-    val bobDown by rememberBlink(gbaFramesMs(10), enabled = selected, label = "party-bob")
+    val bobDown by rememberBlink(gbaFramesMs(10), enabled = selected && CompanionTweaks[CompanionTweaks.Tweak.PARTY_ICONS_MOVE], label = "party-bob")
     BoxWithConstraints(modifier.slotClickable(sound, enabled = mon != null, onClick = onClick)) {
         val g = with(density) { SlotGeometry(maxWidth.toPx(), maxHeight.toPx()) }
         val u = g.u
@@ -404,8 +428,10 @@ private fun PartySlot(palette: PartyPalette, mon: MonView?, selected: Boolean, o
 
         // Pixel Operator's caps are 9 font pixels to the game font's 7: 3/4 of a slot pixel keeps them in proportion.
         val m = slotTextMetrics(density, max(1, (u * 0.75f).roundToInt()))
+        // A game font (Yellow's, drawn condensed) sets the name and level larger: a slot pixel per font pixel.
+        val nameM = if (com.pokedaisy.app.companion.ui.theme.LocalGameFont.current != null) slotTextMetrics(density, max(1, u)) else m
         val chipText = slotTextMetrics(density, max(1, (u * 0.6f).roundToInt()))
-        fun Density.at(x: Float, midY: Float) = Modifier.offset { IntOffset(x.toInt(), (midY - 8 * m.px).toInt()) }
+        fun Density.at(x: Float, midY: Float, tm: GbaTextMetrics = m) = Modifier.offset { IntOffset(x.toInt(), (midY - 8 * tm.px).toInt()) }
         val text = colors.text ?: palette.text
         val textShadow = colors.textShadow ?: palette.textShadow
 
@@ -418,14 +444,14 @@ private fun PartySlot(palette: PartyPalette, mon: MonView?, selected: Boolean, o
         )
 
         val textWidth = with(density) { (g.fx + g.fw - 4 * u - g.textX).toDp() }
-        GbaText(mon.name, text, textShadow, m, density.at(g.textX, g.nameMid).width(textWidth))
+        GbaText(mon.name, text, textShadow, nameM, density.at(g.textX, g.nameMid, nameM).width(textWidth))
         if (!showHp) return@BoxWithConstraints
 
         val status = if (mon.hp == 0) "FNT" else mon.status
         if (status.isNotEmpty()) {
             StatusChip(status, u, chipText, Modifier.offset { IntOffset((g.textX + 6 * u).toInt(), (g.levelMid - 5 * u).toInt()) })
         } else {
-            GbaText(tr("Lv{0}", mon.level), text, textShadow, m, density.at(g.textX + 6 * u, g.levelMid))
+            GbaText(tr("Lv{0}", mon.level), text, textShadow, nameM, density.at(g.textX + 6 * u, g.levelMid, nameM))
         }
         val gender = when (mon.genderSymbol) {
             GENDER_SYMBOL_MALE -> Triple(PixelIcons.male, palette.male, palette.maleShadow)

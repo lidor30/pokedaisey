@@ -20,12 +20,18 @@ class HackGuidesTest {
     private val odyssey = Game("Pokémon Odyssey (English) (v4.1.1).gba", GameKind.ODYSSEY, NATIVE_ODYSSEY, "odyssey")
     private val gaia = Game("Pokemon - Gaia (v3.2).gba", GameKind.GAIA, NATIVE_GAIA_V3_2, "gaia")
     private val amethyst = Game("Pokemon Amethyst (v1.3.0).gba", GameKind.AMETHYST, NATIVE_AMETHYST, "amethyst")
+    private val amethyst141 = Game("Pokemon Amethyst (v1.4.1).gba", GameKind.AMETHYST, NATIVE_AMETHYST_V1_4_1, "amethyst_v141")
     private val celia = Game("Pokemon Celia's Stupid Romhack (v1.1.4).gba", GameKind.CELIA, NATIVE_CELIA, "celia")
-    private val all = listOf(odyssey, gaia, amethyst, celia)
+    private val all = listOf(odyssey, gaia, amethyst, amethyst141, celia)
 
     private fun load(g: Game): RomFileReader? = RomFileReader.load(RETAIL_ROM_DIR + g.rom)?.also {
-        activeGame = g.kind
+        select(g)
         PokedexSource.reader = it
+    }
+
+    private fun select(g: Game) {
+        activeGame = g.kind
+        amethystV141 = g.cfg === NATIVE_AMETHYST_V1_4_1
     }
 
     private val noProgress = SaveProgress(ByteArray(0x120), ByteArray(0x200))
@@ -64,6 +70,23 @@ class HackGuidesTest {
         assertEquals(3, terrence[3].size)
     }
 
+    /** v1.4.1 moved the four tables; TERRENCE's teams are the same. */
+    @Test fun `amethyst v1_4_1 tables`() {
+        assumeTrue(load(amethyst141) != null)
+        val terrence = GUIDE_AMETHYST.bosses.first().teams(noProgress).map { GuideRomSource.party(amethyst141.t, it.second)!! }
+        assertEquals(listOf(1102 to 11, 780 to 13), terrence[0].map { it.species to it.level })
+        assertEquals(3, terrence[1].size)
+        assertEquals(638, terrence[2][1].species)
+        assertEquals(3, terrence[3].size)
+        try {
+            assertEquals("Tepig", speciesName(551))
+            assertEquals("Growlithe", speciesName(1234)) // a Hisuian form, where v1.3.0 had Gigantamax VENUSAUR
+            assertEquals("Venusaur", speciesName(1260))
+        } finally {
+            amethystV141 = false
+        }
+    }
+
     /** RAINE's and CHANCE's teams follow the badges held. */
     @Test fun `amethyst middle gyms by badges`() {
         fun save(badges: Int) = SaveProgress(ByteArray(0x120).also { b -> repeat(badges) { b[(0x820 + it) / 8] = (b[(0x820 + it) / 8].toInt() or (1 shl ((0x820 + it) % 8))).toByte() } }, ByteArray(0x200))
@@ -91,7 +114,7 @@ class HackGuidesTest {
     }
 
     @Test fun `generated WHERE IS`() = all.forEach { g ->
-        activeGame = g.kind
+        select(g)
         val page = generatedWhereIs(g.t.guide, { "AREA $it" }) { false }
         assertNotNull(g.kind.name, page)
         assertTrue(g.kind.name, page!!.sections.any { it.heading == "KEY ITEMS" && it.entries.size >= 5 })

@@ -26,7 +26,7 @@ object RomArt {
     const val DIR = "rom-art"
 
     /** Bump when [OUTPUTS] grows, so ROMs scanned before get scanned again. */
-    private const val SCAN_VERSION = 7
+    private const val SCAN_VERSION = 9
 
     /** Bumped whenever new art lands on disk, so loaders can retry. */
     val updates: StateFlow<Int> get() = _updates
@@ -120,8 +120,9 @@ object RomArt {
     /** Every file [compose] can make. */
     val OUTPUTS: List<String> = run {
         val slots = listOf("normal", "selected", "fainted", "selected_fainted", "nohp_normal", "nohp_selected")
-        listOf("partyfr", "partyem").flatMap { d ->
-            slots.map { "$d/slot_$it.png" } + listOf("$d/pokeball.png", "$d/status_icons.png", "$d/font_small.png")
+        (listOf("partyfr", "partyem") + listOf("es", "de", "fr", "it").flatMap { listOf(emeraldPartyDir(it), fireRedPartyDir(it)) }).flatMap { d ->
+            slots.map { "$d/slot_$it.png" } + listOf("$d/status_icons.png", "$d/font_small.png") +
+                listOfNotNull("$d/pokeball.png".takeIf { d == "partyfr" || d == "partyem" })
         } + listOf("partybg/firered.png", "partybg/emerald.png") +
             listOf("kanto", "sevii123", "sevii45", "sevii67", "hoenn", "seaglass", "lazarus", "soulgold").map { "regionmap/$it.png" } +
             PLAYER_ICONS.map { "regionmap/${it.first}.png" } +
@@ -277,8 +278,16 @@ object RomArt {
     private class Party(
         val dir: String, val backdrop: String,
         val bgGfx: RomBlob, val bgPal: RomBlob, val bgMap: RomBlob, val slotMain: RomBlob, val slotNoHp: RomBlob,
-        val ball: RomBlob, val ballPal: RomBlob, val status: RomBlob, val statusPal: RomBlob,
+        val ball: RomBlob?, val ballPal: RomBlob, val status: RomBlob, val statusPal: RomBlob,
         val font: RomBlob, val halfWidthFont: Boolean,
+    )
+
+    /** The European FireReds' (LeafGreen's are the same bytes): scripts/port_retail.py found them. */
+    private val FIRERED_LANGUAGE_PARTIES = listOf(
+        Triple("es", RomBlob.FR_ES_PARTY_BG_GFX, RomBlob.FR_ES_STATUS_GFX to RomBlob.FR_ES_FONT_SMALL),
+        Triple("de", RomBlob.FR_DE_PARTY_BG_GFX, RomBlob.FR_DE_STATUS_GFX to RomBlob.FR_DE_FONT_SMALL),
+        Triple("fr", RomBlob.FR_FR_PARTY_BG_GFX, RomBlob.FR_FR_STATUS_GFX to RomBlob.FR_FR_FONT_SMALL),
+        Triple("it", RomBlob.FR_IT_PARTY_BG_GFX, RomBlob.FR_IT_STATUS_GFX to RomBlob.FR_IT_FONT_SMALL),
     )
 
     private val PARTIES = listOf(
@@ -288,7 +297,30 @@ object RomArt {
         Party("partyem", "partybg/emerald.png", RomBlob.EM_PARTY_BG_GFX, RomBlob.EM_PARTY_BG_PAL, RomBlob.EM_PARTY_BG_MAP,
             RomBlob.EM_SLOT_MAIN, RomBlob.EM_SLOT_NO_HP, RomBlob.EM_BALL_GFX, RomBlob.EM_BALL_PAL,
             RomBlob.EM_STATUS_GFX, RomBlob.EM_STATUS_PAL, RomBlob.EM_FONT_SMALL, halfWidthFont = false),
-    )
+    ) + listOf(
+        // The European Emeralds: their own slot tiles (the HP label), status icons and font;
+        // the backdrop comes out pixel for pixel English's (only CANCEL's tiles differ).
+        Triple("es", RomBlob.EM_ES_PARTY_BG_GFX, RomBlob.EM_ES_STATUS_GFX to RomBlob.EM_ES_FONT_SMALL),
+        Triple("de", RomBlob.EM_DE_PARTY_BG_GFX, RomBlob.EM_DE_STATUS_GFX to RomBlob.EM_DE_FONT_SMALL),
+        Triple("fr", RomBlob.EM_FR_PARTY_BG_GFX, RomBlob.EM_FR_STATUS_GFX to RomBlob.EM_FR_FONT_SMALL),
+        Triple("it", RomBlob.EM_IT_PARTY_BG_GFX, RomBlob.EM_IT_STATUS_GFX to RomBlob.EM_IT_FONT_SMALL),
+    ).map { (lang, gfx, statusFont) ->
+        Party(emeraldPartyDir(lang), "partybg/emerald.png", gfx, RomBlob.EM_PARTY_BG_PAL, RomBlob.EM_PARTY_BG_MAP,
+            // English's Poke Ball, byte for byte: partyem/pokeball.png serves them all.
+            RomBlob.EM_SLOT_MAIN, RomBlob.EM_SLOT_NO_HP, null, RomBlob.EM_BALL_PAL,
+            statusFont.first, RomBlob.EM_STATUS_PAL, statusFont.second, halfWidthFont = false)
+    } + FIRERED_LANGUAGE_PARTIES.map { (lang, gfx, statusFont) ->
+        Party(fireRedPartyDir(lang), "partybg/firered.png", gfx, RomBlob.FR_PARTY_BG_PAL, RomBlob.FR_PARTY_BG_MAP,
+            RomBlob.FR_SLOT_MAIN, RomBlob.FR_SLOT_NO_HP, null, RomBlob.FR_BALL_PAL,
+            statusFont.first, RomBlob.FR_STATUS_PAL, statusFont.second, halfWidthFont = true)
+    }
+
+
+    /** Where a European Emerald's party art goes: partyem_<es|de|fr|it>. */
+    fun emeraldPartyDir(lang: String) = "partyem_$lang"
+
+    /** Where a European FireRed / LeafGreen's party art goes: partyfr_<es|de|fr|it>. */
+    fun fireRedPartyDir(lang: String) = "partyfr_$lang"
 
     // Window palette 3 with each state's LoadPartyBoxPalette overrides:
     // (idx 4,5,6 <- ids1), (idx 1,7,8 <- ids2) - both decomps' party_menu.c.
@@ -315,7 +347,7 @@ object RomArt {
             if (has(p.bgGfx, p.bgPal, p.slotMain, p.slotNoHp)) {
                 slots(d(p.bgGfx), palette(d(p.bgPal)), d(p.slotMain), d(p.slotNoHp)).forEach { (k, v) -> out["${p.dir}/$k"] = v }
             }
-            if (has(p.ball, p.ballPal)) out["${p.dir}/pokeball.png"] = sprite(d(p.ball), palette(d(p.ballPal)), 32, 64)
+            if (p.ball != null && has(p.ball, p.ballPal)) out["${p.dir}/pokeball.png"] = sprite(d(p.ball), palette(d(p.ballPal)), 32, 64)
             if (has(p.status, p.statusPal)) {
                 // 32x8 icons, one after another -> one row.
                 val status = d(p.status)

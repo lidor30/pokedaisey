@@ -134,6 +134,15 @@ class HackPokedexTest {
     }
 
     @Test
+    fun `Amethyst v1_4_1 entries`() = roms("Pokemon Amethyst (v1.4.1).gba", GameKind.AMETHYST, POKEDEX_AMETHYST_V1_4_1) { t ->
+        val tepig = PokedexSource.entry(t, 340)!!
+        assertEquals(551, tepig.species)
+        assertEquals("Fire Pig", tepig.category)
+        assertEquals(340, PokedexSource.nationalOf(t, 551))
+        assertEquals("Seed", PokedexSource.entry(t, 301)!!.category)
+    }
+
+    @Test
     fun `Gaia entries`() = roms("Pokemon - Gaia (v3.2).gba", GameKind.GAIA, POKEDEX_GAIA) { t ->
         val chimchar = PokedexSource.entry(t, 390)!!
         assertEquals(443, chimchar.species)
@@ -186,6 +195,15 @@ class HackPokedexTest {
 
     @Test
     fun `SoulGold v1_2 entries and the Johto order`() = roms("Soulgold (v1.2).gba", GameKind.SOULGOLD, POKEDEX_SOULGOLD_V1_2) { t ->
+        val pikachu = PokedexSource.entry(t, 25)!!
+        assertEquals(listOf("Static"), pikachu.abilities)
+        assertEquals("Lightning Rod", pikachu.hiddenAbility)
+        assertEquals("Fire Mouse", PokedexSource.entry(t, 155)!!.category)
+        assertEquals(136, PokedexSource.regionalOrder(t)!!.indexOf(155) + 1)
+    }
+
+    @Test
+    fun `SoulGold v1_2 second build entries and the Johto order`() = roms("Pokemon-SoulGold-v1.2.gba", GameKind.SOULGOLD, POKEDEX_SOULGOLD_V1_2B) { t ->
         val pikachu = PokedexSource.entry(t, 25)!!
         assertEquals(listOf("Static"), pikachu.abilities)
         assertEquals("Lightning Rod", pikachu.hiddenAbility)

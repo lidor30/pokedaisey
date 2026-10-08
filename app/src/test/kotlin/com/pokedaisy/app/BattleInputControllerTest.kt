@@ -70,6 +70,30 @@ class BattleInputControllerTest {
         assertFalse(c.isBusy)
     }
 
+    @Test fun gen1ActionMenuGoesFromTheReadCursor() {
+        // Yellow's FIGHT / PkMn over ITEM / RUN, cursor on ITEM (cell 2): RUN is RIGHT, then A.
+        c.gen1 = true
+        c.onState(0, BATTLE_INPUT_ACTION_SELECT, cursor = 2)
+        c.selectAction(3)
+        run(200)
+        assertEquals("RUN", listOf("RIGHT", "A"), game.presses.take(2))
+        // ...and PkMn (Gen 3's POKEMON, index 2) from FIGHT is just RIGHT, A.
+        game.presses.clear()
+        c.onState(0, BATTLE_INPUT_ACTION_SELECT, cursor = 0)
+        c.selectAction(2)
+        run(200)
+        assertEquals(listOf("RIGHT", "A"), game.presses.filter { it != "B" })
+    }
+
+    @Test fun gen1MovesAreOneList() {
+        // The move list with the cursor on move 1: the 4th move is DOWN, DOWN, A - no LEFT / UP first.
+        c.gen1 = true
+        c.onState(0, BATTLE_INPUT_MOVE_SELECT, cursor = 1)
+        c.selectMove(3)
+        run(200)
+        assertEquals(listOf("DOWN", "DOWN", "A"), game.presses)
+    }
+
     @Test fun switchFollowsTheBattleOrderWhileTheMenuIsOpen() {
         // The game moved the mon to slot 1 while the menu is open (battle order): go there.
         game.pid(1, 0x1004L)

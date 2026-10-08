@@ -241,6 +241,23 @@ object PixelIcons {
         "....KKKK....",
     )
 
+    /** Arrows up and down across a bar: drag to resize the portrait companion (PortraitGrip). */
+    val resizeVertical = listOf(
+        ".....11.....",
+        "....1111....",
+        "...111111...",
+        "..11111111..",
+        "............",
+        "111111111111",
+        "............",
+        "111111111111",
+        "............",
+        "..11111111..",
+        "...111111...",
+        "....1111....",
+        ".....11.....",
+    )
+
     /** A shut padlock: the side panel locked beside the game (see SidePanelHandle). Draw it with [ShadowedPixelIcon]. */
     val lockClosed = listOf(
         "................",

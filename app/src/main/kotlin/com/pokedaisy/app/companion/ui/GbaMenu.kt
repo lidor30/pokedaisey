@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion.ui
 
+import com.pokedaisy.app.companion.ui.theme.isDaisyTheme
 import com.pokedaisy.app.companion.i18n.tk
 import com.pokedaisy.app.companion.i18n.tr
 import androidx.compose.foundation.Canvas
@@ -46,6 +47,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -73,11 +75,22 @@ object OptionColors {
     // A Game Boy game gets its own windows instead (Gen 1: black text on white, no
     // shadows, the text box's double line - sampled headless from Yellow's menus).
     // Read through activeGame like the rest of the per-game look (CompanionScreen is
-    // keyed on the game, so a switch redraws).
-    private val gen1 get() = activeGame == GameKind.YELLOW
+    // keyed on the game, so a switch redraws) - only while a game is open ([inGame]):
+    // the top-screen Library / Settings keep the app's own look after Yellow closes.
+    private val gen1 get() = inGame && activeGame == GameKind.YELLOW
+
+    /** A game's screens are up (PokeDaisyActivity resumed); Compose state, so the look follows at once. */
+    var inGame: Boolean
+        get() = inGameState.value
+        set(v) { inGameState.value = v }
+    private val inGameState = androidx.compose.runtime.mutableStateOf(false)
     private val G1_BLACK = Color(0xFF181818)
     private val G1_WHITE = Color(0xFFFFFFFF)
     private val G1_FRAME = listOf(G1_WHITE to 2, G1_BLACK to 1, G1_WHITE to 1, G1_BLACK to 1, G1_WHITE to 1)
+
+    // The PokéDaisy theme's light backdrop on the top screen (Library, Settings, setup): text drawn straight
+    // on it takes the windows' dark grey instead of white. Never inside a game (the game's own backdrops).
+    private val daisy get() = !inGame && isDaisyTheme
 
     val hintBar get() = if (gen1) G1_BLACK else Color(0xFF007BC6)
     val hintText get() = Color(0xFFFFFFFF)
@@ -103,13 +116,21 @@ object OptionColors {
     /** The dark outer line of [listLayers], for frames drawn around images. */
     val frameDark get() = if (gen1) G1_BLACK else Color(0xFF293131)
     val frameLight get() = if (gen1) G1_WHITE else Color(0xFF8C8CCE)
-    /** Text straight on a game backdrop: white with the hint bar's grey shadow (black on Gen 1's white). */
-    val onBackdrop get() = if (gen1) G1_BLACK else Color(0xFFFFFFFF)
-    val onBackdropShadow get() = if (gen1) Color.Transparent else Color(0xFF404850)
+    /** Text straight on a game backdrop: white with the hint bar's grey shadow (black on Gen 1's white,
+     * the windows' grey on PokéDaisy's light backdrop). */
+    val onBackdrop get() = if (gen1) G1_BLACK else if (daisy) label else Color(0xFFFFFFFF)
+    val onBackdropShadow get() = if (gen1) Color.Transparent else if (daisy) labelShadow else Color(0xFF404850)
+    /** A tab chip's frame: the title window's, or for Gen 1 just its double line (black, white, black) - its
+     * full text-box frame is six pixels a side, which left a narrow chip no room for CHEEVOS. */
+    val chipLayers get() = if (gen1) listOf(G1_BLACK to 1, G1_WHITE to 1, G1_BLACK to 1) else titleLayers
     /** The tab bar's chips: the open one white over grey idle ones (Gen 1: the cursor row's grey over white). */
     val tabSelectedFill get() = if (gen1) rowSelected else titleFill
     val tabIdleFill get() = if (gen1) G1_WHITE else listFill
     /** The dashed line between list rows (the bag list's 6/2 dash). */
+    /** Settings group titles: Gen 1's value colour is the rows' black, so its titles get a black band (white text). */
+    val groupTitleFill: Color? get() = if (gen1) G1_BLACK else null
+    val groupTitleText get() = if (gen1) G1_WHITE else value
+    val groupTitleShadow get() = if (gen1) Color.Transparent else valueShadow
     val divider get() = if (gen1) Color(0xFFB0B0B0) else Color(0xFFC6C5C5)
 }
 
@@ -153,6 +174,8 @@ fun OptionTitleWindow(
     modifier: Modifier = Modifier,
     trailing: String? = null,
     onBack: (() -> Unit)? = null,
+    /** Drawn before the title (after the back arrow): the Library's logo. */
+    leading: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val u = m.u
@@ -163,14 +186,23 @@ fun OptionTitleWindow(
             .drawBehind { drawLayeredBox(OptionColors.titleLayers.inPx(u.toPx()), OptionColors.titleFill, radius = 2 * u.toPx()) }
             .padding(horizontal = u * 12, vertical = u * 6),
     ) {
+        leading?.let { it(); Spacer(Modifier.width(u * 6)) }
         if (onBack != null) {
             CompanionBackHandler(onBack = onBack)
             Box(Modifier.soundClickable(onClick = onBack).padding(end = u * 6)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Back"), tint = OptionColors.titleText, modifier = Modifier.size(m.lineHeight))
             }
         }
-        GbaText(tr(title), OptionColors.titleText, OptionColors.titleShadow, m, modifier = Modifier.weight(1f))
-        trailing?.let { GbaText(it, OptionColors.titleText, OptionColors.titleShadow, m) }
+        if (trailing == null) {
+            GbaText(tr(title), OptionColors.titleText, OptionColors.titleShadow, m, modifier = Modifier.weight(1f))
+        } else {
+            // The title whole; the trailing (the game's name) right-aligned after a gap, and the one
+            // that shortens when both don't fit (a wide game font: "OPTI…" read badly).
+            GbaText(tr(title), OptionColors.titleText, OptionColors.titleShadow, m)
+            Box(Modifier.weight(1f).padding(start = u * 8), contentAlignment = Alignment.CenterEnd) {
+                GbaText(trailing, OptionColors.titleText, OptionColors.titleShadow, m)
+            }
+        }
         actions()
     }
 }
@@ -345,7 +377,7 @@ fun OptionButton(
             Icon(icon, contentDescription, tint = fg, modifier = Modifier.size(m.lineHeight))
         }
         if (icon != null && label != null) Spacer(Modifier.width(u * 4))
-        if (label != null) GbaText(tr(label), fg, shadow, m)
+        if (label != null) GbaText(tr(label), fg, shadow, m, bold = gameBoldLabels())
     }
 }
 
@@ -429,6 +461,8 @@ fun OptionConfirm(
     m: GbaTextMetrics,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    /** Null: [confirmLabel] alone, for a notice there's nothing to cancel on. */
+    cancelLabel: String? = tk("CANCEL"),
 ) {
     OptionOverlay(onDismiss, Modifier.widthIn(max = 480.dp)) {
         Column {
@@ -445,7 +479,7 @@ fun OptionConfirm(
                         horizontalArrangement = Arrangement.spacedBy(m.u * 4),
                         modifier = Modifier.fillMaxWidth().padding(horizontal = m.u * 4, vertical = m.u * 4),
                     ) {
-                        OptionButton(tk("CANCEL"), m, onClick = onDismiss, modifier = Modifier.weight(1f).height(m.rowHeight * 1.4f))
+                        cancelLabel?.let { OptionButton(it, m, onClick = onDismiss, modifier = Modifier.weight(1f).height(m.rowHeight * 1.4f)) }
                         OptionButton(confirmLabel, m, onClick = onConfirm, emphasis = true, modifier = Modifier.weight(1f).height(m.rowHeight * 1.4f))
                     }
                 }
@@ -490,11 +524,20 @@ fun GameBackdrop(game: GameKind, modifier: Modifier = Modifier.fillMaxSize()) {
  * stripes of FireRed's party-menu screen - the backdrop the companion's tabs
  * sit on - drawn natively so it fills any aspect ratio (the party screen
  * image itself has a dark cancel-button column that looks wrong stretched
- * to 16:9). The default theme uses the game's exact two teals; other themes
- * stripe their own slot colors, so a theme still reskins the app.
+ * to 16:9). The FireRed theme uses the game's exact two teals; other themes
+ * stripe their own slot colors, so a theme still reskins the app. The
+ * PokéDaisy theme (the default) draws the website's backdrop instead ([DaisyBackdrop]).
  */
 @Composable
-fun AppBackdrop() {
+fun AppBackdrop(
+    /** The PokéDaisy theme's floating logos (the Library). */
+    logos: Boolean = false,
+) {
+    // PokéDaisy: the website's light backdrop - outside a game only, whose windows keep the game's look.
+    if (isDaisyTheme && !OptionColors.inGame) {
+        DaisyBackdrop(logos)
+        return
+    }
     val m = rememberGbaTextMetrics()
     val (a, b) = if (QolColors.currentThemeId == 0) {
         Color(0xFF4AADA5) to Color(0xFF398C8C)
@@ -512,8 +555,9 @@ fun AppBackdrop() {
     }
 }
 
-/** A one-line text input in the title window's look (white, grey frame), pixel font.
- * [password] hides what's typed and keeps the keyboard from learning it. */
+/** A text input in the title window's look (white, grey frame), pixel font: one line, or
+ * [minLines] and more. [password] hides what's typed and keeps the keyboard from learning
+ * it; [code] asks for capitals with no suggestions (cheat codes). */
 @Composable
 fun OptionTextField(
     value: String,
@@ -522,14 +566,21 @@ fun OptionTextField(
     modifier: Modifier = Modifier,
     placeholder: String? = null,
     password: Boolean = false,
+    minLines: Int = 1,
+    code: Boolean = false,
 ) {
     val u = m.u
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        singleLine = true,
+        singleLine = minLines == 1,
+        minLines = minLines,
         visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
-        keyboardOptions = if (password) KeyboardOptions(autoCorrect = false, keyboardType = KeyboardType.Password) else KeyboardOptions.Default,
+        keyboardOptions = when {
+            password -> KeyboardOptions(autoCorrect = false, keyboardType = KeyboardType.Password)
+            code -> KeyboardOptions(capitalization = KeyboardCapitalization.Characters, autoCorrect = false, keyboardType = KeyboardType.Ascii)
+            else -> KeyboardOptions.Default
+        },
         textStyle = gbaTextStyle(pixelFontFamily(), m).copy(color = OptionColors.label),
         cursorBrush = SolidColor(OptionColors.value),
         modifier = modifier

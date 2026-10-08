@@ -52,6 +52,11 @@ class DualScreenPresentation(
             addView(content(context).also { (it.parent as? ViewGroup)?.removeView(it) })
         }
         setContentView(frame!!)
+        // Never takes key focus: touching the bottom screen used to make it the focused
+        // display, and the device's HOME (the Thor's double press closes the app) then
+        // acted there - on no activity - instead of on the game. Touches still land here,
+        // and every key goes to the activity anyway (dispatchKeyEvent below).
+        window?.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
         goFullScreen()
     }
 
@@ -114,12 +119,13 @@ class DualScreenPresentation(
             clickSound: () -> Unit,
             achievements: com.pokedaisy.app.companion.CompanionAchievements?,
             initialTab: String = "PARTY",
-        ): View = ComposeView(context).apply {
+            statusBar: (@androidx.compose.runtime.Composable () -> Unit)? = null,
+        ): View = CompanionColors.track(ComposeView(context)).apply {
             setContent {
                 val snap by store.snapshot.collectAsState()
                 CompanionScreen(
                     snap, slots, settings, battleInput, initialTab = initialTab,
-                    back = back, clickSound = clickSound, achievements = achievements,
+                    back = back, clickSound = clickSound, achievements = achievements, statusBar = statusBar,
                 )
             }
         }

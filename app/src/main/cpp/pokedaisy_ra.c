@@ -29,6 +29,8 @@
 #include "rc_client.h"
 #include "rc_consoles.h"
 
+#include "pk_cheats.h"
+
 #define LOG_TAG "pokedaisy/ra"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN,  LOG_TAG, __VA_ARGS__)
@@ -492,8 +494,12 @@ RA_FN(raLoadGame)(JNIEnv* env, jobject thiz) {
     if (!gba->memory.rom || !gba->pristineRomSize) {
         return JNI_FALSE;
     }
+    // A cheat's hook or ROM patch changes the ROM mGBA runs: hash the file's bytes
+    // (rc_client hashes right here, before returning).
+    pkRomSwapCheats();
     rc_client_begin_identify_and_load_game(ra_client, RC_CONSOLE_GAMEBOY_ADVANCE, NULL,
         (const uint8_t*) gba->memory.rom, gba->pristineRomSize, raGameLoaded, NULL);
+    pkRomSwapCheats();
     return JNI_TRUE;
 }
 

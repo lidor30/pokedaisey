@@ -1,5 +1,7 @@
 package com.pokedaisy.app
 
+import com.pokedaisy.app.companion.data.RETAIL_PORTS
+import com.pokedaisy.app.companion.data.RETAIL_PORT_TITLES
 import com.pokedaisy.app.companion.data.TelemetrySampler
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -10,6 +12,14 @@ class GameTitlesTest {
     fun `every hack the companion supports has a name`() {
         val missing = TelemetrySampler.SUPPORTED_HACK_SHA1S - GameTitles.BY_SHA1.keys
         assertTrue("no title for $missing", missing.isEmpty())
+    }
+
+    /** scripts/port_retail.py's ROMs are named by their hashes too (RETAIL_PORT_TITLES, generated with them). */
+    @Test
+    fun `every ported ROM has a name`() {
+        assertEquals(RETAIL_PORTS.size, RETAIL_PORT_TITLES.size)
+        assertTrue(GameTitles.BY_SHA1.keys.containsAll(RETAIL_PORT_TITLES.keys))
+        assertEquals("Pokémon Feuerrote Edition", GameTitles.BY_SHA1["18a3758ceeef2c77b315144be2c3910d6f1f69fe"])
     }
 
     @Test

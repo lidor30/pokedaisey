@@ -16,6 +16,8 @@ internal val trCompanion: Map<String, Tr> = mapOf(
     "Open the companion" to Tr(ja = "コンパニオンを ひらく", fr = "Ouvrir le compagnon", de = "Begleiter öffnen", it = "Apri il compagno", es = "Abrir el compañero"),
     "Close the companion" to Tr(ja = "コンパニオンを とじる", fr = "Fermer le compagnon", de = "Begleiter schließen", it = "Chiudi il compagno", es = "Cerrar el compañero"),
     "Unlock the companion" to Tr(ja = "コンパニオンの こていを かいじょ", fr = "Libérer le compagnon", de = "Begleiter lösen", it = "Sblocca il compagno", es = "Soltar el compañero"),
+    // The grip on the companion's top edge with a phone held upright (PortraitGrip).
+    "Resize the companion" to Tr(ja = "コンパニオンの おおきさを かえる", fr = "Redimensionner le compagnon", de = "Begleitergröße ändern", it = "Ridimensiona il compagno", es = "Cambiar el tamaño del compañero"),
 
     // Battle sides and the foe's state (foeHeading's halves, BattlerCard).
     "YOU" to Tr(ja = "じぶん", fr = "TOI", de = "DU", it = "TU", es = "TÚ"),

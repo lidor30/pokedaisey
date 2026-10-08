@@ -8,4 +8,9 @@ class PackageManager {
 
 class ResolveInfo { val activityInfo = ActivityInfo() }
 
-class ActivityInfo { val packageName = ""; val name = "" }
+class ActivityInfo { val packageName = ""; val name = ""; val applicationInfo = ApplicationInfo() }
+
+class ApplicationInfo {
+    val flags = 0
+    companion object { const val FLAG_SYSTEM = 1 }
+}

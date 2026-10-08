@@ -1,11 +1,13 @@
 package com.pokedaisy.app
 
+import com.pokedaisy.app.companion.GridStrength
 import com.pokedaisy.app.companion.ScreenFilter
 
 /**
  * Fragment shaders for [EmulatorView]'s passes. Each reads `uTex` at `vUv`; `uTexSize` is
  * the GBA frame's size in pixels, so `vUv * uTexSize` is the position in GBA pixels (y
- * running down the game's rows, like the frame's own).
+ * running down the game's rows, like the frame's own). `uGrid` is SHADERS > GRID's strength for
+ * the grid filters ([gridFor]: how much a line darkens its pixel, and how wide it is).
  */
 internal object ScreenShaders {
 
@@ -17,8 +19,26 @@ internal object ScreenShaders {
     fun effectFor(filter: ScreenFilter): Effect? = when (filter) {
         ScreenFilter.NONE -> null
         ScreenFilter.LCD -> LCD
+        ScreenFilter.LCD_PAPER -> LCD_PAPER
         ScreenFilter.SCANLINES -> SCANLINES
         ScreenFilter.CRT -> CRT
+    }
+
+    /** `uGrid` for [filter] at [strength]: x = how much a grid line darkens its pixel, y = line
+     * width (LCD PAPER: 0 = the thin squared curve, 1 = simpletex's full one). Picked in the
+     * browser harness on Emerald's intro and FireRed's naming screen at the Thor's 1620x1080. */
+    fun gridFor(filter: ScreenFilter, strength: GridStrength): FloatArray = when (filter) {
+        ScreenFilter.LCD -> when (strength) {
+            GridStrength.SOFT -> floatArrayOf(0.2f, 0f)
+            GridStrength.MEDIUM -> floatArrayOf(0.35f, 0f)
+            GridStrength.STRONG -> floatArrayOf(0.5f, 0f)
+        }
+        ScreenFilter.LCD_PAPER -> when (strength) {
+            GridStrength.SOFT -> floatArrayOf(0.3f, 0f)
+            GridStrength.MEDIUM -> floatArrayOf(0.45f, 0.5f)
+            GridStrength.STRONG -> floatArrayOf(0.6f, 1f)
+        }
+        else -> floatArrayOf(0f, 0f)
     }
 
     private const val HEADER = """
@@ -30,6 +50,7 @@ internal object ScreenShaders {
         varying vec2 vUv;
         uniform sampler2D uTex;
         uniform vec2 uTexSize;
+        uniform vec2 uGrid;
     """
 
     /** The texture as is. */
@@ -67,16 +88,15 @@ internal object ScreenShaders {
     /**
      * LCD: a dark grid line along the top and left third of every GBA pixel. mGBA's
      * `res/shaders/lcd.shader` (Copyright (C) 2017 Dominus Iniquitatis, MIT - see NOTICE),
-     * a little darker than its 0.9 default so the grid reads at handheld distance.
+     * its line brightness from GRID (`uGrid.x` darkening: SOFT 0.2 is about its 0.9 default doubled).
      */
     private val LCD = Effect(
         """
         $HEADER
-        const float boundBrightness = 0.8;
         void main() {
             vec3 c = texture2D(uTex, vUv).rgb;
             vec2 sub = vUv * uTexSize * 3.0;
-            if (int(mod(sub.x, 3.0)) == 0 || int(mod(sub.y, 3.0)) == 0) c *= boundBrightness;
+            if (int(mod(sub.x, 3.0)) == 0 || int(mod(sub.y, 3.0)) == 0) c *= 1.0 - uGrid.x;
             gl_FragColor = vec4(c, 1.0);
         }
         """.trimIndent(),
@@ -98,6 +118,60 @@ internal object ScreenShaders {
         }
         """.trimIndent(),
         prescale = true,
+    )
+
+    /**
+     * LCD PAPER: a reflective, unlit LCD in the style of RetroArch's simpletex_lcd (jdgleaver,
+     * GPL-2.0-or-later; its grid curve from Greg Hogan's zfast_lcd - see NOTICE). Soft grid lines
+     * from each view pixel's distance to its GBA pixel's centre, 48(x^4 - 8/3 x^6) - squared for
+     * GRID's SOFT thin lines, the full curve at STRONG (`uGrid.y`) - over colours 15% desaturated, a
+     * reflective screen's duller look (simpletex's DARKEN_COLOUR deepened them past plain LCD's, too
+     * vibrant). Unlike simpletex, a line darkens its own pixel (`uGrid.x`) rather
+     * than mixing towards a fixed colour: white lines (its default), then a fixed grey, both lifted
+     * every darker colour and looked washed out on the Thor (Emerald's intro grass); then light pixels
+     * take on an off-white paper by their brightness while dark ones stay solid ink. The paper is
+     * noise in view pixels (faint blotches, grain, a few short fibres; the big blotches toned down
+     * after they read as stains), not a bundled texture. Smooth, so
+     * drawn at the view's own pixels like CRT; picked in the browser harness at 1620x1080.
+     */
+    private val LCD_PAPER = Effect(
+        """
+        $HEADER
+        const float gridIntensity = 0.85;
+        const float desaturate = 0.15;
+        const vec3 luma709 = vec3(0.2126, 0.7152, 0.0722);
+        float hash(vec2 p) {
+            p = fract(p * vec2(0.1031, 0.1030));
+            p += dot(p, p.yx + 33.33);
+            return fract((p.x + p.y) * p.x);
+        }
+        float noise(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            f = f * f * (3.0 - 2.0 * f);
+            return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
+                       mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+        }
+        vec3 paper(vec2 p) {
+            float n = 0.2 * noise(p / 90.0) + 0.3 * noise(p / 22.0) + 0.3 * noise(p / 5.0) + 0.2 * hash(p);
+            float fibre = max(smoothstep(0.7, 0.95, noise(vec2(p.x / 2.0, p.y / 14.0) + 17.0)),
+                              smoothstep(0.7, 0.95, noise(vec2(p.x / 14.0, p.y / 2.0) + 51.0)));
+            return vec3(0.98, 0.96, 0.90) * (0.88 + 0.12 * n - 0.025 * fibre);
+        }
+        void main() {
+            vec2 pos = vUv * uTexSize;
+            vec2 d = abs(fract(pos) - 0.5);
+            float x2 = max(d.x, d.y);
+            x2 *= x2;
+            float w = 48.0 * (x2 * x2 - 8.0 / 3.0 * x2 * x2 * x2);
+            vec3 c = texture2D(uTex, (floor(pos) + 0.5) / uTexSize).rgb;
+            c = mix(c, vec3(dot(c, luma709)), desaturate);
+            c *= 1.0 - uGrid.x * clamp(mix(w * w, w, uGrid.y) * gridIntensity, 0.0, 1.0);
+            c = mix(c, paper(gl_FragCoord.xy) * c, dot(c, luma709));
+            gl_FragColor = vec4(c, 1.0);
+        }
+        """.trimIndent(),
+        prescale = false,
     )
 
     /**

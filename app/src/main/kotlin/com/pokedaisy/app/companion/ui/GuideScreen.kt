@@ -35,6 +35,7 @@ import com.pokedaisy.app.companion.data.EncounterSlot
 import com.pokedaisy.app.companion.data.hasAreaGuide
 import com.pokedaisy.app.companion.data.areaThings
 import com.pokedaisy.app.companion.data.areaKey
+import com.pokedaisy.app.companion.data.englishMapSecName
 import com.pokedaisy.app.companion.data.Have
 import com.pokedaisy.app.companion.data.AreaThing
 import com.pokedaisy.app.companion.data.AreaKind
@@ -354,7 +355,8 @@ private fun herePage(
     }.orEmpty()
 
     // The hand-written guide's entries about this area (not TIPS - they're about the whole game).
-    val key = areaKey(snapshot.location.mapSecName)
+    // Hand-written entries tag areas by their English names, whatever the game's language.
+    val key = areaKey(englishMapSecName(snapshot.regionMapSectionId, snapshot.location.mapSecName))
     val todo = if (key.isEmpty()) emptyList() else guide?.pages.orEmpty().filter { it.title != TIPS }
         .flatMap { p -> p.sections.flatMap { it.entries } }
         .filter { e -> e.areas.any { areaKey(it) == key } }

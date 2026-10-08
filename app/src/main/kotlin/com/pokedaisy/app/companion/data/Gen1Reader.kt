@@ -27,6 +27,17 @@ data class Gen1Config(
     val enemyPartyCount: Long,  // wEnemyPartyCount, then its species list
     val enemyMons: Long,        // wEnemyMons: a trainer's party_structs
     val internalToDex: IntArray,
+    // The menu HandleMenuInput is running: wTopMenuItemY / X, wCurrentMenuItem, (+1 tile
+    // behind the cursor), wMaxMenuItem; wMoveMenuType (0 = the battle's move list); and
+    // wTileMap, the screen's 20x18 tiles, where the cursor is a filled ▶ only while the
+    // menu waits for input (an A turns it into ▷).
+    val topMenuItemY: Long = 0,
+    val moveMenuType: Long = 0,
+    val tileMap: Long = 0,
+    val pokedex: PokedexTables? = null,
+    // wPlayTimeHours, Maxed, Minutes, Seconds, Frames: the telemetry's frame counter (the
+    // companion's per-second refreshes, STATES' list, key off it moving).
+    val playTime: Long = 0,
 )
 
 /** Pokémon Yellow (USA, Europe). Red/Blue's own addresses are one byte later (wPartyCount D163). */
@@ -46,6 +57,11 @@ val GEN1_YELLOW = Gen1Config(
     enemyPartyCount = 0xD89BL,
     enemyMons = 0xD8A3L,
     internalToDex = gen1InternalToDexYellow,
+    topMenuItemY = 0xCC24L,
+    moveMenuType = 0xCCDBL,
+    tileMap = 0xC3A0L,
+    pokedex = POKEDEX_YELLOW,
+    playTime = 0xDA40L,
 )
 
 const val GEN1_PARTY_MON_SIZE = 44
@@ -94,6 +110,44 @@ fun decodeGen1BattleMon(raw: ByteArray, cfg: Gen1Config): BattleMon? {
     )
 }
 
+private const val TILE_CURSOR = 0xED          // ▶, the waiting menu's cursor
+private const val BATTLE_MENU_TOP = 0x0E         // DisplayBattleMenu: rows 14 / 16, X 9 (FIGHT / ITEM) or 15 (PkMn / RUN)
+private const val BATTLE_MENU_LEFT_X = 0x09
+private const val BATTLE_MENU_RIGHT_X = 0x0F
+private const val MOVE_MENU_TOP = 0x0C           // MoveSelectionMenu: moves on rows 13-16 (items 1-4), X 5
+private const val MOVE_MENU_X = 0x05
+
+/**
+ * Which battle menu waits for the player, and its cursor: BATTLE_INPUT_ACTION_SELECT with
+ * the cell (column + 2 x row: FIGHT 0, PkMn 1, ITEM 2, RUN 3 - Gen 1's own layout), or
+ * BATTLE_INPUT_MOVE_SELECT with the move index; BATTLE_INPUT_BUSY in between; NONE outside
+ * a battle. The menu variables stay set after a pick, so a menu only counts as waiting
+ * while its cursor cell on screen is the filled arrow.
+ */
+fun readGen1BattleInput(r: MemoryReader, cfg: Gen1Config): Pair<Int, Int> {
+    if (cfg.topMenuItemY == 0L) return BATTLE_INPUT_NONE to -1
+    val battle = u8(r.readCoreMemory(cfg.isInBattle, 1), 0)
+    if (battle != 1 && battle != 2) return BATTLE_INPUT_NONE to -1
+    val menu = r.readCoreMemory(cfg.topMenuItemY, 5)
+    val top = u8(menu, 0)
+    val x = u8(menu, 1)
+    val item = u8(menu, 2)
+    val max = u8(menu, 4)
+    fun cursorShown(row: Int) = row in 0 until 18 && x < 20 &&
+        u8(r.readCoreMemory(cfg.tileMap + row * 20 + x, 1), 0) == TILE_CURSOR
+    if (top == BATTLE_MENU_TOP && max == 1 && item <= 1 && (x == BATTLE_MENU_LEFT_X || x == BATTLE_MENU_RIGHT_X) &&
+        cursorShown(top + 2 * item)
+    ) {
+        return BATTLE_INPUT_ACTION_SELECT to ((if (x == BATTLE_MENU_RIGHT_X) 1 else 0) + 2 * item)
+    }
+    if (top == MOVE_MENU_TOP && x == MOVE_MENU_X && item in 1..4 &&
+        u8(r.readCoreMemory(cfg.moveMenuType, 1), 0) == 0 && cursorShown(top + item)
+    ) {
+        return BATTLE_INPUT_MOVE_SELECT to item - 1
+    }
+    return BATTLE_INPUT_BUSY to -1
+}
+
 /** Three BCD bytes (wPlayerMoney 99 99 99 = ¥999999). */
 fun bcd(b: ByteArray): Long = b.fold(0L) { acc, x -> acc * 100 + ((x.toInt() shr 4) and 0xF) * 10 + (x.toInt() and 0xF) }
 
@@ -127,8 +181,11 @@ fun readGen1Telemetry(r: MemoryReader, cfg: Gen1Config): Telemetry {
     }
 
     val map = u8(r.readCoreMemory(cfg.curMap, 1), 0)
+    val frames = if (cfg.playTime == 0L) 0L else r.readCoreMemory(cfg.playTime, 5).let { t ->
+        (((u8(t, 0) * 60L + u8(t, 2)) * 60L + u8(t, 3)) * 60L + u8(t, 4))
+    }
     return Telemetry(
-        frameCounter = 0,
+        frameCounter = frames,
         inBattle = inBattle,
         isDoubleBattle = false,
         mapGroup = 0,
@@ -140,10 +197,12 @@ fun readGen1Telemetry(r: MemoryReader, cfg: Gen1Config): Telemetry {
         partyCount = party.size,
         party = party,
         battleMons = battleMons,
+        battleInputState = if (inBattle) readGen1BattleInput(r, cfg).first else BATTLE_INPUT_NONE,
         itemCount = items.size,
         items = items,
         enemyParty = enemyParty,
         enemyActive = enemyActive,
         money = bcd(r.readCoreMemory(cfg.money, 3)),
+        pokedex = cfg.pokedex?.let { t -> t.gen1?.let { runCatching { readGen1PokedexState(r, it, t) }.getOrNull() } },
     )
 }

@@ -34,6 +34,20 @@ var activeGame: GameKind = GameKind.FIRERED
 
 private inline val unbound get() = activeGame == GameKind.UNBOUND
 private inline val emerald get() = activeGame == GameKind.EMERALD
+
+/** The running ROM's language letter (its game code's last: BPE<S|D|F|I|J>); 'E' for English
+ * and everything else. Set with [activeGame] by the Poller. */
+var romLanguage = 'E'
+
+/** The running retail ROM's game code when it has names of its own ("BPED", "AXVF"); else "". */
+var romGameCode = ""
+
+/** The running game's own names (EmeraldLanguages.kt); null for English and every game without them. */
+val localText: GameText? get() = if (romGameCode.isEmpty()) null else gameText(romGameCode)
+
+/** [shown]'s English name - what hand-written GUIDE entries tag areas with - for map section [mapsec]. */
+fun englishMapSecName(mapsec: Int, shown: String): String =
+    localText?.let { it.baseMapSecs[mapsec]?.name } ?: shown
 private inline val seaglass get() = activeGame == GameKind.EMERALD_SEAGLASS
 private inline val celia get() = activeGame == GameKind.CELIA
 private inline val tmt2 get() = activeGame == GameKind.TMT2
@@ -48,6 +62,9 @@ private inline val yellow get() = activeGame == GameKind.YELLOW
 var soulGoldV12 = false
 private val itemNamesSoulGoldV12 by lazy { itemNamesSoulGold + (SOULGOLD_V12_TM75 to "TM75 Agility") }
 internal const val SOULGOLD_V12_TM75 = 656
+/** Amethyst v1.4.1 renumbered species past 1233 (26 Hisuian forms inserted) and filled
+ * ~90 item slots: its own tables. Set with [activeGame] by the Poller. */
+var amethystV141 = false
 private inline val gaia get() = activeGame == GameKind.GAIA
 private inline val radicalRed get() = activeGame == GameKind.RADICAL_RED
 private inline val amethyst get() = activeGame == GameKind.AMETHYST
@@ -71,14 +88,14 @@ private val typeNamesOdyssey: Map<Int, String> by lazy { typeNames + (9 to "Fair
 
 private val speciesNamesOdysseyMerged: Map<Int, String> by lazy { speciesNames + speciesNamesOdyssey }
 
-val activeSpeciesNames: Map<Int, String> get() = when {
+val activeSpeciesNames: Map<Int, String> get() = localText?.species ?: when {
     yellow -> speciesNamesYellow
     unbound -> speciesNamesUnbound
     gaia -> speciesNamesGaia
     radicalRed -> speciesNamesRadicalRed
     odyssey -> speciesNamesOdysseyMerged
     nationalDexSpecies -> speciesNamesNationalDex
-    amethyst -> speciesNamesAmethyst
+    amethyst -> if (amethystV141) speciesNamesAmethystV141 else speciesNamesAmethyst
     celia -> speciesNamesCelia
     tmt2 -> speciesNamesTmt2
     hns -> speciesNamesHns
@@ -86,7 +103,7 @@ val activeSpeciesNames: Map<Int, String> get() = when {
     soulGold -> speciesNamesSoulGold
     else -> speciesNames
 }
-val activeMoveData: Map<Int, MoveInfo> get() = when {
+val activeMoveData: Map<Int, MoveInfo> get() = localText?.moveData ?: when {
     yellow -> moveDataYellow
     unbound -> moveDataUnbound
     celia -> moveDataCelia
@@ -99,10 +116,10 @@ val activeMoveData: Map<Int, MoveInfo> get() = when {
     radicalRed -> moveDataRadicalRed
     else -> moveData
 }
-val activeItemNames: Map<Int, String> get() = when {
+val activeItemNames: Map<Int, String> get() = localText?.items ?: when {
     yellow -> itemNamesYellow
     unbound -> itemNamesUnbound
-    amethyst -> itemNamesAmethyst
+    amethyst -> if (amethystV141) itemNamesAmethystV141 else itemNamesAmethyst
     seaglass -> itemNamesSeaglass
     celia -> itemNamesCelia
     tmt2 -> itemNamesTmt2
@@ -152,7 +169,7 @@ val activeTypeNames: Map<Int, String> get() = when {
     rogue -> typeNamesRogue
     else -> typeNames
 }
-val activeMapSecData: Map<Int, MapSecInfo> get() = when {
+val activeMapSecData: Map<Int, MapSecInfo> get() = localText?.mapSecData ?: when {
     yellow -> mapSecDataYellow
     unbound -> mapSecDataUnbound
     // Seaglass keeps vanilla Hoenn mapsec ids (0x00 = Littleroot, confirmed live).

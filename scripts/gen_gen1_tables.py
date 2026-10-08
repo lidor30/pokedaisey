@@ -33,6 +33,7 @@ GAMES = {
         base_stats=(0x0E, 0x43DE), base_stats_size=28, dex_count=151,
         moves=(0x0E, 0x4000), move_count=165, move_names=(0x2F, 0x4000),
         item_names=(0x01, 0x45B7), item_count=0x61,
+        tm_moves=(0x04, 0x632D),   # TechnicalMachines: TM01-50 then HM01-05, a move id each
         type_names=(0x09, 0x7D63), type_count=0x1B,
         type_effects=(0x0F, 0x65FA),
         external_maps=(0x1C, 0x539C), internal_maps=(0x1C, 0x540B), first_indoor_map=0x25, map_count=0xF8,
@@ -193,6 +194,17 @@ def main():
             yx, p = entry[1], entry[2]
         maps[m] = (rom.text(xb, p), yx & 0xF, yx >> 4)
     assert all(maps[k][0] == v for k, v in c["maps"].items()), "maps"
+
+    # TMs / HMs: Gen 1 gives items no description text; the TM's own move says what it does.
+    tb2, ta2 = g["tm_moves"]
+    tm = {}
+    for i in range(55):
+        mv = data[rom.off(tb2, ta2 + i)]
+        item = 0xC9 + i if i < 50 else 0xC4 + (i - 50)
+        tm[item] = f"Teaches {moves[mv][0]} to a POKéMON." + (" Can be used again." if i >= 50 else "")
+    write(f"ItemDescriptionsTm{sfx}.kt", head + " TechnicalMachines: what each TM / HM teaches\n"
+          "// (the game has no item descriptions; ItemDescriptionsYellow.kt has the rest, hand-written).\n",
+          kmap(f"tmDescriptions{sfx}", "String", [(k, kstr(v)) for k, v in sorted(tm.items())]))
 
     write(f"Gen1Species{sfx}.kt", head + " PokedexOrder: the party / battle structs'\n"
           "// internal species index -> National Dex number (0 = MISSINGNO.).\n",

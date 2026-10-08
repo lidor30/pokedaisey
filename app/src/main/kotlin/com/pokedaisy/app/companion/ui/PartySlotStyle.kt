@@ -9,7 +9,7 @@ package com.pokedaisy.app.companion.ui
  * CfruPartyStylesGen.kt). Coordinates are slot-window pixels, as the game's
  * sPartyBoxInfoRects / sPartyMenuSpriteCoords give them.
  */
-class PartySlotStyle(
+data class PartySlotStyle(
     /** assets/<dir>/slot_*.png. */
     val frameDir: String,
     /** FONT_SMALL atlas (red = text, blue = shadow). */

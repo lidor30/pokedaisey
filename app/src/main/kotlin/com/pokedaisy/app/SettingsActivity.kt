@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -57,14 +59,22 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.pokedaisy.app.achievements.RetroAchievements
+import com.pokedaisy.app.cheats.Cheat
+import com.pokedaisy.app.cheats.CheatCheck
+import com.pokedaisy.app.cheats.CheatCodes
+import com.pokedaisy.app.cheats.CheatStore
+import com.pokedaisy.app.cheats.CheatType
 import com.pokedaisy.app.companion.ui.AppBackdrop
 import com.pokedaisy.app.companion.ui.AspectPicker
 import com.pokedaisy.app.companion.ui.aspectLabel
+import com.pokedaisy.app.companion.ui.portraitPlaceLabel
 import com.pokedaisy.app.companion.ui.CoffeeCup
 import com.pokedaisy.app.companion.ui.GbaText
 import com.pokedaisy.app.companion.ui.GitHubMark
 import com.pokedaisy.app.companion.ui.GoldTrophy
 import com.pokedaisy.app.companion.ui.GroupedRows
+import com.pokedaisy.app.companion.ui.STATUS_BAR_PLACES
+import com.pokedaisy.app.companion.ui.statusBarLabel
 import com.pokedaisy.app.companion.ui.SettingRow
 import com.pokedaisy.app.companion.ui.groupTitle
 import com.pokedaisy.app.companion.ui.GbaTextMetrics
@@ -76,7 +86,8 @@ import com.pokedaisy.app.companion.ui.OptionListWindow
 import com.pokedaisy.app.companion.ui.OptionRows
 import com.pokedaisy.app.companion.ui.OptionSelector
 import com.pokedaisy.app.companion.FfMode
-import com.pokedaisy.app.companion.ScreenFilter
+import com.pokedaisy.app.companion.hasGrid
+import com.pokedaisy.app.companion.next
 import com.pokedaisy.app.companion.FfMusicMode
 import com.pokedaisy.app.companion.ui.OptionTextField
 import com.pokedaisy.app.companion.ui.OptionTitleWindow
@@ -100,7 +111,7 @@ import com.pokedaisy.app.companion.ui.drawPixelRoundRect
  */
 class SettingsActivity : ComponentActivity() {
 
-    private enum class Screen { HOME, HOTKEYS, CONTROLS, SHADERS, FOLDERS, COVER_ART, HIDDEN, ACHIEVEMENTS }
+    private enum class Screen { HOME, HOTKEYS, CONTROLS, SHADERS, FOLDERS, COVER_ART, HIDDEN, ACHIEVEMENTS, CHEATS, CHEAT_ADD }
 
     private lateinit var prefs: Prefs
     private var screen by mutableStateOf(Screen.HOME)
@@ -113,6 +124,8 @@ class SettingsActivity : ComponentActivity() {
     private val stillHeld = LinkedHashSet<Int>()
     private var revision by mutableIntStateOf(0)
     private var aspectPicker by mutableStateOf(false)
+    /** HOME's scroll, kept while a sub-page is open so BACK returns to the same rows. */
+    private val homeScroll = androidx.compose.foundation.ScrollState(0)
     /** This screen's width / height - the top screen's, for the ASPECT preview. */
     private var screenAspect by mutableFloatStateOf(16f / 9f)
 
@@ -127,16 +140,25 @@ class SettingsActivity : ComponentActivity() {
 
     private val updates by lazy { AppUpdateFlow(this) }
 
+    /** Opened from a game's library menu (CHEATS): BACK from its cheats leaves, not to the hub. */
+    private var cheatsOnly = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = Prefs(this)
         com.pokedaisy.app.companion.i18n.L10n.apply(prefs.appLanguage, null)
         RetroAchievements.init(this)
+        intent?.getStringExtra(EXTRA_CHEATS_ROM)?.let { path ->
+            cheatsOnly = true
+            cheatRom = File(path)
+            screen = Screen.CHEATS
+        }
         setContent { QolTheme { Root() } }
     }
 
     override fun onResume() {
         super.onResume()
+        com.pokedaisy.app.companion.ui.OptionColors.inGame = false
         updates.onResume()
     }
 
@@ -170,7 +192,7 @@ class SettingsActivity : ComponentActivity() {
 
     @Composable
     private fun Root() {
-        BackHandler(enabled = screen != Screen.HOME) { cancelCapture(); screen = Screen.HOME }
+        BackHandler(enabled = screen != Screen.HOME) { cancelCapture(); goBack() }
         BackHandler(enabled = aspectPicker) { aspectPicker = false }
         val m = rememberGbaTextMetrics()
         val small = rememberGbaTextMetrics(textScale = 1f)
@@ -190,11 +212,13 @@ class SettingsActivity : ComponentActivity() {
                         Screen.COVER_ART -> tk("COVER ART")
                         Screen.HIDDEN -> tk("HIDDEN GAMES")
                         Screen.ACHIEVEMENTS -> "RetroAchievements"
+                        Screen.CHEATS -> tk("CHEATS")
+                        Screen.CHEAT_ADD -> tk("ADD CODE")
                     },
                     m = m,
                     onBack = {
                         cancelCapture()
-                        if (screen == Screen.HOME) finish() else screen = Screen.HOME
+                        goBack()
                     },
                 )
                 Spacer(Modifier.height(m.u * 4))
@@ -207,6 +231,8 @@ class SettingsActivity : ComponentActivity() {
                     Screen.COVER_ART -> CoverArtScreen(m, small)
                     Screen.HIDDEN -> HiddenScreen(m, small)
                     Screen.ACHIEVEMENTS -> AchievementsScreen(m, small)
+                    Screen.CHEATS -> CheatsScreen(m, small)
+                    Screen.CHEAT_ADD -> CheatAddScreen(m, small)
                 }
             }
 
@@ -226,7 +252,7 @@ class SettingsActivity : ComponentActivity() {
                     }
                 }
                 AspectPicker(
-                    prefs.stretchGame, gameScreenAspect(), prefs.statusBar, shot, m,
+                    prefs.stretchGame, gameScreenAspect(), prefs.statusBar && !prefs.statusBarOnCompanion, shot, m,
                     onPick = { prefs.stretchGame = it; aspectPicker = false; revision++ },
                     onDismiss = { aspectPicker = false },
                 )
@@ -245,6 +271,26 @@ class SettingsActivity : ComponentActivity() {
 
             UpdateDialog(updates, m, small)
 
+            removingCheat?.let { i ->
+                val c = cheatList.getOrNull(i)
+                if (c == null) removingCheat = null else OptionConfirm(
+                    title = tk("REMOVE CHEAT?"),
+                    message = c.name,
+                    confirmLabel = tk("REMOVE"),
+                    m = m,
+                    onDismiss = { removingCheat = null },
+                    onConfirm = {
+                        removingCheat = null
+                        saveCheats(cheatList.filterIndexed { j, _ -> j != i })
+                        if (cheatList.isEmpty()) cheatRemoveMode = false
+                    },
+                )
+            }
+
+            cheatNotice?.let { (title, message) ->
+                OptionConfirm(title, message, tk("OK"), m, onConfirm = { cheatNotice = null }, onDismiss = { cheatNotice = null }, cancelLabel = null)
+            }
+
             deletingFile?.let { f ->
                 OptionConfirm(
                     title = tk("DELETE FILE?"),
@@ -255,6 +301,15 @@ class SettingsActivity : ComponentActivity() {
                     onConfirm = { f.delete(); deletingFile = null; folderTick++ },
                 )
             }
+        }
+    }
+
+    /** Back one page: ADD CODE to CHEATS, a page to the hub, the hub (or cheats opened from a game's menu) out. */
+    private fun goBack() {
+        when {
+            screen == Screen.CHEAT_ADD -> screen = Screen.CHEATS
+            screen == Screen.HOME || (screen == Screen.CHEATS && cheatsOnly) -> finish()
+            else -> { cheatRemoveMode = false; screen = Screen.HOME }
         }
     }
 
@@ -285,7 +340,8 @@ class SettingsActivity : ComponentActivity() {
     private fun HomeScreen(m: GbaTextMetrics) {
         @Suppress("UNUSED_EXPRESSION") revision
         val rateLabels = RATES.map(::rateLabel)
-        val themeLabels = APP_THEMES.map { it.label.uppercase() }
+        // Upper case, but the game's small é (POKéDAISY, like POKéMON).
+        val themeLabels = APP_THEMES.map { it.label.uppercase().replace('É', 'é') }
         val themeIdx = APP_THEMES.indexOfFirst { it.id == prefs.appTheme }.coerceAtLeast(0)
         fun onOff(on: Boolean) = if (on) tk("ON") else tk("OFF")
         // The same groups and order as the bottom screen's SETTINGS where they overlap.
@@ -319,15 +375,23 @@ class SettingsActivity : ComponentActivity() {
             SettingRow(tk("GAME BUTTONS"), null) { screen = Screen.CONTROLS },
             SettingRow(tk("HOTKEYS"), onOff(prefs.hotkeysEnabled)) { screen = Screen.HOTKEYS },
             groupTitle(tk("SCREEN")),
-            // Game, location, money, clock and battery above the game.
-            SettingRow(tk("STATUS BAR"), onOff(prefs.statusBar)) {
-                prefs.statusBar = !prefs.statusBar
-                revision++
+            // Game, location, money, clock and battery: OFF, over the game, or over the companion's tabs.
+            SettingRow(tk("STATUS BAR"), statusBarLabel(prefs.statusBar, prefs.statusBarOnCompanion)) {
+                selector = Selector(tk("STATUS BAR"), STATUS_BAR_PLACES, statusBarLabel(prefs.statusBar, prefs.statusBarOnCompanion)) {
+                    val i = STATUS_BAR_PLACES.indexOf(it)
+                    if (i > 0) prefs.statusBarOnCompanion = i == 2
+                    prefs.statusBar = i > 0
+                }
             },
             // The game at 3:2 or stretched to fill the screen; picked by preview.
             SettingRow(tk("ASPECT"), aspectLabel(prefs.stretchGame)) { aspectPicker = true },
-            // FILTER (LCD / SCANLINES / CRT) and GBA COLORS, on their own page.
+            // FILTER (LCD / LCD PAPER / SCANLINES / CRT) and GBA COLORS, on their own page.
             SettingRow(tk("SHADERS"), prefs.screenFilter.label) { screen = Screen.SHADERS },
+            // One screen held upright: the companion along the bottom, or right under the game (the touch pad below it).
+            SettingRow(tk("COMPANION"), portraitPlaceLabel(prefs.portraitCompanionUnderGame)) {
+                prefs.portraitCompanionUnderGame = !prefs.portraitCompanionUnderGame
+                revision++
+            }.takeIf { !hasSecondScreen },
             // Game and companion trade screens; the game picks it up on resume.
             SettingRow(tk("SWAP SCREENS"), onOff(prefs.swapScreens)) {
                 prefs.swapScreens = !prefs.swapScreens
@@ -342,9 +406,16 @@ class SettingsActivity : ComponentActivity() {
                 }
             },
             groupTitle(tk("LIBRARY")),
+            // On: a game opens where it was left. Off: at its title screen, from the save.
+            SettingRow(tk("RESUME GAMES"), onOff(prefs.autoResume)) {
+                prefs.autoResume = !prefs.autoResume
+                revision++
+            },
             SettingRow(tk("FOLDERS"), null) { screen = Screen.FOLDERS },
             SettingRow(tk("COVER ART"), onOff(prefs.steamGridDbApiKey != null || prefs.raWebApiKey != null)) { screen = Screen.COVER_ART },
             SettingRow(tk("HIDDEN GAMES"), RomFolder.hiddenRoms(this@SettingsActivity, prefs).size.takeIf { it > 0 }?.toString() ?: tk("NONE")) { screen = Screen.HIDDEN },
+            // A game's GameShark / Action Replay / CodeBreaker codes, on their own page.
+            SettingRow(tk("CHEATS"), onOff(prefs.cheatsEnabled)) { screen = Screen.CHEATS },
             groupTitle(tk("ONLINE")),
             // Signed in = on; the account's name, else OFF.
             SettingRow(
@@ -367,7 +438,7 @@ class SettingsActivity : ComponentActivity() {
         )
         Column(Modifier.fillMaxSize()) {
             OptionListWindow(m, Modifier.fillMaxWidth().weight(1f)) {
-                GroupedRows(rows, m, cursor = -1, onClick = { rows[it].onClick() })
+                GroupedRows(rows, m, cursor = -1, onClick = { rows[it].onClick() }, scroll = homeScroll)
             }
             Spacer(Modifier.height(m.u * 4))
             AboutFooter(m)
@@ -378,17 +449,28 @@ class SettingsActivity : ComponentActivity() {
     @Composable
     private fun ShadersScreen(m: GbaTextMetrics) {
         @Suppress("UNUSED_EXPRESSION") revision
-        val filters = ScreenFilter.entries
         val rows = listOf(
-            // NONE / LCD grid / SCANLINES / CRT.
+            // NONE / LCD grid / LCD PAPER / SCANLINES / CRT.
+            // Each tap steps to the next filter, like the companion's.
             SettingRow(tk("FILTER"), prefs.screenFilter.label) {
-                selector = Selector(tk("FILTER"), filters.map { it.label }, prefs.screenFilter.label) { l ->
-                    prefs.screenFilter = filters.first { it.label == l }
+                prefs.screenFilter = prefs.screenFilter.next()
+                revision++
+            },
+            // SOFT / MEDIUM / STRONG, cycling too; greyed out for a filter with no grid.
+            SettingRow(tk("GRID"), prefs.gridStrength.label, enabled = prefs.screenFilter.hasGrid) {
+                if (prefs.screenFilter.hasGrid) {
+                    prefs.gridStrength = prefs.gridStrength.next()
+                    revision++
                 }
             },
             // The colours as the GBA's own LCD showed them; stacks with any filter.
             SettingRow(tk("GBA COLORS"), if (prefs.gbaColors) tk("ON") else tk("OFF")) {
                 prefs.gbaColors = !prefs.gbaColors
+                revision++
+            },
+            // FILTER and GBA COLORS over the companion too (and the status bar).
+            SettingRow(tk("ON COMPANION"), if (prefs.companionShaders) tk("ON") else tk("OFF")) {
+                prefs.companionShaders = !prefs.companionShaders
                 revision++
             },
         )
@@ -511,6 +593,161 @@ class SettingsActivity : ComponentActivity() {
                                 },
                             )
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    // ---- cheats -------------------------------------------------------------
+
+    /** The game CHEATS shows (its library menu's, else the last one played), its CRC once
+     * worked out, and its cheats (cheats/Cheats.kt). */
+    private var cheatRom by mutableStateOf<File?>(null)
+    private var cheatCrc by mutableStateOf<String?>(null)
+    private var cheatList by mutableStateOf<List<Cheat>>(emptyList())
+    private var cheatRemoveMode by mutableStateOf(false)
+    private var removingCheat by mutableStateOf<Int?>(null)
+    /** A title + message to show over CHEATS (an import's result, a file that isn't one; internal for ui-preview). */
+    internal var cheatNotice by mutableStateOf<Pair<String, String>?>(null)
+
+    private fun cheatStore(): CheatStore? = cheatCrc?.let { CheatStore.forCrc(filesDir, it) }
+
+    private fun saveCheats(list: List<Cheat>) {
+        cheatStore()?.save(list)
+        cheatList = list
+    }
+
+    /**
+     * CHEATS: the master switch, which game, ADD CODE (typed) and IMPORT FILE (a
+     * RetroArch .cht or mGBA .cheats), then the game's cheats - tap one to turn it on
+     * or off; REMOVE turns the taps into removes. The game loads them when it starts
+     * (and live from the companion's SETTINGS > CHEATS).
+     */
+    @Composable
+    private fun CheatsScreen(m: GbaTextMetrics, small: GbaTextMetrics) {
+        @Suppress("UNUSED_EXPRESSION") revision
+        val games = remember { RomFolder.libraryRoms(this@SettingsActivity, prefs) }
+        val rom = cheatRom ?: remember(games) { prefs.lastRomPath?.let(::File)?.takeIf { it.isFile } ?: games.firstOrNull() }
+        LaunchedEffect(rom) {
+            cheatCrc = null
+            cheatList = emptyList()
+            val crc = rom?.let { withContext(Dispatchers.IO) { cheatCrcOf(it) } }
+            cheatCrc = crc
+            cheatList = crc?.let { c -> withContext(Dispatchers.IO) { CheatStore.forCrc(filesDir, c).load() } }.orEmpty()
+        }
+        val importFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) importCheats(uri)
+        }
+        fun onOff(on: Boolean) = if (on) tk("ON") else tk("OFF")
+        val master = prefs.cheatsEnabled
+        val ready = rom != null && cheatCrc != null
+        val rows = buildList {
+            add(SettingRow(tk("CHEATS"), onOff(master)) { prefs.cheatsEnabled = !master; revision++ })
+            add(SettingRow(tk("GAME"), rom?.let { GameTitles.label(this@SettingsActivity, prefs, it) } ?: tk("NONE")) {
+                if (games.isEmpty()) return@SettingRow
+                val labels = games.map { GameTitles.label(this@SettingsActivity, prefs, it) }
+                val current = rom?.let { games.indexOf(it) }?.takeIf { it >= 0 }?.let { labels[it] } ?: ""
+                selector = Selector(tk("GAME"), labels, current) { l -> cheatRom = games[labels.indexOf(l)]; cheatRemoveMode = false }
+            })
+            add(groupTitle(tk("CODES")))
+            when {
+                rom == null -> add(SettingRow(tk("NO GAMES IN THE LIBRARY"), null, enabled = false) {})
+                cheatCrc == null -> add(SettingRow(tk("LOADING…"), null, enabled = false) {})
+                cheatList.isEmpty() -> add(SettingRow(tk("NO CHEATS FOR THIS GAME"), null, enabled = false) {})
+                else -> cheatList.forEachIndexed { i, c ->
+                    if (cheatRemoveMode) add(SettingRow(c.name, tk("REMOVE")) { removingCheat = i })
+                    // Greyed out with the master switch off, like HOTKEYS' binds.
+                    else add(SettingRow(c.name, onOff(c.enabled), enabled = master) {
+                        saveCheats(cheatList.toMutableList().also { it[i] = c.copy(enabled = !c.enabled) })
+                    })
+                }
+            }
+        }
+        Column(Modifier.fillMaxSize()) {
+            Hint(
+                tr("A cheat can break a save, so the save is backed up every time a game starts (RESTORE BACKUP in its library menu). Achievements pause while a cheat is on."),
+                m, small,
+            )
+            OptionListWindow(m, Modifier.fillMaxWidth().weight(1f)) {
+                GroupedRows(rows, m, cursor = -1, onClick = { rows[it].onClick() })
+            }
+            Spacer(Modifier.height(m.u * 4))
+            // Under the list, like HIDDEN GAMES' SHOW ALL, so the cheats get its rows.
+            Row(horizontalArrangement = Arrangement.spacedBy(m.u * 4)) {
+                OptionButton(tk("ADD CODE"), m, emphasis = true, enabled = ready, onClick = { cheatRemoveMode = false; screen = Screen.CHEAT_ADD })
+                OptionButton(tk("IMPORT FILE"), m, enabled = ready, onClick = { importFile.launch(arrayOf("*/*")) })
+                Spacer(Modifier.weight(1f))
+                if (cheatList.isNotEmpty()) {
+                    OptionButton(if (cheatRemoveMode) tk("DONE") else tk("REMOVE"), m, onClick = { cheatRemoveMode = !cheatRemoveMode })
+                }
+            }
+        }
+    }
+
+    /** IMPORT FILE: reads the picked file and adds its cheats (all OFF), saying what came in and what didn't. */
+    private fun importCheats(uri: Uri) {
+        val store = cheatStore() ?: return
+        val name = uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.')?.ifBlank { null } ?: tk("CHEAT")
+        Thread {
+            val text = runCatching {
+                contentResolver.openInputStream(uri)?.use { it.readBytes().takeIf { b -> b.size <= MAX_CHEAT_FILE } }
+            }.getOrNull()?.toString(Charsets.UTF_8)?.removePrefix("\uFEFF")
+            val result = text?.let { store.import(it, name) }
+            val list = store.load()
+            runOnUiThread {
+                cheatList = list
+                cheatNotice = cheatImportNotice(result)
+            }
+        }.start()
+    }
+
+    @Composable
+    private fun CheatAddScreen(m: GbaTextMetrics, small: GbaTextMetrics) {
+        var name by remember { mutableStateOf("") }
+        var code by remember { mutableStateOf("") }
+        var type by remember { mutableStateOf(CheatType.AUTO) }
+        var error by remember { mutableStateOf<String?>(null) }
+        Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+            Hint(
+                tr("Type or paste a GameShark, Action Replay or CodeBreaker code, one line or many. AUTO works out which it is; pick the type when a code doesn't take."),
+                m, small,
+            )
+            OptionListWindow(m, Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(horizontal = m.u * 4)) {
+                    GbaText(tr("NAME"), OptionColors.label, OptionColors.labelShadow, m, Modifier.padding(vertical = m.u * 2))
+                    OptionTextField(name, { name = it; error = null }, small, placeholder = tr("e.g. INFINITE MONEY"))
+                    Spacer(Modifier.height(m.u * 4))
+                    GbaText(tr("CODE"), OptionColors.label, OptionColors.labelShadow, m, Modifier.padding(vertical = m.u * 2))
+                    OptionTextField(code, { code = it.uppercase(); error = null }, small, placeholder = "XXXXXXXX YYYYYYYY", minLines = 3, code = true)
+                    Spacer(Modifier.height(m.u * 2))
+                    // Back by the list row's own inset, so TYPE lines up with NAME and CODE.
+                    OptionLine(tk("TYPE"), type.label, selected = false, m, Modifier.offset(x = -m.u * 4), height = m.rowHeight * 1.2f) {
+                        val types = CheatType.entries
+                        selector = Selector(tk("TYPE"), types.map { it.label }, type.label) { l -> type = types.first { it.label == l }; error = null }
+                    }
+                    error?.let {
+                        GbaText(it, OptionColors.value, OptionColors.valueShadow, small, Modifier.padding(top = m.u * 4), maxLines = 4)
+                    }
+                    Row(Modifier.padding(vertical = m.u * 4), horizontalArrangement = Arrangement.spacedBy(m.u * 4)) {
+                        OptionButton(tk("CANCEL"), m, onClick = { screen = Screen.CHEATS })
+                        OptionButton(tk("ADD"), m, emphasis = true, enabled = code.isNotBlank(), onClick = {
+                            val lines = CheatCodes.normalize(code)
+                            val label = name.trim().ifEmpty { tr("CHEAT {0}", cheatList.size + 1) }
+                            val r = CheatCheck.check(Cheat(label, lines), type)
+                            val ok = r.cheat
+                            if (ok == null) {
+                                error = when {
+                                    r.bad.isEmpty() -> tr("That isn't a code.")
+                                    type == CheatType.AUTO -> tr("mGBA can't read {0}.", r.bad.joinToString(", "))
+                                    else -> tr("mGBA can't read {0} as a {1} code.", r.bad.joinToString(", "), tr(type.label))
+                                }
+                            } else {
+                                // Typed in to be used: on (the master switch still decides).
+                                saveCheats(cheatList + ok.copy(enabled = true))
+                                screen = Screen.CHEATS
+                            }
+                        })
                     }
                 }
             }
@@ -698,12 +935,12 @@ class SettingsActivity : ComponentActivity() {
         val tick = folderTick
         val savesDir = remember(tick) { SavesLocation.dir(this@SettingsActivity, prefs) }
         val statesDir = remember { File(getExternalFilesDir(null), "states").apply { mkdirs() } }
-        val pickSavesDir = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        val pickSavesDir = rememberLauncherForActivityResult(StorageAccess.PickFolder()) { uri ->
             val path = pickedFolder(uri) ?: return@rememberLauncherForActivityResult
             prefs.savesDirOverride = path
             folderTick++
         }
-        val pickRomsDir = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        val pickRomsDir = rememberLauncherForActivityResult(StorageAccess.PickFolder()) { uri ->
             val path = pickedFolder(uri) ?: return@rememberLauncherForActivityResult
             if (path != prefs.romsFolder) {
                 prefs.romsFolder = path
@@ -790,7 +1027,7 @@ class SettingsActivity : ComponentActivity() {
     /** Needs "All files access" first (games and saves are opened by raw path,
      * which scoped storage otherwise blocks outside this app's own sandbox). */
     private fun pickFolder(launcher: androidx.activity.result.ActivityResultLauncher<Uri?>) {
-        if (!StorageAccess.hasAllFilesAccess()) {
+        if (!StorageAccess.hasAllFilesAccess(this)) {
             StorageAccess.requestAllFilesAccess(this)
             Toast.makeText(this, tr("Grant \"All files access\", then tap the button again"), Toast.LENGTH_LONG).show()
             return
@@ -854,10 +1091,36 @@ class SettingsActivity : ComponentActivity() {
         Toast.makeText(ctx, tr("Path copied"), Toast.LENGTH_SHORT).show()
     }
 
-    private companion object {
+    companion object {
         val RATES = floatArrayOf(0f, 2f, 3f, 4f, 5f, 6f, 8f, 10f)
         val TOUCH_NAMES = listOf(tk("AUTO"), tk("ALWAYS"), tk("NEVER"))
         const val REPO_URL = "https://github.com/lidor30/pokedaisy"
+        /** A ROM path: open straight on that game's CHEATS (its library menu). */
+        const val EXTRA_CHEATS_ROM = "cheats_rom"
+        /** Cheat files are text; anything bigger isn't one. */
+        const val MAX_CHEAT_FILE = 1 shl 20
+
+        private val cheatCrcs = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+        /** [rom]'s CRC32 ([SaveStates.crc32], the key of its cheats like its states), remembered
+         * by path + size + mtime. Not on the UI thread. */
+        fun cheatCrcOf(rom: File): String? {
+            val key = "${rom.absolutePath}|${rom.length()}|${rom.lastModified()}"
+            cheatCrcs[key]?.let { return it }
+            return runCatching { SaveStates.crc32(rom) }.getOrNull()?.also { cheatCrcs[key] = it }
+        }
+
+        /** What IMPORT FILE says once it's done (null: the file couldn't be read). */
+        fun cheatImportNotice(r: CheatStore.Import?): Pair<String, String> = when {
+            r == null -> tk("CAN'T READ THAT FILE") to tr("Pick a RetroArch .cht or an mGBA .cheats file.")
+            r.added == 0 && r.badCheats == 0 && r.duplicates == 0 ->
+                tk("NO CHEATS FOUND") to tr("That file has no cheats in a format PokeDaisy reads (RetroArch .cht, mGBA .cheats).")
+            else -> (if (r.added == 0) tk("NO CHEATS ADDED") else tr("{0} CHEATS ADDED", r.added)) to listOfNotNull(
+                tr("They start OFF: tap one to turn it on.").takeIf { r.added > 0 },
+                tr("{0} left out: mGBA can't read {1} of their code lines.", r.badCheats, r.badLines).takeIf { r.badCheats > 0 },
+                tr("{0} were already in the list.", r.duplicates).takeIf { r.duplicates > 0 },
+            ).joinToString(" ")
+        }
         const val COFFEE_URL = "https://buymeacoffee.com/lidor30g"
 
         fun rateLabel(v: Float) = if (v <= 0f) tk("INFINITE") else "${v.toInt()}×"

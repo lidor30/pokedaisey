@@ -1,0 +1,60 @@
+name: Bug report
+description: Something in PokeDaisy doesn't work or shows the wrong thing.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please **never attach or link a ROM** - name the game and its version instead.
+  - type: input
+    id: app_version
+    attributes:
+      label: PokeDaisy version
+      description: Top-screen Settings > VERSION.
+      placeholder: 1.2.0
+    validations:
+      required: true
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      options:
+        - AYN Thor
+        - Retroid Pocket Duo
+        - Another dual-screen device
+        - A single-screen device
+    validations:
+      required: true
+  - type: input
+    id: device_model
+    attributes:
+      label: Device model and Android version
+      placeholder: Retroid Pocket 6, Android 13
+  - type: input
+    id: game
+    attributes:
+      label: Game
+      description: The game and its version (the website's ROM check shows both).
+      placeholder: Pokémon Unbound v2.1.1.1
+    validations:
+      required: true
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected instead. Screenshots of both screens help a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen
+      placeholder: |
+        1. Open the PARTY tab in a trainer battle
+        2. ...
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Optional - `adb logcat -s pokedaisy` output if you have it.
+      render: shell

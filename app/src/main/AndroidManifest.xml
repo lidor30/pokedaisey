@@ -12,6 +12,15 @@
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
 
+    <!-- Android 8-10's counterpart of MANAGE_EXTERNAL_STORAGE (which only exists from 11):
+         the linked ROMs / saves folders are opened by raw path (StorageAccess). -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+
     <!-- Two uses, both outbound HTTPS only: library cover art (Settings > Cover
          Art) from SteamGridDB's API with a user-supplied key (Prefs.steamGridDbApiKey /
          SteamGridDbClient), and the update check against this app's GitHub releases
@@ -32,6 +41,7 @@
 
     <application
         android:allowBackup="false"
+        android:requestLegacyExternalStorage="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
@@ -51,7 +61,9 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:mimeType="*/*" android:pathPattern=".*\\.gba" />
-                <!-- .gb / .gbc go back here with TelemetrySampler.GAME_BOY_SUPPORT. -->
+                <!-- Game Boy / Color, with TelemetrySampler.GAME_BOY_SUPPORT. -->
+                <data android:mimeType="*/*" android:pathPattern=".*\\.gb" />
+                <data android:mimeType="*/*" android:pathPattern=".*\\.gbc" />
             </intent-filter>
         </activity>
 
@@ -63,7 +75,7 @@
              Its own empty affinity keeps it out of the library's task. -->
         <activity
             android:name=".LaunchActivity"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|navigation|uiMode"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode"
             android:exported="true"
             android:excludeFromRecents="true"
             android:noHistory="true"
@@ -86,13 +98,17 @@
             android:exported="false"
             android:theme="@style/Theme.PokeDaisy" />
 
+        <!-- No screenOrientation: PokeDaisyActivity locks landscape itself with a second
+             screen and follows the device's rotation without one (a phone upright puts the
+             companion under the game, PortraitPanel). configChanges keeps the game running
+             through a rotation and through a controller connecting ("keyboard": many
+             8BitDo / GameSir modes register as one, which restarted the activity). -->
         <activity
             android:name=".PokeDaisyActivity"
             android:exported="false"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|navigation|uiMode"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode"
             android:launchMode="singleTask"
             android:parentActivityName=".LibraryActivity"
-            android:screenOrientation="sensorLandscape"
             android:theme="@style/Theme.PokeDaisy" />
     </application>
 </manifest>

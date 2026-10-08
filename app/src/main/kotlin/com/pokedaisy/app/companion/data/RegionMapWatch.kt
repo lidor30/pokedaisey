@@ -70,6 +70,10 @@ object RegionMapWatch {
     private const val EM_FIELD_REGION_MAP = 0x0203BCD0L
     private const val EM_FLY_MAP = 0x0203A148L
     private const val EM_POKENAV_RESOURCES = 0x0203CF40L
+    // Japanese Emerald's (English's literal pools, matched in its code).
+    private const val JA_FIELD_REGION_MAP = 0x0203B99CL
+    private const val JA_FLY_MAP = 0x02039E14L
+    private const val JA_POKENAV_RESOURCES = 0x0203CC0CL
     // struct PokenavResources: 4 words of state, then substructPtrs[]; REGION_MAP_STATE is index 3.
     private const val EM_POKENAV_REGION_MAP_STATE = 0x10 + 3 * 4
 
@@ -80,7 +84,8 @@ object RegionMapWatch {
             ((rom[i + 2].toLong() and 0xFF) shl 16) or ((rom[i + 3].toLong() and 0xFF) shl 24)
         val end = minOf(rom.size, SCAN_END) - 8
         return when (String(rom, 0xAC, 4, Charsets.US_ASCII)) {
-            "BPRE", "BPGE" -> {
+            // the other-language FireRed / LeafGreen too: the pattern finds their own pointer
+            "BPRE", "BPGE", "BPRD", "BPRF", "BPRI", "BPRS", "BPGF", "BPGI", "BPGS" -> {
                 val seen = HashMap<Long, Int>()
                 for (i in 0..end step 4) {
                     val a = u32(i)
@@ -89,8 +94,12 @@ object RegionMapWatch {
                 // sRegionMap is loaded that way 3 times; another pointer twice.
                 seen.filterValues { it >= 3 }.keys.map { Watch(it) }
             }
-            "BPEE" -> {
-                val want = longArrayOf(EM_FIELD_REGION_MAP, EM_FLY_MAP, EM_POKENAV_RESOURCES)
+            "BPEE", "BPES", "BPED", "BPEF", "BPEI", "BPEJ" -> { // the European Emeralds keep English's RAM
+                val ja = String(rom, 0xAC, 4, Charsets.US_ASCII) == "BPEJ"
+                val field = if (ja) JA_FIELD_REGION_MAP else EM_FIELD_REGION_MAP
+                val fly = if (ja) JA_FLY_MAP else EM_FLY_MAP
+                val pokenav = if (ja) JA_POKENAV_RESOURCES else EM_POKENAV_RESOURCES
+                val want = longArrayOf(field, fly, pokenav)
                 val seen = IntArray(want.size)
                 for (i in 0..end step 4) {
                     val a = u32(i)
@@ -99,7 +108,7 @@ object RegionMapWatch {
                 // Retail loads them 7, 15 and 15 times; a hack that moved them
                 // might still use one of the addresses for something else.
                 if (seen.all { it >= 5 }) {
-                    listOf(Watch(EM_FIELD_REGION_MAP), Watch(EM_FLY_MAP), Watch(EM_POKENAV_RESOURCES, EM_POKENAV_REGION_MAP_STATE))
+                    listOf(Watch(field), Watch(fly), Watch(pokenav, EM_POKENAV_REGION_MAP_STATE))
                 } else emptyList()
             }
             else -> emptyList()

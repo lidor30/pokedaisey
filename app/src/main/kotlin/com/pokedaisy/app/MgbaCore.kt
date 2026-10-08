@@ -68,6 +68,17 @@ object MgbaCore {
     /** A Game Boy / Color cart's ROM bytes (it's bank-switched, so not on the bus whole); null on GBA. */
     external fun pkRomRead(off: Long, len: Int): ByteArray?
 
+    // --- cheats (pk_cheats.c, see cheats/Cheats.kt) ---
+
+    /** Checks a cheat's code lines ('\n'-separated) as [type] (CheatType.native), after
+     * [directive] ("" or a .cheats directive). No core needed, any thread. Returns
+     * "<directive mGBA settled on>\n<'1' / '0' per line>", null on failure. */
+    external fun pkCheatsCheck(code: String, type: Int, directive: String): String?
+
+    /** Emu thread: replaces the core's cheats with [text] (mGBA .cheats, enabled
+     * ones only; "" = none). Returns how many loaded, -1 if it didn't parse. */
+    external fun pkCheatsApply(text: String): Int
+
     // --- FF-music rendering (see FfMusicRenderer) ---
     // A second, fully independent core, never the player's real session —
     // no save file, never shown, never touched by input. Same one-frame-
@@ -88,6 +99,12 @@ object MgbaCore {
      * change the music; the sound engine keeps running from VBlank. False if it never got
      * to a safe moment (see the JNI side). */
     external fun pkRenderPark(spin: Long): Boolean
+
+    /** A Game Boy render core's [pkRenderPark]: the main loop goes to [spin] (a `jr @` in bank 0). */
+    external fun pkRenderGbPark(spin: Int): Boolean
+
+    /** Calls the Game Boy render core's [fn] (bank 0) with A = [a], C = [c], until it returns to [ret]. */
+    external fun pkRenderGbCall(fn: Int, a: Int, c: Int, ret: Int): Boolean
 
     /** [pkReadBytes] for the render core (which song it's really playing - see FfMusicKey). */
     external fun pkRenderReadBytes(addr: Long, len: Int): ByteArray?

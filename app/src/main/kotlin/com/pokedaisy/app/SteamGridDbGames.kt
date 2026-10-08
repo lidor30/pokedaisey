@@ -1,5 +1,8 @@
 package com.pokedaisy.app
 
+import com.pokedaisy.app.companion.data.EMERALD_LOCALIZED_CODES
+import com.pokedaisy.app.companion.data.RETAIL_PORT_CODE_TITLES
+
 /**
  * Which SteamGridDB "game" entry each supported ROM hack corresponds to, so
  * [SteamGridDbClient] knows what to ask for once a ROM is identified by
@@ -63,7 +66,8 @@ object SteamGridDbGames {
         if (rom.length() > 0x1000000L) return null
         return when (RomIdentity.gameCode(rom)) {
             "BPRE" -> FIRERED
-            "BPEE" -> EMERALD
+            "BPEE", in EMERALD_LOCALIZED_CODES -> EMERALD
+            in RETAIL_PORT_CODE_TITLES.keys.filter { it.startsWith("BPR") } -> FIRERED
             else -> null
         }
     }

@@ -1,0 +1,177 @@
+---
+// A dual-screen handheld in pixels, laid out like the AYN Thor: a wide 16:9 top screen in a thin
+// bezel, a two-piece hinge, and below it the small screen between the controls - left stick over the
+// d-pad, ABXY over the right stick, the small menu buttons under the screen, speaker grilles. The top
+// screen is an overworld of our own (no game art) under the app's STATUS BAR; the bottom one plays the
+// companion's PARTY tab.
+import Pixel from './Pixel.astro';
+import PartyDemo from './PartyDemo.astro';
+import { spriteUrl } from '../lib/pixel.js';
+
+interface Props { still?: boolean }
+const { still = false } = Astro.props;
+const bg = `--hill:${spriteUrl('hill')};--tuft:${spriteUrl('tuft')};--path:${spriteUrl('path')};--fence:${spriteUrl('fence')};--tall:${spriteUrl('tallgrass')}`;
+const daisies = [[4, 66], [24, 69], [60, 64], [74, 72], [90, 66], [40, 90], [56, 93], [92, 92], [8, 93], [31, 63]];
+---
+<div class:list={['device', still && 'still']} style={bg}>
+  <div class="lid f-thorShell">
+    <div class="bezel f-bezel">
+      <div class="topscreen">
+        <div class="sky"></div>
+        <span class="cloud c1"><Pixel name="cloud" scale={1} /></span>
+        <span class="cloud c2"><Pixel name="cloud" scale={1.334} /></span>
+        <span class="cloud c3"><Pixel name="cloud" scale={0.667} /></span>
+        <span class="bird bird-1"><Pixel name="bird" scale={1} /></span>
+        <span class="bird bird-2"><Pixel name="bird" scale={0.667} /></span>
+        <div class="hills"></div>
+        <div class="ground"></div>
+        <div class="path"></div>
+        <div class="fence"></div>
+        <div class="tall"></div>
+        <span class="house"><Pixel name="house" scale={1.334} /></span>
+        <span class="sign"><Pixel name="sign" scale={1} /></span>
+        <span class="pond"><Pixel name="pond" scale={1.334} /></span>
+        <span class="tree t1"><Pixel name="tree" scale={1.334} /></span>
+        <span class="tree t2"><Pixel name="tree" scale={1.334} /></span>
+        <span class="tree t3"><Pixel name="tree" scale={1} /></span>
+        {daisies.map(([x, y], i) => <span class="flower" style={`left:${x}%;top:${y}%;animation-delay:-${(i % 3) * 0.4}s`}><Pixel name="daisy" scale={0.667} /></span>)}
+        <span class="walker"><span class="walker-bob"><Pixel name="walker" scale={1} /></span></span>
+        <div class="statusbar">
+          <span>DAISY QUEST</span><span class="sb-place"><Pixel name="pin" scale={0.667} />MEADOW PATH</span><span class="sb-right">12:45 · 96%<Pixel name="battery" scale={0.667} /></span>
+        </div>
+        <div class="textbox f-dialog" data-textbox>
+          <p data-line>Your party is on the bottom screen.</p>
+          <span class="tb-more"><Pixel name="more" scale={0.667} /></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="hinge"></div>
+  <div class="base f-thorShell">
+    <div class="side">
+      <span class="ctl stick"><Pixel name="thorStick" scale={1.5} /></span>
+      <span class="ctl"><Pixel name="thorDpad" scale={1.5} /></span>
+      <span class="mini"></span>
+    </div>
+    <div class="middle">
+      <div class="bezel f-bezel low"><PartyDemo compact /></div>
+      <div class="menu-keys"><i></i><i class="home"></i><i></i></div>
+    </div>
+    <div class="side">
+      <span class="ctl"><Pixel name="thorAbxy" scale={1.5} /></span>
+      <span class="ctl stick"><Pixel name="thorStick" scale={1.5} /></span>
+      <span class="mini"></span>
+    </div>
+    <span class="grille left"></span>
+    <span class="grille right"></span>
+  </div>
+</div>
+
+<style is:global>
+  .device { width: 100%; max-width: 560px; margin: 0 auto; filter: drop-shadow(calc(var(--px) * 4) calc(var(--px) * 4) 0 rgba(29, 27, 38, 0.16)); }
+  .device .lid { padding: 0; }
+  .device .bezel { display: block; }
+  .device .topscreen { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #8ccaf4; font-family: 'Pixel Operator', monospace; }
+  .device .sky { position: absolute; inset: 0; background: linear-gradient(#7cc0f0 0 18%, #90ccf4 18% 30%, #a6d8f8 30% 40%, #bce2f8 40% 50%, #d0ecfa 50% 60%); }
+  .device .cloud { position: absolute; left: 0; animation: cloud 40s steps(160) infinite; }
+  .device .c1 { top: 15%; }
+  .device .c2 { top: 25%; animation-duration: 56s; animation-delay: -20s; }
+  .device .c3 { top: 11%; animation-duration: 70s; animation-delay: -45s; opacity: 0.85; }
+  @keyframes cloud { from { transform: translateX(-120px); } to { transform: translateX(620px); } }
+  .device .bird { position: absolute; left: 0; animation: fly 18s steps(90) infinite, flap 0.5s steps(1) infinite; }
+  .device .bird-1 { top: 20%; }
+  .device .bird-2 { top: 27%; animation-delay: -6s, -0.25s; }
+  @keyframes fly { from { transform: translateX(620px); } to { transform: translateX(-60px); } }
+  @keyframes flap { 50% { transform: scaleY(0.4); } }
+  .device .hills { position: absolute; left: 0; right: 0; top: 46%; height: calc(var(--px) * 14); background: var(--hill) repeat-x 0 0 / calc(var(--px) * 64) 100%; }
+  .device .ground { position: absolute; left: 0; right: 0; top: calc(46% + var(--px) * 14); bottom: 0; background: #88d058 var(--tuft) repeat 0 0 / calc(var(--px) * 32) calc(var(--px) * 32); }
+  .device .path { position: absolute; left: 0; right: 0; top: 77%; height: calc(var(--px) * 14); background: var(--path) repeat 0 0 / calc(var(--px) * 32) calc(var(--px) * 16); box-shadow: 0 calc(var(--px) * -1) 0 #6cb848, 0 var(--px) 0 #6cb848; }
+  .device .fence { position: absolute; left: 30%; width: 26%; top: 60%; height: calc(var(--px) * 8); background: var(--fence) repeat-x 0 0 / calc(var(--px) * 8) 100%; }
+  .device .tall { position: absolute; left: 36%; width: 20%; top: 66%; height: calc(var(--px) * 16); background: var(--tall) repeat 0 0 / calc(var(--px) * 8) calc(var(--px) * 8); animation: rustle 1.6s steps(1) infinite; }
+  @keyframes rustle { 50% { background-position: var(--px) 0; } }
+  .device .house { position: absolute; left: 7%; top: 36%; }
+  .device .sign { position: absolute; left: 25%; top: 61%; }
+  .device .pond { position: absolute; left: 62%; top: 62%; }
+  .device .tree { position: absolute; }
+  .device .t1 { left: 80%; top: 37%; }
+  .device .t2 { left: 0; top: 52%; }
+  .device .t3 { left: 90%; top: 49%; }
+  .device .flower { position: absolute; animation: sway 1.2s steps(1) infinite; transform-origin: 50% 100%; }
+  @keyframes sway { 50% { transform: rotate(-12deg); } }
+  .device .walker { position: absolute; top: 70%; left: 0; animation: walk 14s steps(56) infinite alternate; }
+  .device .walker-bob { display: block; animation: step 0.3s steps(1) infinite; }
+  @keyframes walk { from { transform: translateX(80px); } to { transform: translateX(380px); } }
+  @keyframes step { 50% { transform: translateY(calc(var(--px) * -1)); } }
+  .device .statusbar {
+    position: absolute; left: 0; right: 0; top: 0; display: flex; gap: 12px; align-items: center; padding: 3px 8px;
+    font-size: var(--t-xs); line-height: 1; color: #636363; background: #fff; box-shadow: 0 2px 0 #ced6d6, 0 4px 0 #63737b; white-space: nowrap;
+  }
+  .device .sb-place { color: #cb0707; }
+  .device .sb-right { margin-left: auto; }
+  .device .textbox { position: absolute; left: 3%; right: 3%; bottom: 4%; padding: 2px 8px 4px; font-size: var(--t-xs); line-height: 1.5; color: #404048; text-shadow: 2px 2px 0 #d8d8d0; min-height: 2.4em; }
+  .device .textbox.closed { visibility: hidden; }
+  .device .tb-more { position: absolute; right: 6px; bottom: 2px; animation: bob 0.8s steps(1) infinite; }
+
+  .device .sb-place, .device .sb-right { display: inline-flex; align-items: center; gap: 5px; }
+  .device .sb-right .pixel { margin-left: 2px; }
+
+  /* The Thor's hinge: one long cylinder across the base's top edge. */
+  .device .hinge {
+    width: 94%; height: calc(var(--px) * 8); margin: 0 auto;
+    background: linear-gradient(#5a5a68 0 calc(var(--px) * 1), #3a3a46 calc(var(--px) * 1) calc(var(--px) * 3), #2a2a34 calc(var(--px) * 3) calc(var(--px) * 6), #16161c calc(var(--px) * 6));
+    box-shadow: 0 0 0 var(--px) #0c0c10;
+    clip-path: polygon(calc(var(--px) * 2) 0, calc(100% - var(--px) * 2) 0, 100% calc(var(--px) * 2), 100% calc(100% - var(--px) * 2), calc(100% - var(--px) * 2) 100%, calc(var(--px) * 2) 100%, 0 calc(100% - var(--px) * 2), 0 calc(var(--px) * 2));
+  }
+
+  /* The base: big round controls either side of the small screen, as on the Thor. */
+  .device .base { position: relative; display: grid; grid-template-columns: 1fr minmax(0, 50%) 1fr; gap: calc(var(--px) * 2); align-items: stretch; padding-block: calc(var(--px) * 3); }
+  .device .side { display: grid; justify-items: center; align-content: start; gap: calc(var(--px) * 4); padding-top: calc(var(--px) * 2); }
+  .device .ctl { display: block; width: 86%; }
+  .device .ctl .pixel { width: 100%; height: auto; aspect-ratio: 1; }
+  .device .stick { animation: glow 2.4s steps(2) infinite; }
+  @keyframes glow { 50% { filter: brightness(1.2) saturate(1.2); } }
+  .device .mini { width: calc(var(--px) * 5); height: calc(var(--px) * 5); margin-bottom: calc(var(--px) * 2); background: #2e2e38; box-shadow: 0 0 0 var(--px) #0c0c10, inset var(--px) var(--px) 0 #4a4a58;
+    clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%); }
+  .device .middle { display: grid; gap: calc(var(--px) * 3); align-content: start; }
+  .device .bezel.low { width: 100%; }
+  .device .bezel.low .appwrap { max-width: none; }
+  .device .menu-keys { display: flex; justify-content: center; gap: calc(var(--px) * 6); }
+  .device .menu-keys i { width: calc(var(--px) * 8); height: calc(var(--px) * 3); background: #33333f; box-shadow: 0 0 0 var(--px) #0c0c10, inset 0 var(--px) 0 #4e4e5c; }
+  .device .menu-keys i.home { width: calc(var(--px) * 4); height: calc(var(--px) * 4); margin-top: calc(var(--px) * -0.5); }
+  .device .grille { position: absolute; bottom: calc(var(--px) * 3); width: calc(var(--px) * 10); height: calc(var(--px) * 3);
+    background: radial-gradient(circle, #0c0c10 0 calc(var(--px) * 0.6), transparent calc(var(--px) * 0.7)) 0 0 / calc(var(--px) * 2) calc(var(--px) * 1.5); }
+  .device .grille.left { left: calc(var(--px) * 9); }
+  .device .grille.right { right: calc(var(--px) * 9); }
+
+  .device.still * { animation: none !important; }
+  @media (max-width: 560px) { .device .statusbar { gap: 6px; } .device .sb-right { display: none; } .device .house, .device .sign { transform: scale(0.75); transform-origin: 0 100%; } }
+</style>
+
+<script>
+  // The top screen's text box types a line, waits, closes for a while (the scene shows), then the next.
+  const LINES = [
+    'Your party is on the bottom screen.',
+    'So are the map, the bag and your dex.',
+    'In a battle, every matchup is a glance away.',
+  ];
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  for (const box of document.querySelectorAll<HTMLElement>('[data-textbox]')) {
+    if (reduce || box.closest('.still')) continue;
+    const line = box.querySelector<HTMLElement>('[data-line]')!;
+    let n = 0;
+    const next = () => {
+      const text = LINES[n++ % LINES.length];
+      let i = 0;
+      const type = () => {
+        line.textContent = text.slice(0, ++i);
+        if (i < text.length) setTimeout(type, 34);
+        else setTimeout(() => {
+          box.classList.add('closed');
+          setTimeout(() => { box.classList.remove('closed'); next(); }, 3600);
+        }, 2600);
+      };
+      type();
+    };
+    setTimeout(next, 2400);
+  }
+</script>

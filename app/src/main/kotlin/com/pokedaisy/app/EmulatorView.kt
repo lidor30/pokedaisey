@@ -30,7 +30,26 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
             if (field == v) return
             field = v
             renderer.setStretch(v)
+            reportGamePixel()
         }
+
+    /** Called (UI thread) with one GBA pixel's height on screen, in view px, whenever it changes -
+     * SHADERS on the companion draw their grid at that size ([CompanionColors]). */
+    var onGamePixel: ((Float) -> Unit)? = null
+    private var frameW = 0
+    private var frameH = 0
+
+    private fun reportGamePixel() {
+        if (frameW == 0 || width == 0 || height == 0) return
+        // As FrameRenderer.recomputeQuad: the game's height on screen, letterboxed or stretched.
+        val h = if (stretch) height.toFloat() else minOf(height.toFloat(), width * frameH.toFloat() / frameW)
+        onGamePixel?.invoke(h / frameH)
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        reportGamePixel()
+    }
 
     /** The GBA LCD's colours ([Prefs.gbaColors], [ScreenShaders.GBA_COLOR]). */
     var gbaColors: Boolean = false
@@ -46,6 +65,13 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
             if (field == v) return
             field = v
             renderer.setEffect(v)
+        }
+
+    /** The effect's `uGrid` (SHADERS > GRID, [ScreenShaders.gridFor]): a uniform, so no rebuild. */
+    var screenGrid: FloatArray = floatArrayOf(0f, 0f)
+        set(v) {
+            field = v
+            renderer.setGrid(v[0], v[1])
         }
 
     init {
@@ -71,6 +97,9 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
     /** Called once after the core is up. */
     fun bindCore(buffer: ByteBuffer, width: Int, height: Int) {
         renderer.bind(buffer, width, height)
+        frameW = width
+        frameH = height
+        post { reportGamePixel() }
     }
 
     /**
@@ -109,6 +138,8 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
         private var stretch = false
         private var gbaColors = false
         private var effect: ScreenShaders.Effect? = null
+        private var gridX = 0f
+        private var gridY = 0f
 
         private var plain: Program? = null
         private var colorProgram: Program? = null
@@ -159,6 +190,8 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
         fun setGbaColors(on: Boolean) = synchronized(lock) { gbaColors = on }
 
         fun setEffect(e: ScreenShaders.Effect?) = synchronized(lock) { effect = e }
+
+        fun setGrid(x: Float, y: Float) = synchronized(lock) { gridX = x; gridY = y }
 
         /** Drops the buffer reference; [onDrawFrame] just clears until the next [bind]. */
         fun unbind() = synchronized(lock) {
@@ -265,6 +298,7 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
             GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, filter)
             GLES20.glUniform1i(program.uTex, 0)
             GLES20.glUniform2f(program.uTexSize, texW.toFloat(), texH.toFloat())
+            GLES20.glUniform2f(program.uGrid, gridX, gridY)
 
             GLES20.glEnableVertexAttribArray(program.aPos)
             GLES20.glVertexAttribPointer(program.aPos, 2, GLES20.GL_FLOAT, false, 0, quad)
@@ -309,6 +343,7 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
             val aUv = GLES20.glGetAttribLocation(id, "aUv")
             val uTex = GLES20.glGetUniformLocation(id, "uTex")
             val uTexSize = GLES20.glGetUniformLocation(id, "uTexSize")
+            val uGrid = GLES20.glGetUniformLocation(id, "uGrid")
         }
 
         /** An offscreen texture a pass draws into; lives and dies with the GL context. */

@@ -17,6 +17,7 @@ open class ComponentActivity : Context() {
     open fun onKeyUp(keyCode: Int, event: android.view.KeyEvent): Boolean = false
     fun finish() {}
     fun startActivity(i: Intent) {}
+    fun requestPermissions(p: Array<String>, code: Int) {}
     fun runOnUiThread(r: () -> Unit) = r()
     override fun getSystemService(n: String): Any? = android.content.ClipboardManager()
     fun <I, O> registerForActivityResult(c: ActivityResultContract<I, O>, cb: (O) -> Unit): ActivityResultLauncher<I> =

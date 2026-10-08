@@ -49,6 +49,7 @@ internal val trCore: Map<String, Tr> = mapOf(
     "SP. ATK" to Tr(ja = "とくこう", fr = "ATQ. SPÉ.", de = "SP. ANG.", it = "ATT. SP.", es = "AT. ESP."),
     "SP. DEF" to Tr(ja = "とくぼう", fr = "DÉF. SPÉ.", de = "SP. VERT.", it = "DIF. SP.", es = "DEF. ESP."),
     "SPEED" to Tr(ja = "すばやさ", fr = "VITESSE", de = "INIT.", it = "VELOCITÀ", es = "VELOCIDAD"),
+    "SPECIAL" to Tr(ja = "とくしゅ", fr = "SPECIAL", de = "SPEZIAL", it = "SPECIALE", es = "ESPECIAL"),
     "Settings" to Tr(ja = "せってい", fr = "Options", de = "Optionen", it = "Opzioni", es = "Ajustes"),
     "TOTAL" to Tr(ja = "ごうけい", fr = "TOTAL", de = "GESAMT", it = "TOTALE", es = "TOTAL"),
     "UNLOCKED" to Tr(ja = "かいじょずみ", fr = "DÉBLOQUÉS", de = "FREIGESCHALTET", it = "SBLOCCATI", es = "DESBLOQUEADOS"),

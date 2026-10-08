@@ -98,6 +98,27 @@ val GUIDE_TABLES_EMERALD = GuideTables(
     guide = GuideId.EMERALD,
 )
 
+// The European Emerald releases: English's tables, moved (found through the
+// literal pools of English's code); ROXANNE is each game's own name for her.
+val GUIDE_TABLES_EMERALD_ES = GUIDE_TABLES_EMERALD.copy(
+    trainers = 0x08316294L, learnsets = 0x0832F638L, wildHeaders = 0x085563A4L, probeName = "PETRA",
+)
+val GUIDE_TABLES_EMERALD_DE = GUIDE_TABLES_EMERALD.copy(
+    trainers = 0x083249A0L, learnsets = 0x0833DD3CL, wildHeaders = 0x08564A78L, probeName = "FELIZIA",
+)
+val GUIDE_TABLES_EMERALD_FR = GUIDE_TABLES_EMERALD.copy(
+    trainers = 0x08317B60L, learnsets = 0x08330EECL, wildHeaders = 0x08557C34L, probeName = "ROXANNE",
+)
+val GUIDE_TABLES_EMERALD_IT = GUIDE_TABLES_EMERALD.copy(
+    trainers = 0x0830F9F4L, learnsets = 0x08328D7CL, wildHeaders = 0x0854FA8CL, probeName = "PETRA",
+)
+
+// Japanese Emerald: 0x20-byte trainers - trainerName[6] at +4, partySize at +0x18, the party at +0x1C.
+val GUIDE_TABLES_EMERALD_JA = GUIDE_TABLES_EMERALD.copy(
+    trainers = 0x082E383CL, learnsets = 0x082F9D04L, wildHeaders = 0x0852D9F4L, probeName = "ツツジ",
+    trainerStride = 0x20, trainerNameLen = 6, trainerSizeOff = 0x18, trainerPartyOff = 0x1C,
+)
+
 /**
  * Ruby / Sapphire (rev 1 and rev 2 share every address), from pret/pokeruby's
  * ruby_rev1 / sapphire_rev1 maps (both builds byte-identical to the user's
@@ -462,6 +483,15 @@ val GUIDE_TABLES_AMETHYST = GuideTables(
     trainerMon = TrainerMonLayout(stride = 18, movesOff = 8, speciesOff = 4, itemOff = 6, levelOff = 2),
     learnsetCfru = true,
     altTrainers = listOf(0x089CECCCL, 0x089B8A34L, 0x089C63B8L), // HARD, DIVERGENT, DIVERGENT + HARD
+)
+
+/** Amethyst v1.4.1: the same loader and flags (0x93C / 0x945), the tables moved; the gym leaders'
+ * records and parties are byte for byte v1.3.0's in all four. Its own area data (AMETHYST_V141). */
+val GUIDE_TABLES_AMETHYST_V1_4_1 = GUIDE_TABLES_AMETHYST.copy(
+    trainers = 0x08A25A14L,
+    learnsets = 0x09ADB8D0L,
+    guide = GuideId.AMETHYST_V141,
+    altTrainers = listOf(0x08A1861CL, 0x08A02384L, 0x08A0FD08L),
 )
 
 /**

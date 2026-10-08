@@ -2,6 +2,7 @@ package com.pokedaisy.app
 
 import android.content.Context
 import com.pokedaisy.app.companion.FfMode
+import com.pokedaisy.app.companion.GridStrength
 import com.pokedaisy.app.companion.ScreenFilter
 import com.pokedaisy.app.companion.FfMusicMode
 
@@ -115,11 +116,30 @@ class Prefs(context: Context) {
         get() = p.getBoolean("show_foe_ivs", false)
         set(v) = p.edit().putBoolean("show_foe_ivs", v).apply()
 
+    /** The CHEATS master switch (cheats/Cheats.kt): off, no cheat reaches the game,
+     * whatever each one is set to. Off by default. */
+    var cheatsEnabled: Boolean
+        get() = p.getBoolean("cheats_enabled", false)
+        set(v) = p.edit().putBoolean("cheats_enabled", v).apply()
+
     /** The app's language: "AUTO" (the ROM's, or the device's in the Library) or
      * an AppLanguage code ("EN", "JA", ...) - see [com.pokedaisy.app.companion.i18n.L10n]. */
     var appLanguage: String
         get() = p.getString("app_language", null) ?: com.pokedaisy.app.companion.i18n.LANGUAGE_AUTO
         set(v) = p.edit().putString("app_language", v).apply()
+
+    /**
+     * Whether launching a game picks up where it was left (the suspend state written when it
+     * closed, else the newest slot). Off, a launch boots the cart from its save - the title
+     * screen - and only a game that's still open (back from HOME) carries on from memory.
+     */
+    var autoResume: Boolean
+        get() = p.getBoolean("auto_resume", true)
+        set(v) = p.edit().putBoolean("auto_resume", v).apply()
+
+    /** A SETTINGS > TWEAKS switch (CompanionTweaks), on unless turned off. */
+    fun tweak(key: String): Boolean = p.getBoolean("tweak_$key", true)
+    fun setTweak(key: String, on: Boolean) = p.edit().putBoolean("tweak_$key", on).apply()
 
     /** Whether the companion's buttons play the game's click (GameClickSound). */
     var clickSound: Boolean
@@ -136,6 +156,11 @@ class Prefs(context: Context) {
         get() = p.getBoolean("status_bar", false)
         set(v) = p.edit().putBoolean("status_bar", v).apply()
 
+    /** The status bar over the companion's tabs instead of over the game (CompanionStatusBar). */
+    var statusBarOnCompanion: Boolean
+        get() = p.getBoolean("status_bar_on_companion", false)
+        set(v) = p.edit().putBoolean("status_bar_on_companion", v).apply()
+
     /** Whether the game is stretched to fill the top screen (16:9) instead of kept at the GBA's 3:2. */
     var stretchGame: Boolean
         get() = p.getBoolean("stretch_game", false)
@@ -150,6 +175,16 @@ class Prefs(context: Context) {
     var screenFilter: ScreenFilter
         get() = ScreenFilter.entries.firstOrNull { it.name == p.getString("screen_filter", null) } ?: ScreenFilter.NONE
         set(v) = p.edit().putString("screen_filter", v.name).apply()
+
+    /** Whether SHADERS (filter and GBA COLORS) also draw over the companion and status bar ([CompanionColors]). */
+    var companionShaders: Boolean
+        get() = p.getBoolean("companion_shaders", true)
+        set(v) = p.edit().putBoolean("companion_shaders", v).apply()
+
+    /** LCD / LCD PAPER's grid strength ([ScreenShaders.gridFor]). */
+    var gridStrength: GridStrength
+        get() = GridStrength.entries.firstOrNull { it.name == p.getString("grid_strength", null) } ?: GridStrength.MEDIUM
+        set(v) = p.edit().putString("grid_strength", v.name).apply()
 
     /** Two screens: the game on the second display and the companion on the main one -
      * for a device whose main display is its bottom screen (see PokeDaisyActivity.syncPresentation). */
@@ -166,6 +201,18 @@ class Prefs(context: Context) {
     var sidePanelWidth: Float
         get() = p.getFloat("side_panel_width", 0.5f)
         set(v) = p.edit().putFloat("side_panel_width", v).apply()
+
+    /** A phone held upright: the companion right under the game, the touch pad at the screen's bottom, instead of
+     * the companion along the bottom (SETTINGS > COMPANION; see [PortraitPanel]). */
+    var portraitCompanionUnderGame: Boolean
+        get() = p.getBoolean("portrait_companion_under_game", false)
+        set(v) = p.edit().putBoolean("portrait_companion_under_game", v).apply()
+
+    /** A phone held upright: the companion's height, as a ratio of the screen's width (see [PortraitPanel]). */
+    var portraitCompanionRatio: Float
+        // PortraitLayout.DEFAULT_RATIO: the Thor bottom screen's shape (spelled out: ui-preview's data module has no UI).
+        get() = p.getFloat("portrait_companion_ratio", 1080f / 1240f)
+        set(v) = p.edit().putFloat("portrait_companion_ratio", v).apply()
 
     /** The companion tabs shown in the bottom screen's tab bar (see
      * [com.pokedaisy.app.companion.COMPANION_TABS]); the rest are
@@ -229,9 +276,10 @@ class Prefs(context: Context) {
         get() = p.getBoolean("setup_requested", false)
         set(v) = p.edit().putBoolean("setup_requested", v).apply()
 
-    /** Index into APP_THEMES (Theme.kt). 0 = FireRed (default). */
+    /** A ThemeSpec.id from APP_THEMES (Theme.kt): 8 = PokéDaisy (the default, DAISY_THEME_ID - spelled out:
+     * ui-preview's data module has no UI), 0 = FireRed (the default before it; kept for whoever picked it). */
     var appTheme: Int
-        get() = p.getInt("app_theme", 0)
+        get() = p.getInt("app_theme", 8)
         set(v) = p.edit().putInt("app_theme", v).apply()
 
     /** User-supplied SteamGridDB API key (Settings > Cover Art) — see

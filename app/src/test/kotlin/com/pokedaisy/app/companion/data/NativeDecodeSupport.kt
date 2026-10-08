@@ -13,8 +13,11 @@ import org.junit.Assert.assertTrue
  * Gradle restarts the JVM between classes, resetting that state - splitting
  * by class is what actually makes that isolation apply per-game.
  */
-fun decodeNative(key: String, cfg: NativeConfig): Telemetry =
-    readNativeTelemetry(FixtureMemoryReader.load(key), cfg)
+fun decodeNative(key: String, cfg: NativeConfig): Telemetry {
+    // Several fixtures share a class (SoulGold's, Radical Red's): start each decode clean.
+    resetNativeBagCache()
+    return readNativeTelemetry(FixtureMemoryReader.load(key), cfg)
+}
 
 fun assertPocketsInRange(t: Telemetry) {
     t.items.forEach {

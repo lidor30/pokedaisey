@@ -149,6 +149,11 @@ data class NativeConfig(
     // CARD tab. Retail FireRed / LeafGreen / Emerald and the QoL builds only:
     // the hacks below copy these configs and their saves differ.
     val trainerCard: TrainerCardSave? = null,
+    // The ROM's language letter (game code BPE<S|D|F|I>): a European Emerald's
+    // names come from its own tables (EmeraldLanguages.kt). 'E' = English.
+    val language: Char = 'E',
+    // Its game code, when it has names of its own (GameText): "BPED", "AXVF".
+    val gameCode: String = "",
 ) {
     val gMainInBattle get() = gMain + inBattleOff
     val gMainVblankCtr get() = gMain + 0x24
@@ -434,6 +439,65 @@ val NATIVE_EMERALD_RETAIL = NATIVE_EMERALD.copy(
     battlerPartyIndexes = 0x0202406EL,
     battleStructPtr = 0x0202449CL,
     monToSwitchIntoOff = 0x5C,
+)
+
+// The European Emerald releases (BPES / BPED / BPEF / BPEI): every RAM address
+// is English's (literal pools matched in each ROM; English's save loads in all
+// four with the same party bytes, money and position - headless, the
+// emerald_es / _de / _fr / _it fixtures). The ROM data moved: icon tables, dex,
+// guide tables. German and Italian's battle code sits 4 bytes later. The
+// TRAINER CARD stays off: their cards are localized art, not matched yet.
+val NATIVE_EMERALD_ES = NATIVE_EMERALD_RETAIL.copy(
+    language = 'S', gameCode = "BPES", trainerCard = null,
+    monIconTable = 0x0857E784L, monIconPaletteIndices = 0x0857EE64L, monIconPaletteTable = 0x0857F01CL,
+    itemIconTable = 0x08617250L,
+    pokedex = POKEDEX_EMERALD_ES, guideTables = GUIDE_TABLES_EMERALD_ES,
+)
+val NATIVE_EMERALD_DE = NATIVE_EMERALD_RETAIL.copy(
+    language = 'D', gameCode = "BPED", trainerCard = null,
+    monIconTable = 0x0858CAA8L, monIconPaletteIndices = 0x0858D188L, monIconPaletteTable = 0x0858D340L,
+    itemIconTable = 0x086258D8L,
+    handleInputChooseAction = 0x0805758CL, handleInputChooseMove = 0x08057C00L,
+    completeWhenChoseItem = 0x080598E4L, waitForMonSelection = 0x0805982CL, handleInputChooseTarget = 0x08057828L,
+    pokedex = POKEDEX_EMERALD_DE, guideTables = GUIDE_TABLES_EMERALD_DE,
+)
+val NATIVE_EMERALD_FR = NATIVE_EMERALD_RETAIL.copy(
+    language = 'F', gameCode = "BPEF", trainerCard = null,
+    monIconTable = 0x08580020L, monIconPaletteIndices = 0x08580700L, monIconPaletteTable = 0x085808B8L,
+    itemIconTable = 0x08618798L,
+    pokedex = POKEDEX_EMERALD_FR, guideTables = GUIDE_TABLES_EMERALD_FR,
+)
+val NATIVE_EMERALD_IT = NATIVE_EMERALD_RETAIL.copy(
+    language = 'I', gameCode = "BPEI", trainerCard = null,
+    monIconTable = 0x0857838CL, monIconPaletteIndices = 0x08578A6CL, monIconPaletteTable = 0x08578C24L,
+    itemIconTable = 0x08610FACL,
+    handleInputChooseAction = 0x0805758CL, handleInputChooseMove = 0x08057C00L,
+    completeWhenChoseItem = 0x080598E4L, waitForMonSelection = 0x0805982CL, handleInputChooseTarget = 0x08057828L,
+    pokedex = POKEDEX_EMERALD_IT, guideTables = GUIDE_TABLES_EMERALD_IT,
+)
+
+// Japanese Emerald (BPEJ): its own build - every RAM global and the battle code
+// moved (English's literal pools, matched word for word), the structs didn't:
+// English's save loads with the same party bytes, money and position, and a
+// scripted wild battle reads with English's BattlePokemon / gMain layouts
+// (emerald_ja / emerald_ja_battle, headless; the action / move / bag / party
+// handlers checked there). Its names are kana (EmeraldText 'J', Gen3Text's
+// Japanese table). No TRAINER CARD, and the party slot is the app's own (its
+// fonts aren't the Western ones the slot art is drawn with).
+val NATIVE_EMERALD_JA = NATIVE_EMERALD_RETAIL.copy(
+    language = 'J', gameCode = "BPEJ", trainerCard = null,
+    playerParty = 0x02024190L, playerPartyCount = 0x0202418DL,
+    battleMons = 0x02023D28L, battlerPositions = 0x02023D1AL, battlersCount = 0x02023D10L,
+    battleTypeFlags = 0x02022C90L, battlerPartyIndexes = 0x02023D12L, battleStructPtr = 0x02024140L,
+    enemyParty = 0x020243E8L,
+    gMain = 0x03002360L, saveBlock1Ptr = 0x03005AECL, saveBlock2Ptr = 0x03005AF0L,
+    objectEvents = 0x02036FF0L, mapHeader = 0x02036FB8L, bagPockets = 0x02039A78L,
+    battlerControllerFuncs = 0x03005AC0L,
+    handleInputChooseAction = 0x08057198L, handleInputChooseMove = 0x0805780CL,
+    completeWhenChoseItem = 0x080594F0L, waitForMonSelection = 0x08059438L, handleInputChooseTarget = 0x08057434L,
+    monIconTable = 0x08556804L, monIconPaletteIndices = 0x08556EE4L, monIconPaletteTable = 0x0855709CL,
+    itemIconTable = 0x085DFCC8L,
+    pokedex = POKEDEX_EMERALD_JA, guideTables = GUIDE_TABLES_EMERALD_JA,
 )
 
 // LeafGreen (BPGE). pret/pokefirered @ c75f352 builds `leafgreen` and
@@ -856,6 +920,21 @@ val NATIVE_SOULGOLD_V1_2 = NATIVE_SOULGOLD.copy(
     pokedex = POKEDEX_SOULGOLD_V1_2,
 )
 
+// A second build released as SoulGold v1.2 (sha1 5d6a0362..., its title screen says v1.2 too):
+// a few small code changes, so every RAM global and the battle handlers sit where they do in
+// NATIVE_SOULGOLD_V1_2 (checked on the same save headlessly: the soulgold_v12b fixtures, and the
+// action / move / bag / party handlers in a scripted wild battle) and only the ROM data moved,
+// 0x98 bytes (gSpeciesInfo, gItemsInfo) or 0xA4 (the icon palettes). Its tables are byte for byte
+// the first v1.2's, TM75 included.
+val NATIVE_SOULGOLD_V1_2B = NATIVE_SOULGOLD_V1_2.copy(
+    monIconTable = 0x087D5CA4L,
+    monIconPaletteIndices = 0x087D5CCAL,
+    monIconPaletteTable = 0x08F20A18L,
+    monIconPalettes = 0x087D5CCCL,
+    itemIconTable = 0x087537ACL,
+    pokedex = POKEDEX_SOULGOLD_V1_2B,
+)
+
 // R.O.W.E. 2.1.9.1 Experimental - separate codebase from Heart and Soul/
 // Lazarus, not confirmed to be the same engine/fork. A live EWRAM+IWRAM
 // capture (confirmed non-stale: ~66k/262144 EWRAM bytes and ~12.5k/32768
@@ -1198,9 +1277,10 @@ val NATIVE_TMT2 = NATIVE_EMERALD.copy(
 // - monIconPaletteTable: UNCHANGED at vanilla's own 0x083D4038 - found
 //   as-is (no re-deriving needed) as a literal constant repeated across
 //   several palette-lookup functions near GetMonIconTiles.
-// - monIconPaletteIndices: UNCHANGED at vanilla's own 0x083D3E80 - tried
-//   as-is (since the palette table didn't move, this looked worth trying
-//   unchanged too) and confirmed by a real decoded icon (below).
+// - monIconPaletteIndices: MOVED, to 0x09C01408 - the literal every vanilla
+//   reader of gMonIconPaletteIndices now holds (0x08096EC0, 0x080970D8, ...).
+//   Vanilla's 0x083D3E80 was used at first and looked right on the one icon
+//   checked (Tepig's index is 0 in both), but 757 of the 1268 species differ.
 // - monIconTable: MOVED. GetMonIconTiles's own vanilla rev-0 address
 //   (0x08097028) still holds byte-identical CODE (only the per-species
 //   tile-graphics DATA relocated, unsurprising given ~1267 species now vs.
@@ -1219,9 +1299,22 @@ val NATIVE_TMT2 = NATIVE_EMERALD.copy(
 //   recognizable potion-bottle icon.
 val NATIVE_AMETHYST = NATIVE_FIRERED_REV0.copy(
     monIconTable = 0x09C018FCL,
+    monIconPaletteIndices = 0x09C01408L,
     itemIconTable = 0x083DB028L,
     pokedex = POKEDEX_AMETHYST,
     guideTables = GUIDE_TABLES_AMETHYST,
+)
+
+// Pokemon Amethyst v1.4.1: the same RAM (a v1.3.0 save loads; its EWRAM after
+// boot differs from v1.3.0's by 41 bytes) and vanilla code; the hack's own data
+// moved, found through the literal pools of the code that reads it. It has 26
+// more species (Hisuian forms at 1234, the Gigantamax forms after them), so its
+// names / gender ratios are its own (ActiveTables' amethystV141).
+val NATIVE_AMETHYST_V1_4_1 = NATIVE_AMETHYST.copy(
+    monIconTable = 0x09AD8B50L,
+    monIconPaletteIndices = 0x09AD8642L,
+    pokedex = POKEDEX_AMETHYST_V1_4_1,
+    guideTables = GUIDE_TABLES_AMETHYST_V1_4_1,
 )
 
 private const val MAP_HEADER_REGION_MAPSEC_OFF = 0x14L
@@ -1485,7 +1578,7 @@ private fun Mon.withNativeGender(raw: ByteArray, off: Int, flagsOff: Int = 0x13,
         GameKind.UNBOUND -> genderRatiosUnbound
         GameKind.RADICAL_RED -> genderRatiosRadicalRed
         GameKind.ODYSSEY -> genderRatiosOdyssey
-        GameKind.AMETHYST -> genderRatiosAmethyst
+        GameKind.AMETHYST -> if (amethystV141) genderRatiosAmethystV141 else genderRatiosAmethyst
         GameKind.HEART_AND_SOUL -> genderRatiosHns
         GameKind.LAZARUS -> genderRatiosLazarus
         GameKind.SOULGOLD -> genderRatiosSoulGold

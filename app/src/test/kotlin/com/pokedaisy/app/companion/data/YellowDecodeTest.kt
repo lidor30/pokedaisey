@@ -50,6 +50,18 @@ class YellowDecodeTest {
     }
 
     @Test
+    fun `battle menus - which one waits, and its cursor`() {
+        // On the move list (the yellow_battle fixture), the first move.
+        assertEquals(BATTLE_INPUT_MOVE_SELECT to 0, readGen1BattleInput(FixtureMemoryReader.load("yellow_battle"), GEN1_YELLOW))
+        assertEquals(BATTLE_INPUT_MOVE_SELECT to 1, readGen1BattleInput(FixtureMemoryReader.load("yellow_battle_move2"), GEN1_YELLOW))
+        // The battle menu with the cursor on RUN: column 1, row 1.
+        assertEquals(BATTLE_INPUT_ACTION_SELECT to 3, readGen1BattleInput(FixtureMemoryReader.load("yellow_battle_menu"), GEN1_YELLOW))
+        assertEquals(BATTLE_INPUT_ACTION_SELECT, readGen1Telemetry(FixtureMemoryReader.load("yellow_battle_menu"), GEN1_YELLOW).battleInputState)
+        // On the field: no battle.
+        assertEquals(BATTLE_INPUT_NONE to -1, readGen1BattleInput(FixtureMemoryReader.load("yellow"), GEN1_YELLOW))
+    }
+
+    @Test
     fun `Gen 1 type chart - its own quirks`() {
         activeGame = GameKind.YELLOW
         val ghost = activeTypeNames.entries.first { it.value == "GHOST" }.key

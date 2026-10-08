@@ -35,6 +35,7 @@ import com.pokedaisy.app.companion.ui.AchievementBadges
 import com.pokedaisy.app.companion.BatteryStatus
 import com.pokedaisy.app.companion.DeviceBattery
 import com.pokedaisy.app.companion.FfMode
+import com.pokedaisy.app.companion.GridStrength
 import com.pokedaisy.app.companion.ScreenFilter
 import com.pokedaisy.app.companion.FfMusicMode
 import com.pokedaisy.app.companion.data.FfMenuWatch
@@ -73,7 +74,9 @@ class PokeDaisyActivity : Activity() {
     private lateinit var statusBar: ComposeView
     private lateinit var inputManager: android.hardware.input.InputManager
     private val ffMusicPlayer = FfMusicPlayer()
-    private var ffMusicRenderer: FfMusicRenderer? = null
+    private var ffMusicRenderer: SongRenderer? = null
+    /** A Game Boy game's music tables (STEADY FF music), null for GBA / unknown carts. */
+    private var gen1Music: com.pokedaisy.app.companion.data.Gen1MusicTables? = null
     private var clickSound: GameClickSound? = null
     private var unlockSound: GameClickSound? = null
     /** The companion's button click (the game's own; see GameClickSound). */
@@ -81,10 +84,34 @@ class PokeDaisyActivity : Activity() {
     @Volatile private var clickSoundOn = true
 
     private val inputDeviceListener = object : android.hardware.input.InputManager.InputDeviceListener {
-        override fun onInputDeviceAdded(id: Int) = syncTouchControls()
-        override fun onInputDeviceRemoved(id: Int) = syncTouchControls()
+        override fun onInputDeviceAdded(id: Int) {
+            InputDevice.getDevice(id)?.takeIf(::isGamepad)?.let {
+                pads[id] = it.name
+                showHud(tr("Controller connected: {0}", it.name))
+            }
+            syncTouchControls()
+        }
+        override fun onInputDeviceRemoved(id: Int) {
+            pads.remove(id)?.let { showHud(tr("Controller disconnected: {0}", it)) }
+            // A keyboard-mode controller (see physicalPadUsed) may have been the one that went.
+            physicalPadUsed = false
+            syncTouchControls()
+        }
         override fun onInputDeviceChanged(id: Int) = syncTouchControls()
     }
+
+    /** Connected controllers by device id, with their names (for the disconnect notice). */
+    private val pads = HashMap<Int, String>()
+
+    /**
+     * A real button played the game: AUTO hides the touch pad from then on, even for a
+     * controller that doesn't call itself a gamepad (some 8BitDo / GameSir modes show
+     * up as a keyboard), until a device goes away.
+     */
+    private var physicalPadUsed = false
+
+    private fun isGamepad(d: InputDevice) = !d.isVirtual &&
+        d.sources and (InputDevice.SOURCE_GAMEPAD or InputDevice.SOURCE_JOYSTICK) != 0
 
     private var rom: File? = null
     /** What the emulator and the ROM readers load for [rom]: the file itself, or an
@@ -104,8 +131,13 @@ class PokeDaisyActivity : Activity() {
     private val companionBack = com.pokedaisy.app.companion.ui.CompanionBack()
     private val mirrorBack = com.pokedaisy.app.companion.ui.CompanionBack()
     private val panelBack = com.pokedaisy.app.companion.ui.CompanionBack()
+    private val portraitBack = com.pokedaisy.app.companion.ui.CompanionBack()
     /** The companion beside the game when there's no second screen (see [SidePanel]). */
     private lateinit var sidePanel: SidePanel
+    /** ... and under it, with the screen held upright (see [PortraitPanel]). */
+    private lateinit var portraitPanel: PortraitPanel
+    /** No second screen for the companion: it's in [sidePanel] or [portraitPanel], by the screen's orientation. */
+    private var singleScreen = false
     private var debugMirror = false
     /** The game's stage (game, status bar, touch pad, HUD, side panel): the activity's
      * content, or the second screen's with SWAP SCREENS (see [syncPresentation]). */
@@ -133,7 +165,7 @@ class PokeDaisyActivity : Activity() {
     private val stateSlots = object : com.pokedaisy.app.companion.StateSlots {
         override fun list() = states?.allSlots()?.map {
             com.pokedaisy.app.companion.StateSlots.Slot(
-                it.slot, it.present, it.savedAt, it.thumb?.absolutePath,
+                it.slot, it.present, it.savedAt, it.thumb?.absolutePath, it.thumb?.lastModified() ?: 0L,
             )
         } ?: emptyList()
         override val currentIndex get() = if (::engine.isInitialized) engine.currentSlot else 0
@@ -172,7 +204,11 @@ class PokeDaisyActivity : Activity() {
     private fun switchAddrsFor(game: com.pokedaisy.app.companion.data.GameKind?): BattleInputController.SwitchAddrs? = when {
         game == com.pokedaisy.app.companion.data.GameKind.FIRERED && romCode == "BPRE" && romRev == 1 ->
             BattleInputController.SwitchAddrs(partyMenu = 0x0203B0A0L, party = 0x02024284L)
-        game == com.pokedaisy.app.companion.data.GameKind.EMERALD && romCode == "BPEE" ->
+        // Japanese Emerald: its own RAM (NATIVE_EMERALD_JA).
+        game == com.pokedaisy.app.companion.data.GameKind.EMERALD && romCode == "BPEJ" ->
+            BattleInputController.SwitchAddrs(partyMenu = 0x0203CB94L, party = 0x02024190L)
+        game == com.pokedaisy.app.companion.data.GameKind.EMERALD &&
+            (romCode == "BPEE" || romCode in com.pokedaisy.app.companion.data.EMERALD_EUROPEAN_CODES) ->
             BattleInputController.SwitchAddrs(partyMenu = 0x0203CEC8L, party = 0x020244ECL)
         game == com.pokedaisy.app.companion.data.GameKind.LAZARUS ->
             BattleInputController.SwitchAddrs(partyMenu = 0x0201B67CL, party = 0x0201B960L, grid = true)
@@ -183,6 +219,11 @@ class PokeDaisyActivity : Activity() {
             telemetry.knownPartyMenu()?.let { (menu, party) ->
                 BattleInputController.SwitchAddrs(partyMenu = menu, party = party, monStride = 96)
             }
+        // The other-language FireRed / LeafGreen (RETAIL_PORTS): their mapped gPartyMenu, checked by
+        // scripts/verify_ports.py's party step. (Ruby / Sapphire have no battle input.)
+        game == com.pokedaisy.app.companion.data.GameKind.FIRERED &&
+            com.pokedaisy.app.companion.data.RETAIL_PORTS.containsKey("$romCode$romRev") ->
+            telemetry.knownPartyMenu()?.let { (menu, party) -> BattleInputController.SwitchAddrs(partyMenu = menu, party = party) }
         else -> null
     }
 
@@ -244,12 +285,23 @@ class PokeDaisyActivity : Activity() {
             states?.resumeFile?.let { if (it.exists()) it.delete() }
             saveDir = SavesLocation.dir(this@PokeDaisyActivity)
             val save = SavesLocation.resolve(saveDir, r)
+            syncCheats()
             engine.start(romData ?: r, save, null)
             showHud(com.pokedaisy.app.companion.i18n.tr("Game restarted"))
         }
         override fun closeGame() {
             exitGame()   // drives the normal onPause()/onStop() lifecycle, which already suspends+saves
         }
+        override val canCloseCompanion get() = Screens.second(this@PokeDaisyActivity) != null && !Prefs(this@PokeDaisyActivity).swapScreens
+        override fun closeCompanion() {
+            runOnUiThread {
+                companionClosed = true
+                syncPresentation()
+                showHud(com.pokedaisy.app.companion.i18n.tr("Companion closed. Press BACK to bring it back."))
+            }
+        }
+        override val autoResume get() = Prefs(this@PokeDaisyActivity).autoResume
+        override fun setTweak(key: String, on: Boolean) = Prefs(this@PokeDaisyActivity).setTweak(key, on)
         override val clickSound get() = clickSoundOn
         override fun setClickSound(on: Boolean) {
             Prefs(this@PokeDaisyActivity).clickSound = on
@@ -258,6 +310,11 @@ class PokeDaisyActivity : Activity() {
         override val statusBar get() = Prefs(this@PokeDaisyActivity).statusBar
         override fun setStatusBar(on: Boolean) {
             Prefs(this@PokeDaisyActivity).statusBar = on
+            runOnUiThread { syncGameScreen() }
+        }
+        override val statusBarOnCompanion get() = Prefs(this@PokeDaisyActivity).statusBarOnCompanion
+        override fun setStatusBarOnCompanion(on: Boolean) {
+            Prefs(this@PokeDaisyActivity).statusBarOnCompanion = on
             runOnUiThread { syncGameScreen() }
         }
         override val stretchGame get() = Prefs(this@PokeDaisyActivity).stretchGame
@@ -275,11 +332,27 @@ class PokeDaisyActivity : Activity() {
             Prefs(this@PokeDaisyActivity).screenFilter = filter
             runOnUiThread { syncGameScreen() }
         }
+        override val gridStrength get() = Prefs(this@PokeDaisyActivity).gridStrength
+        override fun setGridStrength(strength: GridStrength) {
+            Prefs(this@PokeDaisyActivity).gridStrength = strength
+            runOnUiThread { syncGameScreen() }
+        }
+        override val companionShaders get() = Prefs(this@PokeDaisyActivity).companionShaders
+        override fun setCompanionShaders(on: Boolean) {
+            Prefs(this@PokeDaisyActivity).companionShaders = on
+            runOnUiThread { syncGameScreen() }
+        }
         // The display itself, not `presentation != null`: a swap composes the companion
         // here before the new presentation is assigned, and the remembered rows then lost
         // SWAP SCREENS until the page was rebuilt.
         override val hasSecondScreen get() = Screens.second(this@PokeDaisyActivity) != null
         override val swapScreens get() = Prefs(this@PokeDaisyActivity).swapScreens
+        override val portraitUnderGame get() =
+            if (::portraitPanel.isInitialized && portraitPanel.enabled) Prefs(this@PokeDaisyActivity).portraitCompanionUnderGame else null
+        override fun setPortraitUnderGame(on: Boolean) {
+            Prefs(this@PokeDaisyActivity).portraitCompanionUnderGame = on
+            runOnUiThread { portraitPanel.refresh() }
+        }
         override fun setSwapScreens(on: Boolean) {
             Prefs(this@PokeDaisyActivity).swapScreens = on
             // The companion that asked moves screens: it comes back on SETTINGS.
@@ -298,6 +371,19 @@ class PokeDaisyActivity : Activity() {
         override val showFoeIvs get() = Prefs(this@PokeDaisyActivity).showFoeIvs
         override fun setShowFoeIvs(on: Boolean) {
             Prefs(this@PokeDaisyActivity).showFoeIvs = on
+        }
+        override val cheats get() = cheatStore()?.load().orEmpty()
+        override val cheatsEnabled get() = Prefs(this@PokeDaisyActivity).cheatsEnabled
+        override fun setCheatsEnabled(on: Boolean) {
+            Prefs(this@PokeDaisyActivity).cheatsEnabled = on
+            syncCheats()
+        }
+        override fun setCheatEnabled(index: Int, on: Boolean) {
+            val store = cheatStore() ?: return
+            val list = store.load()
+            if (index !in list.indices) return
+            store.save(list.toMutableList().also { it[index] = it[index].copy(enabled = on) })
+            syncCheats()
         }
         override val gameName get() = com.pokedaisy.app.companion.data.activeGame.displayName()
         override val romFileName get() = rom?.name ?: "(none)"
@@ -351,6 +437,8 @@ class PokeDaisyActivity : Activity() {
 
         view = EmulatorView(this)
         view.holdFrame = { ::engine.isInitialized && engine.holdFrame }
+        // SHADERS on the companion: its grid at the game's own pixel size, so both screens match.
+        view.onGamePixel = CompanionColors::setCell
         if (debugMirror) view.setZOrderMediaOverlay(true) // see EmulatorView's z-order note
         hud = TextView(this).apply {
             setTextColor(Color.WHITE)
@@ -416,8 +504,15 @@ class PokeDaisyActivity : Activity() {
         root.setViewTreeViewModelStoreOwner(owner)
         sidePanel = SidePanel(root, view, touchControls, Prefs(this), panelBack, playClick) {
             val snap by telemetry.snapshot.collectAsState()
-            CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = panelBack, clickSound = playClick, achievements = RetroAchievements)
+            CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = panelBack, clickSound = playClick, achievements = RetroAchievements, statusBar = companionStatusBar)
         }
+        portraitPanel = PortraitPanel(root, view, touchControls, Prefs(this), portraitBack, playClick) {
+            val snap by telemetry.snapshot.collectAsState()
+            CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = portraitBack, clickSound = playClick, achievements = RetroAchievements, statusBar = companionStatusBar)
+        }
+        // Two screens: the game stays on the landscape top one. One screen (a phone): it turns
+        // with the device (the user's rotation setting), the companion under the game upright.
+        syncOrientation(Screens.hasSecond(this))
         syncGameScreen()
 
         saveDir = SavesLocation.dir(this)
@@ -444,7 +539,11 @@ class PokeDaisyActivity : Activity() {
      * alive - the activity is always paused before a new intent, so the old
      * engine has already stopped (and suspended its game) by then.
      */
+    /** The next [startGame] is this ROM's launch (not a return from HOME): RESUME GAMES decides. */
+    private var freshLaunch = true
+
     private fun loadRom(romFile: File) {
+        freshLaunch = true
         // An archive unpacks once (cached after) - ~0.5 s for 32 MiB, on the black screen.
         val r = RomArchive.playable(romFile, cacheDir) ?: romFile
         romData = r
@@ -459,6 +558,7 @@ class PokeDaisyActivity : Activity() {
         clickSound?.release()
         clickSound = GameClickSound(filesDir, crc)
         clickSoundOn = Prefs(this).clickSound
+        com.pokedaisy.app.companion.ui.CompanionTweaks.load { Prefs(this).tweak(it) }
         // RetroAchievements unlocks play the game's level-up fanfare, rendered the same way.
         unlockSound?.release()
         unlockSound = GameClickSound(filesDir, crc, GameClickSound.FANFARE)
@@ -467,10 +567,22 @@ class PokeDaisyActivity : Activity() {
         // GBA art fingerprints, FireRed's region_map.c); its click is borrowed.
         val gameBoy = RomIdentity.isGameBoy(r)
         romIsGameBoy = gameBoy
-        ffMusicRenderer = if (gameBoy) null else FfMusicRenderer(r, crc, ffMusicCache, clickSound, unlockSound).also { it.start() }
         // FireRed / Emerald party-menu art and region maps come from the ROM
         // itself, once per ROM (see RomArt) - nothing of the game is bundled.
         if (!gameBoy) RomArt.prefetch(filesDir, crc, r) else com.pokedaisy.app.companion.data.Gen1Art.prefetch(filesDir, r)
+        // A Game Boy cart's POKéDEX pages are read from its bytes (bank-switched: not on the bus whole); a few MB at most.
+        val gbRom = if (gameBoy) runCatching { r.readBytes() }.getOrNull() else null
+        com.pokedaisy.app.companion.data.Gen1Dex.rom = gbRom
+        // STEADY FF music: a Gen 1 cart's songs come from its own sound engine (Gen1MusicRenderer).
+        gen1Music = gbRom?.let {
+            val sha1 = java.security.MessageDigest.getInstance("SHA-1").digest(it).joinToString("") { b -> "%02x".format(b) }
+            com.pokedaisy.app.companion.data.Gen1Music.forSha1(sha1)
+        }
+        ffMusicRenderer = when {
+            !gameBoy -> FfMusicRenderer(r, crc, ffMusicCache, clickSound, unlockSound).also { it.start() }
+            gen1Music != null -> Gen1MusicRenderer(r, gen1Music!!, ffMusicCache).also { it.start() }
+            else -> null
+        }
         // A FireRed-engine hack's own region map (Unbound, Odyssey, ...), read
         // from the ROM on every launch - a few KB of reads (see RomRegionMap).
         if (!gameBoy) RomRegionMap.load(filesDir, crc, r)
@@ -489,6 +601,7 @@ class PokeDaisyActivity : Activity() {
 
         engine = EmulatorEngine(input, states!!, ffMusicCache).apply {
             gba = !gameBoy
+            gen1Music = this@PokeDaisyActivity.gen1Music
             onCoreReady = { w, h ->
                 MgbaCore.pkVideoBuffer()?.let { buf ->
                     runOnUiThread {
@@ -527,6 +640,7 @@ class PokeDaisyActivity : Activity() {
                 telemetry.knownGMain()?.let { (addr, inBattleOff) -> FfMenuWatch.useKnownGMain(addr, inBattleOff) }
                 if (snap.connected) FfMenuWatch.notePosition(snap.x, snap.y, snap.mapGroup, snap.mapNum, snap.inBattle)
                 if (snap.connected) battleSwitchAddrs = switchAddrsFor(snap.game)
+                if (snap.connected) battleGen1Menus = snap.game == com.pokedaisy.app.companion.data.GameKind.YELLOW
                 // party.isNotEmpty(), not just connected: `connected` flips true as
                 // soon as the QOLT struct/native addresses are found, which can be
                 // well before the save's party has actually loaded into RAM (e.g.
@@ -537,7 +651,7 @@ class PokeDaisyActivity : Activity() {
             }
             onBattleInputSample = {   // runs on the emu thread, ~15x/sec
                 telemetry.refreshBattleInputFast()?.let { (battler, state) ->
-                    setBattleMenuState(battler, state)
+                    setBattleMenuState(battler, state, telemetry.battleMenuCursor())
                 }
             }
             ffMaxSpeed = Prefs(this@PokeDaisyActivity).ffMaxSpeed
@@ -588,6 +702,7 @@ class PokeDaisyActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        com.pokedaisy.app.companion.ui.OptionColors.inGame = true
         goImmersive()
         view.onResume()
         // Pick up any Settings changes made since launch.
@@ -604,11 +719,26 @@ class PokeDaisyActivity : Activity() {
         if (!startGame()) return
         displayManager.registerDisplayListener(displayListener, null)
         syncPresentation()
+        // SETTINGS > COMPANION may have changed in the top-screen Settings.
+        portraitPanel.refresh()
         inputManager.registerInputDeviceListener(inputDeviceListener, null)
+        for (id in InputDevice.getDeviceIds()) InputDevice.getDevice(id)?.takeIf(::isGamepad)?.let { pads[id] = it.name }
         syncTouchControls()
         syncGameScreen()
         // Sticky: the current reading arrives right away, then every change.
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(::onBattery)
+    }
+
+    /** This ROM's cheats (by CRC, like its states); null before a ROM is loaded. */
+    private fun cheatStore(): com.pokedaisy.app.cheats.CheatStore? =
+        romKey.takeIf { it.isNotEmpty() }?.let { com.pokedaisy.app.cheats.CheatStore.forCrc(filesDir, it) }
+
+    /** Hands the engine this ROM's enabled cheats (none with the master switch off); it loads
+     * them before the first frame, or on the next one while the game runs. */
+    private fun syncCheats() {
+        if (!::engine.isInitialized) return
+        val text = if (Prefs(this).cheatsEnabled) cheatStore()?.load()?.let(com.pokedaisy.app.cheats.CheatFiles::coreText).orEmpty() else ""
+        engine.setCheats(text)
     }
 
     /** Starts the loaded ROM's engine, resuming where it was left; false with no ROM. */
@@ -616,6 +746,8 @@ class PokeDaisyActivity : Activity() {
         val r = rom ?: return false
         val st = states ?: return false
         val save = SavesLocation.resolve(saveDir, r)
+        // Cheats may have changed in the library's Settings since the game was last up.
+        syncCheats()
         // Auto-resume from wherever was written most recently: normally that's
         // the auto-suspend snapshot from the last close, but if that session
         // ended in a crash instead of a clean close (stale/missing resumeFile),
@@ -625,6 +757,16 @@ class PokeDaisyActivity : Activity() {
         // A save file was just loaded from the library: boot from it, once.
         if (st.freshBootFile.exists()) {
             st.freshBootFile.delete()
+            st.resumeFile.delete()
+            engine.start(romData ?: r, save, null)
+            view.postDelayed({ (engine.lastError ?: engine.lastNotice)?.let { Toast.makeText(this, it, Toast.LENGTH_LONG).show() } }, 1500)
+            return true
+        }
+        // RESUME GAMES off: a launch boots from the save (the title screen); only coming back to
+        // this still-open game (after HOME / another app) picks up its suspend state.
+        val launch = freshLaunch
+        freshLaunch = false
+        if (launch && !Prefs(this).autoResume) {
             st.resumeFile.delete()
             engine.start(romData ?: r, save, null)
             view.postDelayed({ (engine.lastError ?: engine.lastNotice)?.let { Toast.makeText(this, it, Toast.LENGTH_LONG).show() } }, 1500)
@@ -688,19 +830,29 @@ class PokeDaisyActivity : Activity() {
      * EmulatorView's bindCore) moves into the second screen's window and a
      * companion becomes this activity's content.
      */
+    /** The player closed the companion (SETTINGS > CLOSE COMPANION): its screen is the device's until BACK. */
+    private var companionClosed = false
+
     private fun syncPresentation() {
         if (!::engine.isInitialized) return
         val target: Display? = Screens.second(this)
         val swap = target != null && Prefs(this).swapScreens && !debugMirror
+        if (companionClosed && target != null && !swap) {
+            presentation?.let { it.dismiss(); it.releaseContent() }
+            presentation = null
+            showStage()
+            return
+        }
         val current = presentation
         if (current != null && target != null && current.display.displayId == target.displayId &&
             current.isShowing && swap == (mainCompanion != null)
         ) return
         current?.let { it.dismiss(); it.releaseContent() }
         presentation = null
-        // One screen: the companion goes in a panel beside the game instead (not
-        // with the debug mirror, which already shows it there).
-        sidePanel.setEnabled(target == null && !debugMirror)
+        syncOrientation(target != null)
+        // One screen: the companion goes in a panel beside / under the game instead
+        // (not with the debug mirror, which already shows it there).
+        syncSingleScreen(target == null && !debugMirror)
         if (swap) showMainCompanion() else showStage()
         if (target == null) return
         presentation = runCatching {
@@ -708,7 +860,7 @@ class PokeDaisyActivity : Activity() {
                 if (swap) stage
                 else DualScreenPresentation.companionView(
                     ctx, telemetry, stateSlots, companionSettings, battleInput, companionBack, playClick, RetroAchievements,
-                    initialTab = companionStartTab,
+                    initialTab = companionStartTab, statusBar = companionStatusBar,
                 )
             }.also { it.show() }
         }.onFailure { Log.w("pokedaisy", "presentation failed", it) }.getOrNull()
@@ -716,8 +868,31 @@ class PokeDaisyActivity : Activity() {
         if (presentation == null && swap) {
             // The game has to be somewhere: back here, the companion beside it.
             showStage()
-            sidePanel.setEnabled(!debugMirror)
+            syncSingleScreen(!debugMirror)
         }
+    }
+
+    /** The companion on the game's screen: beside the game held sideways, under it upright. */
+    private fun syncSingleScreen(on: Boolean) {
+        singleScreen = on
+        val portrait = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+        // Off first, so the two never hold the game's margins at once.
+        if (portrait) sidePanel.setEnabled(false) else portraitPanel.setEnabled(false)
+        sidePanel.setEnabled(on && !portrait)
+        portraitPanel.setEnabled(on && portrait)
+    }
+
+    /** Locked to landscape with a second screen (the Thor's top one); else the device's rotation decides. */
+    private fun syncOrientation(twoScreens: Boolean) {
+        val want = if (twoScreens || debugMirror) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER
+        if (requestedOrientation != want) requestedOrientation = want
+    }
+
+    // A rotation (configChanges keeps the activity, and the game, running through it).
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (::sidePanel.isInitialized) syncSingleScreen(singleScreen)
     }
 
     /** The game's stage as this activity's content (dropping the swapped companion). */
@@ -736,7 +911,7 @@ class PokeDaisyActivity : Activity() {
         val owner = ComposeHostOwner().apply { create(); resume() }
         val view = DualScreenPresentation.companionView(
             this, telemetry, stateSlots, companionSettings, battleInput, companionBack, playClick, RetroAchievements,
-            initialTab = companionStartTab,
+            initialTab = companionStartTab, statusBar = companionStatusBar,
         ).apply {
             setViewTreeLifecycleOwner(owner)
             setViewTreeSavedStateRegistryOwner(owner)
@@ -752,11 +927,19 @@ class PokeDaisyActivity : Activity() {
     private fun syncGameScreen() {
         if (!::statusBar.isInitialized) return
         val prefs = Prefs(this)
-        statusBar.visibility = if (prefs.statusBar) View.VISIBLE else View.GONE
+        // STATUS BAR > COMPANION: the strip goes over the companion's tabs instead.
+        statusBar.visibility = if (prefs.statusBar && !prefs.statusBarOnCompanion) View.VISIBLE else View.GONE
+        com.pokedaisy.app.companion.ui.CompanionStatusBar.shown = prefs.statusBar && prefs.statusBarOnCompanion
         (statusBar.parent as? GameStageLayout)?.stretch = prefs.stretchGame
         view.stretch = prefs.stretchGame
         view.gbaColors = prefs.gbaColors
+        CompanionColors.set(
+            prefs.gbaColors && prefs.companionShaders,
+            if (prefs.companionShaders) prefs.screenFilter else ScreenFilter.NONE,
+            ScreenShaders.gridFor(prefs.screenFilter, prefs.gridStrength),
+        )
         view.screenEffect = ScreenShaders.effectFor(prefs.screenFilter)
+        view.screenGrid = ScreenShaders.gridFor(prefs.screenFilter, prefs.gridStrength)
     }
 
     /**
@@ -764,8 +947,16 @@ class PokeDaisyActivity : Activity() {
      * the ROM's name as the Library shows it, the map section and money from
      * telemetry, the clock (the system's 12/24-hour setting) and the battery.
      */
-    private fun buildStatusBar(): ComposeView = ComposeView(this).apply {
-        setContent {
+    // Tracked by CompanionColors: it sits on the game, so GBA COLORS recolours it with it.
+    private fun buildStatusBar(): ComposeView = CompanionColors.track(ComposeView(this)).apply {
+        setContent { StatusBarContent() }
+    }
+
+    /** The same status bar over the companion's tabs (SETTINGS > STATUS BAR > COMPANION). */
+    private val companionStatusBar: @androidx.compose.runtime.Composable () -> Unit = { StatusBarContent() }
+
+    @androidx.compose.runtime.Composable
+    private fun StatusBarContent() {
             val snap by telemetry.snapshot.collectAsState()
             val time by produceState(clockText()) {
                 while (true) {
@@ -787,7 +978,6 @@ class PokeDaisyActivity : Activity() {
                 money = snap.money.takeIf { snap.connected },
                 time = time,
             )
-        }
     }
 
     private fun clockText(): String =
@@ -799,10 +989,8 @@ class PokeDaisyActivity : Activity() {
         val show = when (Prefs(this).touchControlsMode) {
             1 -> true
             2 -> false
-            else -> InputDevice.getDeviceIds().none { id ->
-                val d = InputDevice.getDevice(id) ?: return@none false
-                !d.isVirtual && d.sources and
-                    (InputDevice.SOURCE_GAMEPAD or InputDevice.SOURCE_JOYSTICK) != 0
+            else -> !physicalPadUsed && InputDevice.getDeviceIds().none { id ->
+                InputDevice.getDevice(id)?.let(::isGamepad) == true
             }
         }
         touchControls.visibility = if (show) View.VISIBLE else View.GONE
@@ -820,7 +1008,18 @@ class PokeDaisyActivity : Activity() {
             for (e in hotkeys.onKey(event.keyCode, down)) handleHotkey(e)
             if (hotkeys.consumes(event.keyCode)) return true   // key is completing a chord
         }
-        if (input.onKey(event.keyCode, down)) return true
+        if (input.onKey(event.keyCode, down)) {
+            if (down && !physicalPadUsed && event.device?.isVirtual == false) {
+                physicalPadUsed = true
+                syncTouchControls()
+            }
+            return true
+        }
+        // A controller's HOME / guide button (unbound): a BACK tap - the companion's back, or the side panel.
+        if (event.keyCode == KeyEvent.KEYCODE_BUTTON_MODE) {
+            if (!down && !event.isCanceled) companionBackTap()
+            return true
+        }
         if (down && event.repeatCount == 0 && event.keyCode != KeyEvent.KEYCODE_BACK) {
             // Helps discover a device's real keycodes (e.g. L2/R2) for rebinding.
             Log.i("pokedaisy", "unmapped key ${event.keyCode} (${KeyEvent.keyCodeToString(event.keyCode)})")
@@ -844,16 +1043,31 @@ class PokeDaisyActivity : Activity() {
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             // Not after a hold (that's canceled) - the long press already left.
-            if (event.isTracking && !event.isCanceled && !sidePanel.onBack()) { companionBack.back(); mirrorBack.back() }
+            if (event.isTracking && !event.isCanceled) companionBackTap()
             return true
         }
         return super.onKeyUp(keyCode, event)
+    }
+
+    private fun companionBackTap() {
+        if (companionClosed) {
+            // The companion was closed: BACK brings it back.
+            companionClosed = false
+            syncPresentation()
+        } else if (!sidePanel.onBack() && !portraitPanel.onBack()) { companionBack.back(); mirrorBack.back() }
     }
 
     // Many Android handhelds report L2/R2 as analog axes, not BUTTON_L2/R2 keys.
     // RetroArch-style: right trigger = hold fast-forward, left trigger = hold slow-mo.
     private var rtDown = false
     private var ltDown = false
+
+    // A controller's stick / D-pad / triggers, before the views: with the companion in this
+    // window (side panel, phone upright) a focused ComposeView would see them first.
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (event.isFromSource(InputDevice.SOURCE_JOYSTICK) && onGenericMotionEvent(event)) return true
+        return super.dispatchGenericMotionEvent(event)
+    }
 
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
         if (::engine.isInitialized) {
@@ -1041,7 +1255,7 @@ class PokeDaisyActivity : Activity() {
         return ComposeView(this).apply {
             setContent {
                 val snap by telemetry.snapshot.collectAsState()
-                CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = mirrorBack, clickSound = playClick, achievements = RetroAchievements)
+                CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = mirrorBack, clickSound = playClick, achievements = RetroAchievements, statusBar = companionStatusBar)
             }
         }
     }

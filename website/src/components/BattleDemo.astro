@@ -1,0 +1,196 @@
+---
+// The BATTLE tab as the app draws it (BattleControlsScreen / BattleInfoScreen / SuggestionsScreen),
+// playing itself: FIGHT, a move, INFO, SUGGESTIONS and back. Invented creatures and moves only (never a real
+// name), a type's emblem for each one's icon and a daisy orb for the party - no game art.
+import AppScreen from './AppScreen.astro';
+import Pixel from './Pixel.astro';
+import { TYPE } from '../lib/types.js';
+
+const v = { super: '#389830', neutral: '#8c8c94', resisted: '#d04030', immune: '#585048' };
+const moves = [
+  { name: 'PAW SWIPE', type: 'NORMAL', pwr: '40', pp: '35', verdict: ['NEUTRAL 1x', '1x', v.neutral] },
+  { name: 'WARY GLARE', type: 'NORMAL', pwr: '-', pp: '40', verdict: ['STATUS', '-', v.neutral] },
+  { name: 'CINDER SPIT', type: 'FIRE', pwr: '40', pp: '25', verdict: ['SUPER 2x', '2x', v.super] },
+  { name: 'IRON NIP', type: 'STEEL', pwr: '50', pp: '35', verdict: ['NEUTRAL 1x', '1x', v.neutral] },
+];
+const weak = [['FIRE', '2x'], ['ICE', '2x'], ['FLYING', '2x'], ['PSYCHIC', '2x']];
+const resists = [['WATER', '1/2x'], ['ELECTRIC', '1/2x'], ['FIGHTING', '1/2x'], ['GRASS', '1/4x']];
+---
+<div class="battle-demo" data-battle-demo>
+  <AppScreen label="The companion's BATTLE tab: FIGHT, then the move list with each move's effect, then INFO and SUGGESTIONS">
+    <!-- The action menu -->
+    <div class="pane on" data-pane="menu">
+      <div class="balls"><Pixel name="orb" scale={1.5} /><Pixel name="orb" scale={1.5} />{[0, 1, 2, 3].map(() => <Pixel name="disc" scale={1.5} />)}</div>
+      <div class="pb pb-info f-pbInfo t32" style="left:128px;top:62px;width:112px;height:46px" data-b="info"><span>INFO</span></div>
+      <div class="pb pb-sugg f-pbSugg t32" style="left:252px;top:62px;width:184px;height:46px" data-b="sugg"><span>SUGGESTIONS</span></div>
+      <div class="pb pb-fight f-pbFight t64" style="left:78px;top:126px;width:404px;height:174px" data-b="fight"><Pixel name="flame" scale={1.5} /><span>FIGHT</span></div>
+      <div class="pb pb-bag f-pbBag t48" style="left:14px;top:320px;width:160px;height:96px"><span>BAG</span></div>
+      <div class="pb pb-run f-pbRun t48" style="left:188px;top:338px;width:160px;height:96px"><span>RUN</span></div>
+      <div class="pb pb-mon f-pbMon t48" style="left:362px;top:320px;width:184px;height:96px"><span>PARTY</span></div>
+    </div>
+
+    <!-- FIGHT: the four moves -->
+    <div class="pane" data-pane="moves">
+      <div class="balls"><Pixel name="orb" scale={1.5} /><Pixel name="orb" scale={1.5} />{[0, 1, 2, 3].map(() => <Pixel name="disc" scale={1.5} />)}</div>
+      <div class="pb pb-info f-pbInfo t32" style="left:128px;top:62px;width:112px;height:46px"><span>INFO</span></div>
+      <div class="pb pb-sugg f-pbSugg t32" style="left:252px;top:62px;width:184px;height:46px"><span>SUGGESTIONS</span></div>
+      {moves.map((m, i) => (
+        <div class="pb pb-move f-pbMove" data-b={m.name === 'CINDER SPIT' ? 'ember' : undefined}
+          style={`left:${i % 2 ? 286 : 14}px;top:${i < 2 ? 122 : 248}px;width:260px;height:112px;--t:${TYPE[m.type]}`}>
+          <span class="t32">{m.name}</span>
+          <span class="pill" style={`--c:${TYPE[m.type]}`}>{m.type}</span>
+          <span class="mrow t24"><span class="pwr">PWR {m.pwr}</span><span class="pill" style={`--c:${m.verdict[2]}`}>{m.verdict[1]}</span><span class="pp">PP {m.pp}</span></span>
+        </div>
+      ))}
+      <div class="pb pb-run f-pbRun t32" style="left:14px;top:376px;width:532px;height:56px"><span>CANCEL</span></div>
+    </div>
+
+    <!-- INFO -->
+    <div class="pane" data-pane="info">
+      <div class="win f-appWin">
+        <div class="sides">
+          <div class="side">
+            <div class="side-l"><span class="red t24">YOU</span><span class="icon-box f-iconBox"><Pixel name="flame" scale={1.334} /></span></div>
+            <div class="side-r">
+              <span class="t32 nm">EMBERPUP<Pixel name="male" scale={1} /></span>
+              <span class="row"><span class="pill" style={`--c:${TYPE.FIRE}`}>FIRE</span><span class="t24">Lv <b class="red">12</b></span></span>
+              <span class="hp"><span class="red">HP</span><span class="hpbar" style="--v:86%"><i></i></span><span>30/35</span></span>
+            </div>
+          </div>
+          <span class="sep-v"></span>
+          <div class="side">
+            <div class="side-l"><span class="red t24">FOE</span><span class="icon-box f-iconBox"><Pixel name="leaf" scale={1.5} /></span></div>
+            <div class="side-r">
+              <span class="t32 nm">THORNLET<Pixel name="female" scale={1} /></span>
+              <span class="row"><span class="pill" style={`--c:${TYPE.GRASS}`}>GRASS</span><span class="pill" style={`--c:${TYPE.POISON}`}>POISON</span><span class="t24">Lv <b class="red">10</b></span></span>
+              <span class="hp"><span class="red">HP</span><span class="hpbar" data-foe-bar style="--v:71%"><i></i></span><span data-foe-hp>22/31</span></span>
+            </div>
+          </div>
+        </div>
+        <div class="sep-h"></div>
+        <div class="lower">
+          <div class="mvlist">
+            {moves.map((m) => (
+              <div class="mv" style={`--t:${TYPE[m.type]}`}>
+                <span class="mv-a"><span class="t24">{m.name}</span><span class="pill" style={`--c:${m.verdict[2]}`}>{m.verdict[0]}</span></span>
+                <span class="mv-b"><span class="pill" style={`--c:${TYPE[m.type]}`}>{m.type}</span><span class="t16">PWR <b class="red">{m.pwr}</b> PP <b class="red">{m.pp}</b></span></span>
+              </div>
+            ))}
+          </div>
+          <span class="sep-v"></span>
+          <div class="weak">
+            <span class="red t24">THORNLET IS</span>
+            <span class="t24">WEAK TO</span>
+            <span class="pills">{weak.map(([t, x]) => <span class="pill big" style={`--c:${TYPE[t]}`}>{t} {x}</span>)}</span>
+            <span class="t24">RESISTS</span>
+            <span class="pills">{resists.map(([t, x]) => <span class="pill big" style={`--c:${TYPE[t]}`}>{t} {x}</span>)}</span>
+          </div>
+        </div>
+      </div>
+      <div class="pb pb-sugg f-pbSugg t32" style="left:14px;top:378px;width:224px;height:56px" data-b="sugg2"><span>SUGGESTIONS</span></div>
+      <div class="pb pb-run f-pbRun" style="left:474px;top:378px;width:72px;height:56px"><Pixel name="back" scale={1.334} /></div>
+    </div>
+
+    <!-- SUGGESTIONS -->
+    <div class="pane" data-pane="sugg">
+      <div class="win f-appWin">
+        <div class="vs">
+          <span class="red t32">VS</span>
+          <span class="icon-box small f-iconBox"><Pixel name="leaf" scale={1} /></span>
+          <span class="t32">THORNLET</span><Pixel name="female" scale={1} />
+          <span class="t24">Lv <b class="red">10</b></span>
+          <span class="pill" style={`--c:${TYPE.GRASS}`}>GRASS</span><span class="pill" style={`--c:${TYPE.POISON}`}>POISON</span>
+          <span class="hp mini"><span class="red">HP</span><span class="hpbar low" style="--v:19%"><i></i></span></span>
+        </div>
+        <div class="sep-h"></div>
+        {[
+          { rank: '1ST', icon: 'flame', name: 'EMBERPUP', g: 'male', out: true, types: ['FIRE'], lv: 12, hp: ['86%', '30/35', ''], move: 'CINDER SPIT', mtype: 'FIRE', pwr: 40, pp: 25 },
+          { rank: '2ND', icon: 'feather', name: 'GALEFINCH', g: 'female', psn: true, types: ['NORMAL', 'FLYING'], lv: 9, hp: ['19%', '5/26', 'low'], move: 'BREEZE CUT', mtype: 'FLYING', pwr: 40, pp: 35 },
+        ].map((s, i) => (
+          <>
+            {i > 0 && <div class="sep-h"></div>}
+            <div class="pick">
+              <div class="side">
+                <div class="side-l"><span class="red t24">{s.rank}</span><span class="icon-box f-iconBox"><Pixel name={s.icon} scale={s.icon === 'feather' ? 1.334 : 1.334} /></span></div>
+                <div class="side-r">
+                  <span class="t32 nm">{s.name}<Pixel name={s.g} scale={1} />{s.out && <span class="pill" style="--c:#8c8c94">OUT</span>}{s.psn && <span class="pill" style="--c:#a259d9">PSN</span>}</span>
+                  <span class="row">{s.types.map((t) => <span class="pill" style={`--c:${TYPE[t]}`}>{t}</span>)}<span class="t24">Lv <b class="red">{s.lv}</b></span></span>
+                  <span class="hp"><span class="red">HP</span><span class:list={['hpbar', s.hp[2]]} style={`--v:${s.hp[0]}`}><i></i></span><span>{s.hp[1]}</span></span>
+                </div>
+              </div>
+              <span class="sep-v"></span>
+              <div class="pick-move">
+                <span class="mv-a"><span class="t32">{s.move}</span><span class="pill big" style={`--c:${v.super}`}>SUPER 2x</span></span>
+                <span class="mv-b"><span class="pill" style={`--c:${TYPE[s.mtype]}`}>{s.mtype}</span><span class="t24">PWR <b class="red">{s.pwr}</b> PP <b class="red">{s.pp}</b></span></span>
+              </div>
+            </div>
+          </>
+        ))}
+      </div>
+      <div class="pb pb-info f-pbInfo t32" style="left:14px;top:378px;width:120px;height:56px"><span>INFO</span></div>
+      <div class="pb pb-run f-pbRun" style="left:474px;top:378px;width:72px;height:56px" data-b="back"><Pixel name="back" scale={1.334} /></div>
+    </div>
+  </AppScreen>
+</div>
+
+<style is:global>
+  .app .balls { position: absolute; left: 14px; top: 18px; display: flex; gap: 12px; }
+  .app .pb-move { flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px; padding: 0 18px; }
+  .app .mrow { display: flex; align-items: center; gap: 10px; width: 100%; }
+  .app .mrow .pwr { color: #a0a0b8; text-shadow: 2px 2px 0 #d8d8c0; }
+  .app .mrow .pp { margin-left: auto; }
+
+  .app .sides { display: grid; grid-template-columns: 1fr 2px 1fr; gap: 10px; }
+  .app .pick { display: grid; grid-template-columns: 1.25fr 2px 0.75fr; gap: 10px; }
+  .app .side { display: flex; gap: 8px; min-width: 0; }
+  .app .side-l { display: grid; gap: 4px; align-content: start; justify-items: center; }
+  .app .side-r { display: grid; gap: 4px; align-content: start; min-width: 0; flex: 1; }
+  .app .nm { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .app .row { display: flex; align-items: center; gap: 8px; }
+  .app .lower { display: grid; grid-template-columns: 1fr 2px 1fr; gap: 10px; height: 216px; }
+  .app .mvlist { display: grid; gap: 4px; align-content: start; }
+  .app .mv { display: grid; gap: 2px; padding-left: 8px; box-shadow: inset 4px 0 0 var(--t); }
+  .app .mv-a, .app .mv-b { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .app .weak { display: grid; gap: 6px; align-content: start; }
+  .app .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .app .vs { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; white-space: nowrap; }
+  .app .icon-box.small { width: 40px; height: 40px; }
+  .app .hp.mini { margin-left: auto; width: 96px; }
+  .app .pick { padding: 4px 0; }
+  .app .pick-move { display: grid; gap: 10px; align-content: center; }
+</style>
+
+<script>
+  import { demo } from '../lib/demo.js';
+
+  for (const root of document.querySelectorAll<HTMLElement>('[data-battle-demo]')) {
+    const foeBar = root.querySelector<HTMLElement>('[data-foe-bar]')!;
+    const foeHp = root.querySelector<HTMLElement>('[data-foe-hp]')!;
+    const foe = (pct: number, text: string) => {
+      foeBar.style.setProperty('--v', `${pct}%`);
+      foeBar.classList.toggle('low', pct <= 20);
+      foeBar.classList.toggle('mid', pct > 20 && pct <= 50);
+      foeHp.textContent = text;
+    };
+    demo(root, async (d) => {
+      foe(71, '22/31');
+      d.show('menu');
+      await d.wait(1500);
+      await d.tap('[data-b="fight"]');
+      d.show('moves');
+      await d.wait(1700);
+      await d.tap('[data-b="ember"]');
+      d.show('menu');
+      await d.wait(900);
+      await d.tap('[data-b="info"]');
+      d.show('info');
+      await d.wait(500);
+      foe(19, '6/31');
+      await d.wait(3400);
+      await d.tap('[data-b="sugg2"]');
+      d.show('sugg');
+      await d.wait(3000);
+      await d.tap('[data-b="back"]');
+    });
+  }
+</script>

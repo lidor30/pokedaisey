@@ -134,6 +134,33 @@ def seaglass_symbols(rom):
     return {"RegionGfx": (0x9534A0, 0)}
 
 
+# The European Emeralds (Spanish, German, French, Italian) redrew three party-menu
+# pieces: the background tiles (the slot's HP label: PS / KP / PV; the CANCEL
+# button), the status icons (localized abbreviations) and FONT_SMALL (a few
+# glyphs). Everything else the party menu uses is byte for byte English's. Found
+# by scanning near English's offset for a blob of the same size (the palette,
+# tilemaps and Poke Ball beside them are identical), FONT_SMALL through
+# English's literal pool. RomArt writes them to partyem_<lang>/.
+EMERALD_MULTILANG = os.path.expanduser("~/Downloads/Game ROMs & Emulation/gba/emerald-multilang")
+EMERALD_EU_ROMS = {
+    "ES": os.path.join(EMERALD_MULTILANG, "Pokemon - Edicion Esmeralda (Spain).gba"),
+    "DE": os.path.join(EMERALD_MULTILANG, "Pokemon - Smaragd-Edition (Germany).gba"),
+    "FR": os.path.join(EMERALD_MULTILANG, "Pokemon - Version Emeraude (France).gba"),
+    "IT": os.path.join(EMERALD_MULTILANG, "Pokemon - Versione Smeraldo (Italy).gba"),
+}
+EMERALD_EU_OFFSETS = {  # gPartyMenuBg_Gfx, gStatusGfx_Icons, gFontSmallLatinGlyphs
+    "ES": (0xD96728, 0xD96ECC, 0x636218),
+    "DE": (0xD967E8, 0xD96F8C, 0x644D88),
+    "FR": (0xD967E0, 0xD96F84, 0x637C18),
+    "IT": (0xD96764, 0xD96F08, 0x630338),
+}
+
+
+def emerald_eu_symbols(lang):
+    gfx, status, font = EMERALD_EU_OFFSETS[lang]
+    return lambda rom: {"PartyBgGfx": (gfx, 0), "StatusGfx": (status, 0), "FontSmall": (font, 0x8000)}
+
+
 # (Kotlin name, symbol, LZ77? - True / False / "smol") per game.
 GAMES = {
     "FR": ("pokefirered/pokefirered_rev1.gba", "pokefirered/pokefirered_rev1.elf", [
@@ -245,8 +272,49 @@ GAMES = {
     ]),
 }
 
+for _lang, _rom in EMERALD_EU_ROMS.items():
+    GAMES["EM" + _lang] = (_rom, None, [
+        (f"EM_{_lang}_PARTY_BG_GFX", "PartyBgGfx", True),
+        (f"EM_{_lang}_STATUS_GFX", "StatusGfx", True),
+        (f"EM_{_lang}_FONT_SMALL", "FontSmall", False),
+    ])
+
+# The European FireReds redrew the same three party-menu pieces (the HP label PS / KP / PV, the
+# status abbreviations, a few glyphs): scripts/port_retail.py finds them (build/ports/ports.json,
+# "art") and RomArt writes them to partyfr_<lang>/. LeafGreen's are byte for byte FireRed's.
+PORTS_JSON = os.path.join(HERE, "..", "build", "ports", "ports.json")
+FR_LANGS = {"S": "ES", "D": "DE", "F": "FR", "I": "IT"}
+
+
+def fireRed_ports():
+    if not os.path.exists(PORTS_JSON):
+        return {}
+    import json
+    out = {}
+    for p in json.load(open(PORTS_JSON, encoding="utf-8")):
+        if p["code"][:3] == "BPR" and p["code"][3] in FR_LANGS and p.get("art"):
+            out[FR_LANGS[p["code"][3]]] = p
+    return out
+
+
+for _lang, _p in fireRed_ports().items():
+    GAMES["FR" + _lang] = (_p["path"], None, [
+        (f"FR_{_lang}_PARTY_BG_GFX", "PartyBgGfx", True),
+        (f"FR_{_lang}_STATUS_GFX", "StatusGfx", True),
+        (f"FR_{_lang}_FONT_SMALL", "FontSmall", False),
+    ])
+
+
+def fireRed_symbols(p):
+    a = p["art"]
+    return lambda rom: {"PartyBgGfx": (a["party_bg"][0] - 0x08000000, 0), "StatusGfx": (a["status"][0] - 0x08000000, 0),
+                        "FontSmall": (a["font"][0] - 0x08000000, 0x4000)}
+
+
 # The binary hacks' made-up symbols (no ELF).
-ROM_SYMBOLS = {"UB": unbound_symbols, "LZ": lazarus_symbols, "SGL": seaglass_symbols, "SG": soulgold_symbols}
+ROM_SYMBOLS = {"UB": unbound_symbols, "LZ": lazarus_symbols, "SGL": seaglass_symbols, "SG": soulgold_symbols,
+               **{"EM" + lang: emerald_eu_symbols(lang) for lang in EMERALD_EU_ROMS},
+               **{"FR" + lang: fireRed_symbols(p) for lang, p in fireRed_ports().items()}}
 
 
 def symbols(elf):
@@ -258,10 +326,31 @@ def symbols(elf):
     return out
 
 
+def existing_rows():
+    """The rows already in RomArtSigsGen.kt, by blob name."""
+    if not os.path.exists(KOTLIN):
+        return {}
+    return {line.strip().split("(")[0]: line for line in open(KOTLIN) if line.startswith("    ") and "(" in line
+            and line.strip().split("(")[0].isupper()}
+
+
 def main():
     rows = []
+    kept = existing_rows()
+    if not fireRed_ports():  # no ports.json here: the European FireReds' rows stay as they were
+        GAMES.update({"FR" + l: ("/nonexistent", None, [(n, "", False) for n in kept if n.startswith(f"FR_{l}_")])
+                      for l in FR_LANGS.values() if any(n.startswith(f"FR_{l}_") for n in kept)})
     for game, (rom_path, elf, blobs) in GAMES.items():
-        rom = open(os.path.join(ROOT, rom_path), "rb").read()
+        path = os.path.join(ROOT, rom_path)
+        if not elf and not os.path.exists(path):
+            # A hack's ROM that isn't on this machine: keep its fingerprints as they were.
+            missing = [name for name, _, _ in blobs if name not in kept]
+            if missing:
+                raise SystemExit(f"{path} missing and no earlier rows for {missing}")
+            rows += [kept[name].rstrip("\n") for name, _, _ in blobs]
+            print(f"{game}: ROM not here, kept its {len(blobs)} rows")
+            continue
+        rom = open(path, "rb").read()
         syms = symbols(os.path.join(ROOT, elf)) if elf else ROM_SYMBOLS[game](rom)
         for name, sym, lz in blobs:
             off, size = syms[sym]

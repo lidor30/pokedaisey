@@ -17,6 +17,8 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onParent
@@ -135,6 +137,7 @@ class FakeSettings(showHintsInitially: Boolean = true, initialTabs: List<String>
     override fun setHotkeyBinding(action: Hotkeys.Action, keyName: String) {}
     override fun restartGame() {}
     override fun closeGame() {}
+    override val canCloseCompanion = true   // the Thor: two screens, so SETTINGS shows CLOSE COMPANION
     override val showHints get() = hints
     override fun setShowHints(on: Boolean) { hints = on }
     private var click = true
@@ -152,11 +155,26 @@ class FakeSettings(showHintsInitially: Boolean = true, initialTabs: List<String>
     private var filter = com.pokedaisy.app.companion.ScreenFilter.NONE
     override val screenFilter get() = filter
     override fun setScreenFilter(filter: com.pokedaisy.app.companion.ScreenFilter) { this.filter = filter }
+    private var grid = com.pokedaisy.app.companion.GridStrength.MEDIUM
+    override val gridStrength get() = grid
+    override fun setGridStrength(strength: com.pokedaisy.app.companion.GridStrength) { grid = strength }
+    private var onCompanion = true
+    override val companionShaders get() = onCompanion
+    override fun setCompanionShaders(on: Boolean) { onCompanion = on }
     // The Thor: SWAP SCREENS shows.
     override val hasSecondScreen = true
     private var swap = false
     override val swapScreens get() = swap
     override fun setSwapScreens(on: Boolean) { swap = on }
+    // SETTINGS > CHEATS: three cheats, one of them on; the master switch on.
+    private var cheatsOn = true
+    private var cheatList = previewCheats()
+    override val cheats get() = cheatList
+    override val cheatsEnabled get() = cheatsOn
+    override fun setCheatsEnabled(on: Boolean) { cheatsOn = on }
+    override fun setCheatEnabled(index: Int, on: Boolean) {
+        cheatList = cheatList.toMutableList().also { it[index] = it[index].copy(enabled = on) }
+    }
     override val gameName = "Pokémon FireRed"
     override val romFileName = "firered-qol.gba"
     private var tabs = initialTabs ?: com.pokedaisy.app.companion.DEFAULT_COMPANION_TABS
@@ -432,6 +450,24 @@ fun fakeRelease() = com.pokedaisy.app.AppUpdater.Release(
     "", 0, "",
 )
 
+/** What a player might have for FireRed: a typed code, two from a RetroArch .cht. */
+fun previewCheats() = listOf(
+    com.pokedaisy.app.cheats.Cheat("INFINITE MONEY", listOf("82025838 FFFF"), "", true),
+    com.pokedaisy.app.cheats.Cheat("Master Code (must be on)", listOf("000014D1 000A", "1003DBB8 0007"), "", false),
+    com.pokedaisy.app.cheats.Cheat("Wild Pokemon are always shiny", listOf("12345678 9ABCDEF0"), "GSAv1", false),
+)
+
+/** [make] on the fake library's first game's CHEATS page (as its library menu opens it),
+ * with [previewCheats] saved for it when [seeded]. */
+fun withCheats(seeded: Boolean = true, make: () -> SettingsActivity): androidx.activity.ComponentActivity {
+    val ctx = android.content.Context()
+    val rom = File(ctx.filesDir, "roms/firered-qol.gba")
+    val crc = SettingsActivity.cheatCrcOf(rom)!!
+    if (seeded) com.pokedaisy.app.cheats.CheatStore.forCrc(ctx.filesDir, crc).save(previewCheats())
+    Prefs(ctx).cheatsEnabled = seeded
+    return make().apply { intent.putExtra(SettingsActivity.EXTRA_CHEATS_ROM, rom.absolutePath) }
+}
+
 /** [make] with two of the fake library's games hidden (after [activity]'s reset). */
 fun withHidden(make: () -> androidx.activity.ComponentActivity): androidx.activity.ComponentActivity {
     val ctx = android.content.Context()
@@ -468,7 +504,11 @@ fun activity(make: () -> androidx.activity.ComponentActivity): () -> (@Composabl
     prefs.savesDirOverride = null
     prefs.stretchGame = false
     prefs.statusBar = false
+    // The default theme (PokéDaisy); a shot that wants another sets it in its make().
+    prefs.appTheme = com.pokedaisy.app.companion.ui.theme.DAISY_THEME_ID
     File(ctx.filesDir, "states").deleteRecursively()
+    File(ctx.filesDir, "cheats").deleteRecursively()
+    prefs.cheatsEnabled = false
     prefs.lastRomPath = File(roms, names[0]).absolutePath
     names.take(3).reversed().forEach { prefs.pushRecentRom(File(roms, it).absolutePath) }
     make().onCreate(null)
@@ -701,11 +741,15 @@ fun main(args: Array<String>) {
             onNodeWithText("ON").performClick()
         },
         // CLOSE GAME / RESTART GAME end the scrolling list.
-        Shot("$g-settings-bottom", bw, bh, bd, companion("SETTINGS")) { onNodeWithText("RESTART GAME").performScrollTo() },
+        Shot("$g-settings-bottom", bw, bh, bd, companion("SETTINGS")) { onNodeWithText("CLOSE COMPANION").performScrollTo() },
         Shot("$g-settings-close", bw, bh, bd, companion("SETTINGS")) {
             onNodeWithText("CLOSE GAME").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         },
-        // SHADERS: its page (FILTER, GBA COLORS), then FILTER's pick-list.
+        // TWEAKS: the small on / off preferences.
+        Shot("$g-settings-tweaks", bw, bh, bd, companion("SETTINGS")) {
+            onNodeWithText("TWEAKS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+        },
+        // SHADERS: its page (FILTER, GBA COLORS), then after one FILTER tap (it cycles: NONE -> LCD).
         Shot("$g-settings-shaders", bw, bh, bd, companion("SETTINGS")) {
             onNodeWithText("SHADERS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         },
@@ -713,6 +757,7 @@ fun main(args: Array<String>) {
             onNodeWithText("SHADERS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
             onNodeWithText("FILTER").performClick()
         },
+        Shot("$g-settings-cheats", bw, bh, bd, companion("SETTINGS")) { onNodeWithText("CHEATS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) },
         Shot("$g-settings-tabs", bw, bh, bd, companion("SETTINGS")) { onNodeWithText("TAB BAR").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) },
         Shot("$g-settings-tabs-states", bw, bh, bd, companion("SETTINGS")) {
             onNodeWithText("TAB BAR").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
@@ -783,6 +828,11 @@ fun main(args: Array<String>) {
             }
         }),
         Shot("library-list", tw, th, td, activity { LibraryActivity() }),
+        // A phone held upright (1080x2400 @ 2.625, a Pixel 6): the library before a game opens.
+        Shot("library-list-phone", 1080, 2400, 2.625f, activity { LibraryActivity() }),
+        Shot("library-grid-phone", 1080, 2400, 2.625f, activity { LibraryActivity() }) {
+            onNodeWithContentDescription("Toggle view").performClick()
+        },
         Shot("library-grid", tw, th, td, activity { LibraryActivity() }) {
             onNodeWithContentDescription("Toggle view").performClick()
         },
@@ -893,7 +943,12 @@ fun main(args: Array<String>) {
             onNodeWithText("FILTER").performClick()
         },
         Shot("settings-swap", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("SWAP SCREENS").performScrollTo() },
-        Shot("settings-theme", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("THEME").performClick() },
+        Shot("settings-theme", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("THEME").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) },
+        // THEME > FIRERED: the look before PokéDaisy became the default (the stripes, the game's OPTION windows).
+        Shot("library-firered-theme", tw, th, td, activity {
+            Prefs(android.content.Context()).appTheme = com.pokedaisy.app.companion.ui.theme.FIRERED_THEME_ID
+            LibraryActivity()
+        }),
         Shot("settings-hotkeys", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("HOTKEYS").performClick() },
         // The list's end: LIBRARY / ONLINE (RetroAchievements' BETA tag) / APP.
         Shot("settings-home-bottom", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("RUN SETUP").performScrollTo() },
@@ -902,6 +957,32 @@ fun main(args: Array<String>) {
             onNodeWithText("HOTKEYS").performClick(); onNodeWithText("ON").performClick()
         },
         Shot("settings-folders", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("FOLDERS").performClick() },
+        // CHEATS from the hub (no cheats yet), then as a game's library menu opens it.
+        Shot("settings-cheats-empty", tw, th, td, activity { SettingsActivity() }) {
+            onNodeWithText("CHEATS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+        },
+        Shot("settings-cheats", tw, th, td, activity { withCheats { SettingsActivity() } }),
+        Shot("settings-cheats-remove", tw, th, td, activity { withCheats { SettingsActivity() } }) {
+            onNodeWithText("REMOVE").performClick()
+            onAllNodesWithText("REMOVE").onFirst().performClick()
+        },
+        Shot("settings-cheats-game", tw, th, td, activity { withCheats { SettingsActivity() } }) { onNodeWithText("GAME").performClick() },
+        Shot("settings-cheats-import-error", tw, th, td, activity {
+            withCheats { SettingsActivity().apply { cheatNotice = SettingsActivity.cheatImportNotice(com.pokedaisy.app.cheats.CheatStore.Import(0, 2, 5, 0)) } }
+        }),
+        Shot("settings-cheats-imported", tw, th, td, activity {
+            withCheats { SettingsActivity().apply { cheatNotice = SettingsActivity.cheatImportNotice(com.pokedaisy.app.cheats.CheatStore.Import(12, 1, 2, 3)) } }
+        }),
+        Shot("settings-cheats-add", tw, th, td, activity { withCheats { SettingsActivity() } }) { onNodeWithText("ADD CODE").performClick() },
+        Shot("settings-cheats-add-error", tw, th, td, activity { withCheats { SettingsActivity() } }) {
+            onNodeWithText("ADD CODE").performClick()
+            onAllNodes(hasSetTextAction())[1].performTextInput("82025838 FFFF\n1234 NOTHEX")
+            onNodeWithText("ADD").performClick()
+        },
+        Shot("settings-cheats-add-type", tw, th, td, activity { withCheats { SettingsActivity() } }) {
+            onNodeWithText("ADD CODE").performClick()
+            onNodeWithText("TYPE").performClick()
+        },
         Shot("settings-coverart", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("COVER ART").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) },
         Shot("settings-retroachievements", tw, th, td, activity { SettingsActivity() }) {
             onNodeWithText("RetroAchievements").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)

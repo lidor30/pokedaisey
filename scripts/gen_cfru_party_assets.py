@@ -65,6 +65,10 @@ GAMES = {
                     egg="EGG", base_stats=0x254784, species=412),
     "amethyst": dict(name="Amethyst", sub="am", sha1="00e70c0384a5f1698588034201fd5b849d3542e2",
                      egg="Egg", base_stats=0x1BC257C, species=1268),
+    # v1.4.1: the same party menu and sprites (checked equal), so no style of its own -
+    # AmethystPartyStyle serves both; only its gender ratios (its own species ids).
+    "amethyst_v141": dict(name="AmethystV141", sub="am", sha1="91291aade04b4b111cd03ae7b6e2ff460e1edd8a",
+                          egg="Egg", base_stats=0x1A98390, species=1294, style=False),
 }
 
 WIN_W, WIN_H = 14, 5
@@ -324,6 +328,8 @@ def main():
 
     styles = []
     for k, cfg in GAMES.items():
+        if not cfg.get("style", True):
+            continue
         g = got[k]
         sub = os.path.join(out, cfg["sub"])
         os.makedirs(sub, exist_ok=True)
@@ -408,7 +414,7 @@ val genderRatios{cfg["name"]}: IntArray by lazy {{ unhexRatios("{hexs}") }}
 // 0 always male, 254 always female, 255 genderless, else female when
 // (personality & 0xFF) < ratio.
 
-private fun unhexRatios(s: String) = IntArray(s.length / 2) { s.substring(it * 2, it * 2 + 2).toInt(16) }
+internal fun unhexRatios(s: String) = IntArray(s.length / 2) { s.substring(it * 2, it * 2 + 2).toInt(16) }
 
 """ + "\n".join(parts))
     print("wrote", out, KT_UI, KT_DATA)

@@ -1,0 +1,136 @@
+---
+// One of the app's companion screens, redrawn in HTML at the app's own layout (a 560x448 canvas:
+// the Thor's bottom screen at 0.45, without the tab bar). The pieces copy the app's Compose code -
+// BattleControlsScreen.kt's Platinum buttons, BattleInfoScreen.kt's window and pills,
+// PartyScreen.kt's FireRedPartyPalette slot - with the same colours, on the site's light backdrop.
+// The canvas scales down to fit, to whole device pixels where it can (crisp text at any zoom).
+
+import Pixel from './Pixel.astro';
+
+/** [tabs]: the app's tab bar along the bottom (the hero handheld's screen); [tinted]: the app's teal, faintly. */
+interface Props { label: string; bare?: boolean; tabs?: string[]; tinted?: boolean }
+const { label, bare = false, tabs, tinted = false } = Astro.props;
+const H = tabs ? 488 : 448;
+---
+<div class:list={['appcard', !bare && 'f-card']}>
+  <div class="appwrap" data-appwrap role="img" aria-label={label} style={`aspect-ratio: 560 / ${H}`}>
+    <div class:list={['app', tinted && 'tinted']} data-app data-h={H} style={`height:${H}px`}>
+      <div class="app-body"><slot /></div>
+      {tabs && (
+        <nav class="app-tabs" aria-hidden="true">
+          {tabs.map((t, i) => <span class:list={['app-tab', i === 0 ? 'f-appTabOn on' : 'f-appTab']}>{t}</span>)}
+          <span class="app-tab gear f-appTab"><Pixel name="gear" scale={0.75} /></span>
+        </nav>
+      )}
+      <span class="tap" data-tap aria-hidden="true"></span>
+    </div>
+  </div>
+</div>
+
+<style is:global>
+  /* The card hugs the canvas: 560px plus its 3-pixel frame and 2-pixel padding each side. */
+  .appcard { filter: var(--hard-shadow); max-width: calc(560px + var(--px) * 10); margin: 0 auto; }
+  .appcard:not(.f-card) { max-width: none; }
+  .appcard.f-card { padding: calc(var(--px) * 2); }
+  .appwrap { position: relative; width: 100%; aspect-ratio: 560 / 448; overflow: hidden; }
+  .app {
+    --px: 2px;
+    position: absolute; left: 0; top: 0; width: 560px; height: 448px; overflow: hidden;
+    transform-origin: 0 0; transform: scale(var(--k, 1));
+    font-family: 'Pixel Operator', monospace; line-height: 1; color: #484848;
+    background: #f2f1f8 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='2' height='2' fill='%231d1b26' fill-opacity='0.08'/%3E%3C/svg%3E");
+    user-select: none;
+  }
+  /* Scaled to a fraction of a device pixel (a phone): smooth the font rather than break it. */
+  .app.soft { -webkit-font-smoothing: antialiased; }
+  .app .app-body { position: absolute; left: 0; right: 0; top: 0; height: 448px; }
+  .app.tinted { background: repeating-linear-gradient(180deg, #e2f1ee 0 2px, #d6ebe7 2px 4px); }
+  .app .app-tabs { position: absolute; left: 14px; right: 14px; bottom: 10px; height: 34px; display: flex; gap: 8px; }
+  .app .app-tab { flex: 1; display: grid; place-items: center; font-size: 24px; color: #707070; text-shadow: 2px 2px 0 #c4c4c4; }
+  .app .app-tab.on { color: #d81818; text-shadow: 2px 2px 0 #f8b8a8; }
+  .app .app-tab.gear { flex: 0 0 60px; }
+
+  /* Panes: one shows at a time. */
+  .app .pane { position: absolute; inset: 0; visibility: hidden; }
+  .app .pane.on { visibility: visible; }
+  .js .app .pane.on.swap { animation: paneIn 0.16s steps(2); }
+  @keyframes paneIn { from { opacity: 0.4; } to { opacity: 1; } }
+
+  /* Platinum's buttons: near-black outline, the fill, darker side bands, a light band on top. */
+  .app .pb { position: absolute; display: flex; align-items: center; justify-content: center; gap: 14px; color: #fff; text-shadow: 3px 3px 0 #383838; transition: transform 0.08s steps(1); }
+  /* The frame's border is 6px: a 2px outline, then 4px of fill - the bevel reaches back over that fill. */
+  .app .pb::before {
+    content: ''; position: absolute; inset: -4px;
+    clip-path: polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px);
+    background: linear-gradient(90deg, var(--edge) 0, var(--mid) 16px, transparent 16px, transparent calc(100% - 16px), var(--mid) calc(100% - 16px), var(--edge) 100%);
+  }
+  .app .pb::after { content: ''; position: absolute; left: 2px; right: 2px; top: -4px; height: 4px; background: var(--hi); }
+  .app .pb > * { position: relative; z-index: 1; }
+  .app .pb.pressed { transform: translateY(2px); filter: brightness(0.9); }
+  .app .pb-fight { --edge: #a82820; --mid: #c8382e; --hi: #f4a49e; }
+  .app .pb-bag { --edge: #a87018; --mid: #c48824; --hi: #f0d098; }
+  .app .pb-run { --edge: #2860a0; --mid: #3878bc; --hi: #a4c8ec; }
+  .app .pb-mon { --edge: #307020; --mid: #448c30; --hi: #acd4a0; }
+  .app .pb-info { --edge: #5c3c98; --mid: #7652b4; --hi: #c8b4e8; }
+  .app .pb-sugg { --edge: #a87c10; --mid: #c89a20; --hi: #f4dc98; }
+  .app .pb-move { --edge: var(--t); --mid: var(--t); --hi: #f4f4d8; color: #484848; text-shadow: 2px 2px 0 #c0c088; }
+  .app .pb-move::before { background: linear-gradient(90deg, var(--t) 0 12px, transparent 12px calc(100% - 12px), var(--t) calc(100% - 12px)); opacity: 0.85; }
+
+  /* The white window (SummaryFrame / battle INFO) and what goes in it. */
+  .app .win { position: absolute; left: 14px; top: 14px; width: 532px; height: 354px; padding: 4px 8px; color: #585858; text-shadow: 2px 2px 0 #d8d8d8; }
+  .app .sep-h { height: 2px; background: #c8c8d0; margin: 6px 0; }
+  .app .sep-v { width: 2px; background: #c8c8d0; align-self: stretch; }
+  .app .red { color: #d81818; text-shadow: 2px 2px 0 #f8b8a8; }
+  .app .t16 { font-size: 16px; }
+  .app .t24 { font-size: 24px; }
+  .app .t32 { font-size: 32px; }
+  .app .t48 { font-size: 48px; }
+  .app .t64 { font-size: 64px; }
+  .app .pill {
+    display: inline-flex; align-items: center; height: 22px; padding: 0 7px; font-size: 16px; color: #fff; text-shadow: none; white-space: nowrap;
+    background: var(--c, #8c8c94);
+    clip-path: polygon(2px 0, calc(100% - 2px) 0, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 0 calc(100% - 2px), 0 2px);
+  }
+  .app .pill.big { height: 26px; font-size: 16px; padding: 0 9px; }
+  .app .icon-box { display: grid; place-items: center; width: 52px; height: 52px; flex: none; }
+  .app .hp { display: flex; align-items: center; gap: 6px; font-size: 24px; }
+  .app .hpbar {
+    position: relative; flex: 1; height: 10px; background: #48584e; box-shadow: 0 0 0 2px #303830;
+    clip-path: polygon(2px -2px, calc(100% - 2px) -2px, calc(100% + 2px) 2px, calc(100% + 2px) calc(100% - 2px), calc(100% - 2px) calc(100% + 2px), 2px calc(100% + 2px), -2px calc(100% - 2px), -2px 2px);
+    margin: 0 2px;
+  }
+  .app .hpbar i { position: absolute; inset: 0 auto 0 0; width: var(--v); background: #58d058; box-shadow: inset 0 -4px 0 #40b040; transition: width 0.8s steps(16); }
+  .app .hpbar.mid i { background: #f8d030; box-shadow: inset 0 -4px 0 #d0a818; }
+  .app .hpbar.low i { background: #f05038; box-shadow: inset 0 -4px 0 #c02818; }
+  .app .hpbar.exp i { background: #48a8f0; box-shadow: inset 0 -4px 0 #2878c8; }
+
+  /* A finger's tap: a pixel ring that grows and fades. */
+  .app .tap { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; opacity: 0; pointer-events: none; z-index: 5;
+    background: rgba(255, 255, 255, 0.35); box-shadow: 0 0 0 3px #fff, 0 0 0 5px rgba(29, 27, 38, 0.6);
+    clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px), 0 8px);
+  }
+  .app .tap.go { animation: tap 0.45s steps(5) forwards; }
+  @keyframes tap { 0% { opacity: 1; transform: scale(0.4); } 60% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.3); } }
+</style>
+
+<script>
+  // Fit each canvas to its box (the layout stays the app's; only the scale changes). A scale where
+  // one canvas pixel is a whole number of device pixels keeps the pixel font crisp - at 110% zoom
+  // on a 2x screen that's 0.909 instead of 1 - so take it unless it would shrink the screen much.
+  const fit = (wrap: HTMLElement) => {
+    const app = wrap.querySelector<HTMLElement>('[data-app]');
+    if (!app) return;
+    const dpr = window.devicePixelRatio || 1;
+    const fitK = Math.min(1, wrap.clientWidth / 560);
+    const crisp = Math.floor(fitK * dpr) / dpr;
+    const k = crisp >= fitK * 0.85 ? crisp : fitK;
+    app.style.setProperty('--k', String(k));
+    app.style.left = `${Math.floor((wrap.clientWidth - 560 * k) / 2)}px`;
+    app.classList.toggle('soft', k !== crisp);
+    wrap.style.height = `${Math.ceil(Number(app.dataset.h) * k)}px`;
+  };
+  const wraps = [...document.querySelectorAll<HTMLElement>('[data-appwrap]')];
+  const ro = new ResizeObserver((entries) => entries.forEach((e) => fit(e.target as HTMLElement)));
+  wraps.forEach((w) => { fit(w); ro.observe(w); });
+  addEventListener('resize', () => wraps.forEach(fit));
+</script>

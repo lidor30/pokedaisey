@@ -72,7 +72,7 @@ target_compile_definitions(rcheevos PUBLIC
 # ---------------------------------------------------------------------------
 # Our JNI bridge.
 # ---------------------------------------------------------------------------
-add_library(pokedaisy SHARED pokedaisy_jni.c pokedaisy_ra.c)
+add_library(pokedaisy SHARED pokedaisy_jni.c pokedaisy_ra.c pk_cheats.c)
 
 target_include_directories(pokedaisy PRIVATE
     "${MGBA_DIR}/include"

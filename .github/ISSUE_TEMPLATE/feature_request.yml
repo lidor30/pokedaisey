@@ -1,0 +1,16 @@
+name: Feature request
+description: An idea for PokeDaisy.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      description: What it would do, and when you'd use it.
+    validations:
+      required: true
+  - type: input
+    id: game
+    attributes:
+      label: Game
+      description: If it's about one game in particular.

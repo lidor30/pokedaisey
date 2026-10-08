@@ -130,6 +130,11 @@ object RetroAchievements : CompanionAchievements {
     private var resumeProgress: ByteArray? = null
     @Volatile private var resumeProgressDue = false
 
+    /** A cheat is loaded into the game (EmulatorEngine.applyCheats): achievements pause -
+     * rc_client_idle instead of rc_client_do_frame, so nothing is checked or unlocked -
+     * until every cheat is off again, like other emulators do. Emu thread. */
+    @Volatile private var cheatsActive = false
+
     /** Plays the game's fanfare (set by the game's activity); from the emu thread, on an unlock. */
     @Volatile var onUnlockSound: (() -> Unit)? = null
 
@@ -384,7 +389,7 @@ object RetroAchievements : CompanionAchievements {
             resumeProgress?.let { RaNative.raDeserializeProgress(it) }
             resumeProgress = null
         }
-        RaNative.raDoFrame()
+        if (cheatsActive) RaNative.raIdle() else RaNative.raDoFrame()
         // Debug builds: what rc_client sees, every ~10 s of emulated time.
         if (BuildConfig.DEBUG && ++debugFrames >= 600) {
             debugFrames = 0
@@ -396,6 +401,20 @@ object RetroAchievements : CompanionAchievements {
             refreshList()
         }
     }
+
+    /** Cheats went in or out of the game (emu thread): pauses / resumes, and says so
+     * when the game has a set. */
+    fun setCheatsActive(active: Boolean) {
+        if (active == cheatsActive) return
+        cheatsActive = active
+        _state.update { it.copy(cheatsPaused = active) }
+        if (!ready || !coreAttached) return
+        if ((_state.value.game?.total ?: 0) > 0) _popups.tryEmit(cheatsPopup(active))
+    }
+
+    private fun cheatsPopup(active: Boolean) =
+        if (active) AchievementPopup(AchievementPopup.Kind.NOTICE, tr("CHEATS ON"), tr("Achievements are paused until every cheat is off."))
+        else AchievementPopup(AchievementPopup.Kind.NOTICE, tr("CHEATS OFF"), tr("Achievements are back on."))
 
     fun onCoreStopping() {
         if (!ready || !coreAttached) return
@@ -542,6 +561,8 @@ object RetroAchievements : CompanionAchievements {
                             tr("{0} OF {1} UNLOCKED · SOFTCORE", unlocked, achievements), badgeUrl,
                         ),
                     )
+                    // The game started with cheats on: say why nothing will unlock.
+                    if (cheatsActive) _popups.tryEmit(cheatsPopup(true))
                 }
             }
             // An unknown hash: rc_client still keeps a placeholder game (id 0).

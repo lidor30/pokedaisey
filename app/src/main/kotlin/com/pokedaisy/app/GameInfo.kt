@@ -157,9 +157,14 @@ class GameInfo(val title: String, val sections: List<Section>) {
             "BPRE" -> "Pokémon FireRed"
             "BPGE" -> "Pokémon LeafGreen"
             "BPEE" -> "Pokémon Emerald"
+            "BPES" -> "Pokémon Edición Esmeralda"
+            "BPED" -> "Pokémon Smaragd-Edition"
+            "BPEF" -> "Pokémon Version Émeraude"
+            "BPEI" -> "Pokémon Versione Smeraldo"
+            "BPEJ" -> "ポケットモンスター エメラルド"
             "AXVE" -> "Pokémon Ruby"
             "AXPE" -> "Pokémon Sapphire"
-            else -> null
+            else -> code?.let { com.pokedaisy.app.companion.data.RETAIL_PORT_CODE_TITLES[it] }
         }
 
         private fun coverFile(context: Context, rom: File) =

@@ -1,0 +1,126 @@
+---
+// Every supported game and what the companion does in it: README.md's "Supported games" table,
+// exported into compat.json by SiteDataExportTest.
+import Pixel from './Pixel.astro';
+import data from '../data/compat.json';
+
+const ICONS: Record<string, string> = { Party: 'orb', Bag: 'bag', Battle: 'battle', Map: 'map', 'Pokédex': 'dex', Guide: 'guide' };
+const LABELS: Record<string, string> = { Party: 'PARTY', Bag: 'BAG', Battle: 'BATTLE', Map: 'MAP', 'Pokédex': 'DEX', Guide: 'GUIDE' };
+const RETAIL = ['FireRed', 'LeafGreen', 'Emerald', 'Ruby', 'Sapphire'];
+const kind = (game: string) =>
+  /\(GB\)/.test(game) ? 'gb' : RETAIL.some((r) => game === `Pokémon ${r}`) ? 'retail' : 'hack';
+// Game Boy first (Pokémon Yellow), then README's order.
+const rows = data.matrix.rows.map((r) => ({ ...r, kind: kind(r.game), name: r.game.replace(/^Pokémon /, '').replace(' (GB)', '') }))
+  .sort((a, b) => Number(b.kind === 'gb') - Number(a.kind === 'gb'));
+const counts = { all: rows.length, retail: 0, hack: 0, gb: 0 } as Record<string, number>;
+rows.forEach((r) => counts[r.kind]++);
+const filters = [['all', 'ALL'], ['retail', 'ORIGINALS'], ['hack', 'ROM HACKS'], ['gb', 'GAME BOY']];
+const KIND_LABEL: Record<string, string> = { retail: 'ORIGINAL', hack: 'ROM HACK', gb: 'GAME BOY' };
+---
+<div class="matrix">
+  <div class="filters" role="tablist" aria-label="Filter games">
+    {filters.map(([key, label], i) => (
+      <button class:list={['chip', 'filter', i === 0 ? 'f-chipOn' : 'f-chip']} role="tab" aria-selected={i === 0 ? 'true' : 'false'} data-filter={key}>
+        {label} <span class="count">{counts[key]}</span>
+      </button>
+    ))}
+  </div>
+
+  <div class="table f-card">
+    <div class="tr head">
+      <span class="game-col small muted">GAME</span>
+      {data.matrix.columns.map((c) => (
+        <span class="cell" title={LABELS[c]}>
+          <Pixel name={ICONS[c]} scale={0.667} />
+          <span class="col-label small">{LABELS[c]}</span>
+        </span>
+      ))}
+    </div>
+    {rows.map((r, i) => (
+      <div class="tr row" data-kind={r.kind} style={`--i:${i}`}>
+        <span class="game-col">
+          <span class="g-name">{r.name}</span>
+          <span class="g-meta small"><span class:list={['kind', `k-${r.kind}`]}>{KIND_LABEL[r.kind]}</span> {r.version}</span>
+        </span>
+        {r.cells.map((c, j) => (
+          <span class="cell" title={`${LABELS[data.matrix.columns[j]]}: ${c === 'yes' ? 'works' : c === 'part' ? 'partly' : 'not yet'}`}>
+            <Pixel name={c} scale={1} label={c === 'yes' ? 'works' : c === 'part' ? 'partly' : 'not yet'} />
+          </span>
+        ))}
+      </div>
+    ))}
+  </div>
+
+  <div class="legend small">
+    <span><Pixel name="yes" scale={0.667} /> WORKS</span>
+    <span><Pixel name="part" scale={0.667} /> PARTLY</span>
+    <span><Pixel name="no" scale={0.667} /> NOT YET</span>
+  </div>
+  <p class="small muted notes">
+    Any Game Boy, Color or Advance game plays; the companion needs one of these, in the exact version listed. MAP partly = place names
+    without the map picture. BATTLE partly = the battle panes work but haven't been checked in every kind of battle.
+  </p>
+</div>
+
+<style is:global>
+  .matrix { display: grid; gap: 20px; }
+  .filters { display: flex; flex-wrap: wrap; gap: 12px; }
+  .filter { font: inherit; font-size: var(--t-s); cursor: pointer; background: none; color: var(--ink); transition: transform 0.12s steps(2); }
+  .filter:hover { transform: translateY(calc(var(--px) * -1)); }
+  .filter.f-chipOn { color: #fff; }
+  .filter .count { opacity: 0.6; }
+  .table { filter: var(--hard-shadow); padding: calc(var(--px) * 2) 0; }
+  .tr { display: grid; grid-template-columns: minmax(0, 1fr) repeat(6, 76px); align-items: center; padding: 10px calc(var(--px) * 5); }
+  .tr.head { border-bottom: var(--px) solid var(--ink); padding-bottom: 12px; }
+  .tr.row + .tr.row { border-top: var(--px) solid #ecebf2; }
+  .tr.row { transition: background 0.1s steps(1); }
+  .tr.row:hover { background: #fff7d6; }
+  .tr.row[hidden] { display: none; }
+  .js .tr.row.pop { animation: rowin 0.3s steps(3) both; animation-delay: calc(var(--n, 0) * 25ms); }
+  @keyframes rowin { from { opacity: 0; transform: translateX(calc(var(--px) * -6)); } to { opacity: 1; transform: none; } }
+  .cell { display: grid; justify-items: center; gap: 4px; }
+  .col-label { color: var(--ink-2); }
+  .game-col { display: grid; gap: 2px; min-width: 0; }
+  .g-name { font-size: var(--t-m); text-shadow: var(--bold); letter-spacing: 0.0625em; }
+  .g-meta { color: var(--muted); }
+  .kind { color: var(--ink); margin-right: 6px; }
+  .k-retail { color: var(--blue); }
+  .k-hack { color: var(--red); }
+  .k-gb { color: var(--green); }
+  .legend { display: flex; flex-wrap: wrap; gap: 24px; }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .notes { max-width: 90ch; }
+  @media (max-width: 760px) {
+    .tr { grid-template-columns: minmax(0, 1fr) repeat(6, 30px); padding: 8px calc(var(--px) * 3); }
+    .col-label { display: none; }
+  }
+</style>
+
+<script>
+  for (const m of document.querySelectorAll<HTMLElement>('.matrix')) {
+    const buttons = [...m.querySelectorAll<HTMLButtonElement>('[data-filter]')];
+    const rows = [...m.querySelectorAll<HTMLElement>('.tr.row')];
+    for (const b of buttons) {
+      b.addEventListener('click', () => {
+        const key = b.dataset.filter;
+        for (const o of buttons) {
+          const on = o === b;
+          o.classList.toggle('f-chipOn', on);
+          o.classList.toggle('f-chip', !on);
+          o.setAttribute('aria-selected', String(on));
+        }
+        let n = 0;
+        for (const r of rows) {
+          const show = key === 'all' || r.dataset.kind === key;
+          r.hidden = !show;
+          r.classList.remove('pop');
+          if (show) {
+            r.style.setProperty('--n', String(n++));
+            void r.offsetWidth;
+            r.classList.add('pop');
+          }
+        }
+      });
+    }
+  }
+</script>

@@ -41,6 +41,7 @@ private fun rawAreas(guide: GuideId): List<String> = when (guide) {
     GuideId.ODYSSEY -> GUIDE_AREAS_ODYSSEY_RAW
     GuideId.GAIA -> GUIDE_AREAS_GAIA_RAW
     GuideId.AMETHYST -> GUIDE_AREAS_AMETHYST_RAW
+    GuideId.AMETHYST_V141 -> GUIDE_AREAS_AMETHYST_V141_RAW
     GuideId.CELIA -> GUIDE_AREAS_CELIA_RAW
 }
 

@@ -44,6 +44,8 @@ data class AchievementsState(
     val trackers: List<LeaderboardTracker> = emptyList(),
     /** The game's leaderboards (none for most sets). */
     val leaderboards: List<Leaderboard> = emptyList(),
+    /** A cheat is on: nothing is checked or unlocked until every cheat is off. */
+    val cheatsPaused: Boolean = false,
 )
 
 data class Leaderboard(

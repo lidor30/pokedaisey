@@ -3,6 +3,7 @@ package com.pokedaisy.app.companion.ui
 import com.pokedaisy.app.companion.i18n.tk
 import com.pokedaisy.app.companion.i18n.tr
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.EnterTransition
 import androidx.compose.ui.platform.testTag
@@ -48,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
@@ -72,6 +74,10 @@ import com.pokedaisy.app.companion.MAX_BAR_TABS
 import com.pokedaisy.app.companion.ui.theme.QolColors
 import com.pokedaisy.app.companion.ui.theme.QolTheme
 import com.pokedaisy.app.companion.ui.theme.LocalGameFont
+import com.pokedaisy.app.companion.ui.theme.LocalGameTextScale
+import com.pokedaisy.app.companion.ui.theme.LocalGameFontWidth
+import com.pokedaisy.app.companion.ui.theme.gameFontWidth
+import com.pokedaisy.app.companion.ui.theme.gameTextScale
 import com.pokedaisy.app.companion.ui.theme.rememberGameFont
 
 /** The whole bottom-screen companion, driven by a single [SnapshotView]. */
@@ -88,6 +94,8 @@ fun CompanionScreen(
     initialMonIndex: Int? = null,
     /** The CARD tab opens on the card's back - for screenshot tests too. */
     initialCardBack: Boolean = false,
+    /** SETTINGS opens on this sub-page ("CHEATS") - for screenshot tests, which can't tap. */
+    initialSettingsPage: String? = null,
     /** The device's BACK, fed by the game's activity (see [CompanionBack]). */
     back: CompanionBack? = null,
     /** Plays the game's click, for every companion button (see [LocalClickSound]). */
@@ -96,13 +104,18 @@ fun CompanionScreen(
     achievements: com.pokedaisy.app.companion.CompanionAchievements? = null,
     /** A popup shown from the start, without timers - for screenshot tests. */
     initialPopup: com.pokedaisy.app.companion.AchievementPopup? = null,
+    /** The game's status bar ([GameStatusBar]), drawn over the tabs while [CompanionStatusBar.shown]. */
+    statusBar: (@Composable () -> Unit)? = null,
 ) {
     // Everything below is keyed on the snapshot's game: the per-game look
     // (backdrops, party slots, bag) reads the plain `activeGame` global, which
     // Compose can't observe - without the key a freshly launched game kept the
     // previous game's backdrop until something else happened to recompose.
+    val gameFont = rememberGameFont(snapshot.game)
     CompositionLocalProvider(
-        LocalCompanionBack provides back, LocalClickSound provides clickSound, LocalGameFont provides rememberGameFont(snapshot.game),
+        LocalCompanionBack provides back, LocalClickSound provides clickSound, LocalGameFont provides gameFont,
+        LocalGameTextScale provides if (gameFont != null) gameTextScale(snapshot.game) else 1f,
+        LocalGameFontWidth provides if (gameFont != null) gameFontWidth(snapshot.game) else 1f,
     ) { QolTheme { key(snapshot.game) {
         val game = snapshot.game
         // Until the first real data arrives (the ROM takes a few seconds to
@@ -156,6 +169,8 @@ fun CompanionScreen(
         // DEX tab: filter / dex / scroll position / open entry, kept across tab switches.
         val dexListState = androidx.compose.foundation.lazy.rememberLazyListState()
         val dexUi = remember { DexUiState(dexListState) }
+        // SETTINGS' page / row / scroll, kept while other tabs are open.
+        val settingsUi = remember { SettingsUiState(initialSettingsPage) }
         val dex = snapshot.pokedex
         // GUIDE tab: page, reveals and scroll position, kept across tab switches.
         val guideUi = remember { GuideUiState() }
@@ -202,7 +217,8 @@ fun CompanionScreen(
         var seenInBattle by remember { mutableStateOf<Boolean?>(null) }
         var preBattleTab by remember { mutableStateOf<String?>(null) }
         LaunchedEffect(battle) {
-            if (seenInBattle != null || battle) {
+            // TWEAKS > JUMP TO BATTLE off: the BATTLE chip shows up, the open tab stays.
+            if ((seenInBattle != null || battle) && CompanionTweaks[CompanionTweaks.Tweak.JUMP_TO_BATTLE]) {
                 if (battle) {
                     if (selectedLabel != "BATTLE") preBattleTab = selectedLabel
                     selectedLabel = "BATTLE"
@@ -246,20 +262,52 @@ fun CompanionScreen(
             // except behind a bag screen with its own backdrop (Emerald),
             // faded in while ITEMS is showing.
             // No game detected yet: the app's own stripes, not a guess.
-            val backdrop = when {
-                game == null -> "app"
-                current == "ITEMS" && hasItemsBackdrop(game) -> "items"
-                else -> "party"
-            }
-            Crossfade(targetState = backdrop, animationSpec = tween(200), label = "tab-backdrop") { show ->
-                when {
-                    game == null || show == "app" -> AppBackdrop()
-                    show == "items" -> ItemsBackdrop(game, Modifier.fillMaxSize())
-                    else -> GameBackdrop(game)
-                }
+            // The party backdrop stays put under the bag's, which fades in over it: a
+            // crossfade dimmed both halfway and showed the dark fill between them (a
+            // flicker on every BAG visit, plainest on Yellow's white on white).
+            if (game == null) {
+                AppBackdrop()
+            } else {
+                GameBackdrop(game)
+                AnimatedVisibility(
+                    visible = current == "ITEMS" && hasItemsBackdrop(game),
+                    enter = fadeIn(tween(200)), exit = fadeOut(tween(200)), label = "tab-backdrop",
+                ) { ItemsBackdrop(game, Modifier.fillMaxSize()) }
             }
 
-            Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+            val tabBar: @Composable () -> Unit = {
+                // IntrinsicSize.Min + fillMaxHeight on every chip: the icon-only
+                // SETTINGS chip stretches to the text chips' height.
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    tabs.forEachIndexed { i, title ->
+                        // Any tab tap (PARTY's own included) closes an open summary.
+                        // BATTLE's own chip also returns to the controls.
+                        val open = {
+                            if (title != current) backTab = current
+                            selectedLabel = title; detailIndex = null; showSuggestions = false; showBattleStats = false; dexUi.open = null
+                            if (title == "BATTLE") battleShowControls = true
+                        }
+                        if (title == "SETTINGS") {
+                            SettingsTabChip(selectedIdx == i, open)
+                        } else {
+                            val usable = !snapshot.unsupported || title == "ACHIEVEMENTS"
+                            TabChip(companionTabLabel(title), selectedIdx == i && usable, Modifier.weight(1f).testTag("tab-$title"), enabled = usable, open)
+                        }
+                    }
+                }
+            }
+            // A phone upright with no room above the companion: its grip sits in here, over the backdrop.
+            val topInset = with(LocalDensity.current) { LocalCompanionTopInset.current.toDp() }
+            Column(modifier = Modifier.fillMaxSize().padding(top = topInset).padding(12.dp)) {
+                // SETTINGS > STATUS BAR on the companion: the game's strip over the tabs.
+                if (statusBar != null && CompanionStatusBar.shown) {
+                    statusBar()
+                    Spacer(Modifier.height(8.dp))
+                }
                 if (loaded && !snapshot.connected) {
                     ErrorBanner(snapshot.error ?: tk("no data yet"))
                     Spacer(Modifier.height(8.dp))
@@ -298,7 +346,8 @@ fun CompanionScreen(
                         targetState = pane,
                         transitionSpec = {
                             val now = System.nanoTime()
-                            val rapid = now - lastSwitchNanos[0] < RAPID_SWITCH_NANOS
+                            // TWEAKS > TAB ANIMATIONS off: every switch cuts.
+                            val rapid = now - lastSwitchNanos[0] < RAPID_SWITCH_NANOS || !CompanionTweaks[CompanionTweaks.Tweak.TAB_ANIMATIONS]
                             lastSwitchNanos[0] = now
                             if (rapid) {
                                 EnterTransition.None togetherWith ExitTransition.None
@@ -363,6 +412,9 @@ fun CompanionScreen(
                                 barChips = tabs.count { it != "SETTINGS" },
                                 onOpenTab = { backTab = "SETTINGS"; selectedLabel = it },
                                 onTabsChanged = { chosenTabs = it },
+                                initialPage = initialSettingsPage,
+                                ui = settingsUi,
+                                statusBarShown = statusBar != null && CompanionStatusBar.shown,
                             )
                         } else if (tab == "ACHIEVEMENTS") {
                             AchievementsScreen(achievements)
@@ -446,35 +498,22 @@ fun CompanionScreen(
                     AchievementIndicators(achievements, Modifier.align(Alignment.BottomEnd).padding(8.dp))
                 }
 
-                // IntrinsicSize.Min + fillMaxHeight on every chip: the icon-only
-                // SETTINGS chip stretches to the text chips' height.
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    tabs.forEachIndexed { i, title ->
-                        // Any tab tap (PARTY's own included) closes an open summary.
-                        // BATTLE's own chip also returns to the controls.
-                        val open = {
-                            if (title != current) backTab = current
-                            selectedLabel = title; detailIndex = null; showSuggestions = false; showBattleStats = false; dexUi.open = null
-                            if (title == "BATTLE") battleShowControls = true
-                        }
-                        if (title == "SETTINGS") {
-                            SettingsTabChip(selectedIdx == i, open)
-                        } else {
-                            val usable = !snapshot.unsupported || title == "ACHIEVEMENTS"
-                            TabChip(companionTabLabel(title), selectedIdx == i && usable, Modifier.weight(1f).testTag("tab-$title"), enabled = usable, open)
-                        }
-                    }
-                }
+                tabBar()
             }
 
             // Unlocks and the like, over every tab.
             AchievementPopupHost(achievements, Modifier.padding(top = 12.dp), initial = initialPopup)
         }
     } } }
+}
+
+/**
+ * SETTINGS > STATUS BAR > COMPANION: the game's status bar over the companion's tabs instead
+ * of over the game - [Prefs.statusBarOnCompanion], set by the activity at start and by SETTINGS.
+ * Compose state, so a change moves it at once.
+ */
+object CompanionStatusBar {
+    var shown by androidx.compose.runtime.mutableStateOf(false)
 }
 
 /**
@@ -509,7 +548,11 @@ internal fun companionTabLabel(id: String): String = when (id) {
  * slots to 4x on the Thor.
  */
 @Composable
-private fun rememberTabMetrics() = rememberGbaTextMetrics(1.15f, wholePixels = false)
+private fun rememberTabMetrics(): GbaTextMetrics {
+    // A fixed-width game font (Gen 1's 8px letters, condensed): its own size at whole pixels, crisp.
+    val wide = LocalGameFont.current != null
+    return rememberGbaTextMetrics(if (wide) 1f else 1.15f, wholePixels = wide)
+}
 
 /** The gear chip's fixed width; SETTINGS' TOOLS row leaves the same gap so its chips line up with the bar's. */
 internal val SETTINGS_CHIP_WIDTH = 52.dp
@@ -533,6 +576,7 @@ internal fun TabChip(label: String, selected: Boolean, modifier: Modifier = Modi
             if (selected) OptionColors.value else OptionColors.label,
             if (selected) OptionColors.valueShadow else OptionColors.labelShadow,
             m,
+            bold = gameBoldLabels(),
         )
     }
 }
@@ -569,10 +613,10 @@ private fun TabChipShell(
                 // Idle tabs take the list window's frame + grey; the selected
                 // one the title window's white, like the OPTION screen's cursor row.
                 val px = u.toPx()
-                drawLayeredBox(OptionColors.titleLayers.inPx(px), if (selected) OptionColors.tabSelectedFill else OptionColors.tabIdleFill, radius = 3 * px)
+                drawLayeredBox(OptionColors.chipLayers.inPx(px), if (selected) OptionColors.tabSelectedFill else OptionColors.tabIdleFill, radius = 3 * px)
             }
             .soundClickable(interactionSource = noRipple, indication = null, enabled = enabled, onClick = onClick)
-            .padding(horizontal = u * 2, vertical = u * 6),
+            .padding(horizontal = if (LocalGameFont.current != null) u else u * 2, vertical = u * 6),
         contentAlignment = Alignment.Center,
     ) { content() }
 }

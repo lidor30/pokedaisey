@@ -22,6 +22,7 @@ open class Intent() {
     var data: Uri? = null
     private val extras = HashMap<String, String>()
     fun putExtra(k: String, v: String) = apply { extras[k] = v }
+    fun putExtra(k: String, v: Boolean) = apply { extras[k] = v.toString() }
     fun getStringExtra(k: String): String? = extras[k]
 
     companion object {

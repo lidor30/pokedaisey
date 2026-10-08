@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -268,6 +269,7 @@ private fun ActionButtons(
     modifier: Modifier = Modifier,
 ) {
     val enabled = battleInput != null && !busy
+    if (gen1Buttons) return Gen1ActionButtons(activeMon, battleInput, enabled, onPokemon, modifier)
     // Platinum's layout: a big FIGHT box centred up top, BAG and POKéMON in
     // the bottom corners with RUN between them, set a little lower.
     Column(
@@ -322,6 +324,7 @@ private fun MoveGrid(
     modifier: Modifier = Modifier,
 ) {
     CompanionBackHandler(enabled = battleInput != null && !busy) { battleInput?.back() }
+    if (gen1Buttons) return Gen1MoveList(moves, battleInput, busy, showHints, modifier)
     Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for (row in 0..1) {
             Row(
@@ -531,16 +534,121 @@ private fun Modifier.platinumBevel(fill: Color, frame: Color): Modifier =
 /** White button text with a dark drop shadow, like the game's labels (Gen 1: plain black). */
 @Composable
 internal fun ButtonLabel(text: String, fontSize: TextUnit, bold: Boolean = false) {
-    val shadow = with(LocalDensity.current) { (fontSize.toPx() / 14f).coerceAtLeast(2f) }
-    Text(
-        text, color = buttonContent, fontSize = fontSize, maxLines = 1,
-        fontWeight = if (bold && !gen1Buttons) FontWeight.Bold else FontWeight.Normal,
+    val density = LocalDensity.current
+    val shadow = with(density) { (fontSize.toPx() / 14f).coerceAtLeast(2f) }
+    // Gen 1: the game's font, condensed like every GbaText, and bold (a copy half a font pixel right).
+    val fontPixel = with(density) { fontSize.toPx() / 16f }
+    val scaleX = if (gen1Buttons) gameFontScaleX(fontPixel) else 1f
+    val style = TextStyle(
         // (An explicit style replaces the theme's, font included - so name the pixel font.)
-        style = TextStyle(
-            fontFamily = pixelFontFamily(),
-            shadow = if (gen1Buttons) null else Shadow(Color(0xFF383838), Offset(shadow, shadow), 0f),
-        ),
+        fontFamily = pixelFontFamily(),
+        shadow = if (gen1Buttons) null else Shadow(Color(0xFF383838), Offset(shadow, shadow), 0f),
+        textGeometricTransform = if (scaleX == 1f) null else androidx.compose.ui.text.style.TextGeometricTransform(scaleX = scaleX),
     )
+    val weight = if (bold && !gen1Buttons) FontWeight.Bold else FontWeight.Normal
+    Box {
+        if (gen1Buttons) {
+            val b = boldOffsetPx(fontPixel * scaleX)
+            Text(text, color = buttonContent, fontSize = fontSize, maxLines = 1, fontWeight = weight, style = style, modifier = Modifier.offset { androidx.compose.ui.unit.IntOffset(b, 0) })
+        }
+        Text(text, color = buttonContent, fontSize = fontSize, maxLines = 1, fontWeight = weight, style = style)
+    }
+}
+
+/**
+ * Gen 1's battle menu as the game lays it out: FIGHT and PkMn over ITEM and RUN, four
+ * text boxes (the game's own words; [BattleInput]'s indices stay Gen 3's: 1 = ITEM / BAG,
+ * 2 = PkMn / POKEMON). The active mon's icon sits by FIGHT, as on the other games.
+ */
+@Composable
+private fun Gen1ActionButtons(
+    activeMon: MonView?,
+    battleInput: BattleInput?,
+    enabled: Boolean,
+    onPokemon: (() -> Unit)?,
+    modifier: Modifier,
+) {
+    val m = rememberGbaTextMetrics(2f)
+    @Composable
+    fun cell(label: String, index: Int, mod: Modifier, icon: Boolean = false) = PlatinumButton(
+        fill = Color.White, frame = Color.White, modifier = mod, enabled = enabled,
+        pressesGame = index != 2 || onPokemon == null,
+        onClick = { if (index == 2 && onPokemon != null) onPokemon() else battleInput?.selectAction(index) },
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.u * 6)) {
+            if (icon) SpeciesIcon(activeMon?.iconAsset, size = m.u * 32)
+            GbaText(label, buttonContent, Color.Transparent, m, bold = true)
+        }
+    }
+    Column(modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            cell("FIGHT", 0, Modifier.weight(1f).fillMaxHeight(), icon = true)
+            cell("PkMn", 2, Modifier.weight(1f).fillMaxHeight())
+        }
+        Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            cell("ITEM", 1, Modifier.weight(1f).fillMaxHeight())
+            cell("RUN", 3, Modifier.weight(1f).fillMaxHeight())
+        }
+    }
+}
+
+/**
+ * Gen 1's moves in the other games' 2x2 grid (the game itself lists them one under another;
+ * [BattleInput.selectMove] steers its cursor either way): each a text box with the name over
+ * its type, how it fares and its PP, then CANCEL (B).
+ */
+@Composable
+private fun Gen1MoveList(
+    moves: List<MoveView>,
+    battleInput: BattleInput?,
+    busy: Boolean,
+    showHints: Boolean,
+    modifier: Modifier,
+) {
+    val m = rememberGbaTextMetrics()
+    val small = rememberGbaTextMetrics(1f)
+    Column(modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (row in 0..1) {
+            Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (col in 0..1) {
+                    val i = row * 2 + col
+                    val mv = moves.getOrNull(i)
+                    PlatinumButton(
+                        fill = Color.White, frame = Color.White,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        enabled = mv != null && mv.pp > 0 && battleInput != null && !busy,
+                        contentPadding = PaddingValues(horizontal = m.u * 8, vertical = m.u * 4),
+                        pressesGame = true, onClick = { battleInput?.selectMove(i) },
+                    ) {
+                        Column(
+                            Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.SpaceEvenly,
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            GbaText(mv?.name ?: "-", buttonContent, Color.Transparent, m, bold = true)
+                            if (mv != null) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    TypeBadge(mv.type, fontSize = 16.sp)
+                                    if (showHints && mv.power > 0) mv.vs.firstOrNull()?.let { v ->   // status moves ignore the chart
+                                        Spacer(Modifier.width(m.u * 4))
+                                        MultiplierChip(v.label, v.pct, fontSize = 16.sp)
+                                    }
+                                    Spacer(Modifier.width(m.u * 8))
+                                    GbaText(tr("PP {0}", mv.pp), buttonContent, Color.Transparent, small)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        PlatinumButton(
+            fill = Color.White, frame = Color.White,
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            enabled = battleInput != null && !busy,
+            pressesGame = true, onClick = { battleInput?.back() },
+        ) { ButtonLabel(tr("CANCEL"), 34.sp) }
+    }
 }
 
 /** A Game Boy game's buttons are plain text boxes ([PlatinumButton]). */

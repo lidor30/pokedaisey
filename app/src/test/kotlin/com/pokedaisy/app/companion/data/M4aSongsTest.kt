@@ -57,5 +57,8 @@ class M4aSongsTest {
         val soulGold12 = songs(File(dir, "Soulgold (v1.2).gba").path)
         assertEquals(0x081A2981L, soulGold12.songNumStart)
         assertEquals(0x096086FCL, soulGold12.songTable)
+        val soulGold12b = songs(File(dir, "Pokemon-SoulGold-v1.2.gba").path)
+        assertEquals(0x081A2915L, soulGold12b.songNumStart)
+        assertEquals(0x09608658L, soulGold12b.songTable)
     }
 }

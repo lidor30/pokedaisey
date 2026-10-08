@@ -34,4 +34,23 @@ class AmethystDecodeTest {
         val t = decodeNative("amethyst", NATIVE_AMETHYST)
         assertEquals(GENDER_SYMBOL_FEMALE, t.party[0].genderSymbol)
     }
+
+    @Test
+    fun `v1_4_1 - the v1_3_0 save at the same RAM addresses`() {
+        activeGame = GameKind.AMETHYST
+        amethystV141 = true
+        try {
+            val t = decodeNative("amethyst_v141", NATIVE_AMETHYST_V1_4_1)
+            val mon = t.party.single()
+            assertEquals(551 to 6, mon.species to mon.level)
+            assertEquals("Tepig", speciesName(mon.species))
+            assertEquals(25 to 25, mon.hp to mon.maxHp)
+            assertEquals(GENDER_SYMBOL_FEMALE, mon.genderSymbol)
+            assertEquals(10, t.items.size)
+            assertPocketsInRange(t)
+            t.items.forEach { assert('#' !in itemName(it.itemId)) { "item ${it.itemId}" } }
+        } finally {
+            amethystV141 = false
+        }
+    }
 }

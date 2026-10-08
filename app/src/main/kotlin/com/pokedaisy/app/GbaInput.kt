@@ -80,6 +80,11 @@ class GbaInput {
         KeyEvent.KEYCODE_DPAD_DOWN -> MgbaCore.Key.DOWN
         KeyEvent.KEYCODE_DPAD_LEFT -> MgbaCore.Key.LEFT
         KeyEvent.KEYCODE_DPAD_RIGHT -> MgbaCore.Key.RIGHT
+        // Some controllers (8BitDo, GameSir in a few modes) send a diagonal as one key.
+        KeyEvent.KEYCODE_DPAD_UP_LEFT -> MgbaCore.Key.UP or MgbaCore.Key.LEFT
+        KeyEvent.KEYCODE_DPAD_UP_RIGHT -> MgbaCore.Key.UP or MgbaCore.Key.RIGHT
+        KeyEvent.KEYCODE_DPAD_DOWN_LEFT -> MgbaCore.Key.DOWN or MgbaCore.Key.LEFT
+        KeyEvent.KEYCODE_DPAD_DOWN_RIGHT -> MgbaCore.Key.DOWN or MgbaCore.Key.RIGHT
         else -> controls[keyCode]   // remappable face/shoulder/menu buttons
     }
 

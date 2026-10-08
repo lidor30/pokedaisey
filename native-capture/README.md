@@ -52,8 +52,14 @@ One command per line:
 | `poke8p PTR OFF VAL` / `peek8p PTR OFF` | Write / print the byte at `*(u32 *)PTR + OFF` — save-block fields (Emerald moves its save blocks on every load), e.g. `poke8p 0x030057D8 0x2951 0` clears a caught flag in TMT2 |
 | `call ADDR ARG0 [ARG1]` | Run Thumb function ADDR with r0 = ARG0 (r1 = ARG1) to its return, CPU state restored after (the app's `pk_call`) — e.g. `call 0x081dd164 297` starts FireRed's MUS_VS_TRAINER |
 | `park ADDR` | Park the main loop on a Thumb `b .` at ADDR once the VBlank IRQ is fully on (the app's `pkRenderPark`) |
+| `gbpark ADDR` | Game Boy: park the main loop on a `jr @` at ADDR once interrupts are on (`pkRenderGbPark`) |
+| `gbcall FN A C RET` | Game Boy: call FN with A / C until it returns to RET, e.g. Yellow's PlayMusic `gbcall 0x2211 240 8 0x1757` (`pkRenderGbCall`) |
+| `gbloop N` | Game Boy: run N frames and report where Gen 1's music channel state first repeats (`Gen1LoopWatch`) |
 | `bgm` | Print the m4a BGM player: address, status, song header (what `FfMusicKey` reads) |
 | `wav FILE N` | Run N frames and write what the APU played to `FILE` as a 16-bit stereo WAV — e.g. `call <m4aSongNumStart> 0`, `wait 20`, `call <m4aSongNumStart> 5`, `wav click.wav 45` renders SE_SELECT alone, the app's click sound |
+| `cheat TYPE CODE` | Add a cheat (TYPE `auto` / `cb` / `gs` / `ar`, CODE's lines joined by `+`) and load every cheat added so far into the core the way the app does - it compiles in the app's own `app/src/main/cpp/pk_cheats.c`, so only when built with the repo mounted (see below). Prints the directive mGBA settled on and which lines it read |
+| `cheatclear` | Take every cheat out again (the ROM goes back to the file's bytes) |
+| `romcheck ROMFILE` | Compare the ROM with the file three ways: the raw bus, the bus through `pk_cheats_overlay` (what the Poller hashes) and swapped (what RetroAchievements hashes) |
 
 Lines starting with `#`, and blank lines, are ignored.
 
@@ -81,3 +87,21 @@ Lines starting with `#`, and blank lines, are ignored.
   BIOS SWI call, straight to stdout/stderr) — this tool installs a no-op
   logger by default; pass `--verbose` (before the ROM path) to get the
   default logger back when debugging a new boot sequence.
+
+## Cheats
+
+`cheat` / `cheatclear` / `romcheck` need the app's `pk_cheats.c`, so build from the repo root
+(the capture scripts mount `native-capture/` alone and get a build without them):
+
+```sh
+docker run --rm -v "$(pwd):/repo" -w /repo/native-capture pokedaisy-capture \
+    -c "gcc -O2 -Wall -o mgba_dump mgba_dump.c -I/usr/include -L/usr/lib/aarch64-linux-gnu -lmgba -lm"
+```
+
+Debian's libmgba is built with the debuggers on; the app's isn't (`USE_DEBUGGERS OFF`). To
+test cheats against the app's own flags, build `third_party/mgba` on the host with the
+`set(...)` lines from `app/src/main/cpp/CMakeLists.txt` and link this file against it - how
+it was checked on 2026-10-08: on FireRed rev 1, a plain CodeBreaker write (`8203F000 1234`),
+a hooked one (`100005FC 0007+8203F002 5678`, a hook on ReadKeys) and an encrypted GameShark
+code (autodetected as `GSAv1`) all fired; `cheatclear` put the ROM back byte for byte.
+

@@ -66,6 +66,8 @@ class SidePanelScreenshotTest {
     @Before
     fun game() {
         activeGame = GameKind.FIRERED
+        // The side panel lives in the game's activity: the companion's in-game look, not the Library's theme.
+        OptionColors.inGame = true
         val art = java.io.File("build/rom-art-paparazzi").also { RomArt.dirOverride = it }
         for (path in listOf(RomFileReader.FIRERED_REV1_PATH, RomFileReader.EMERALD_PATH)) {
             java.io.File(path).takeIf { it.isFile }?.let { RomArt.extractTo(it.readBytes(), art) }
@@ -148,28 +150,28 @@ class SidePanelScreenshotTest {
     @Composable
     private fun px(v: Int): Dp = with(LocalDensity.current) { v.toDp() }
 
-    /** A GBA screen's worth of something game-like: sky, striped ground, a text box. */
-    @Composable
-    private fun FakeGame(modifier: Modifier) {
-        Canvas(modifier) {
-            val k = size.width / 240f
-            fun r(x: Int, y: Int, w: Int, h: Int, c: Color) = drawRect(c, Offset(x * k, y * k), Size(w * k, h * k))
-            r(0, 0, 240, 104, Color(0xFFE8F0E8))
-            for (i in 0 until 7) r(0, 104 + i * 8, 240, 8, if (i % 2 == 0) Color(0xFF5C9C90) else Color(0xFF4C8C80))
-            r(100, 30, 40, 70, Color(0xFFB8A8E0)) // someone standing there
-            r(108, 18, 24, 16, Color(0xFFE8D8A8))
-            r(4, 112, 232, 44, Color(0xFF6888B0))
-            r(6, 114, 228, 40, Color.White)
-            r(14, 122, 120, 8, Color(0xFF606060))
-            r(14, 138, 150, 8, Color(0xFF606060))
-        }
-    }
-
     private companion object {
         const val SCREEN_W = 1920
         const val SCREEN_H = 1080
         const val PANEL_W = 960
         const val CROP_W = 290
         const val CROP_H = 300
+    }
+}
+
+/** A GBA screen's worth of something game-like: sky, striped ground, a text box. */
+@Composable
+internal fun FakeGame(modifier: Modifier) {
+    Canvas(modifier) {
+        val k = size.width / 240f
+        fun r(x: Int, y: Int, w: Int, h: Int, c: Color) = drawRect(c, Offset(x * k, y * k), Size(w * k, h * k))
+        r(0, 0, 240, 104, Color(0xFFE8F0E8))
+        for (i in 0 until 7) r(0, 104 + i * 8, 240, 8, if (i % 2 == 0) Color(0xFF5C9C90) else Color(0xFF4C8C80))
+        r(100, 30, 40, 70, Color(0xFFB8A8E0)) // someone standing there
+        r(108, 18, 24, 16, Color(0xFFE8D8A8))
+        r(4, 112, 232, 44, Color(0xFF6888B0))
+        r(6, 114, 228, 40, Color.White)
+        r(14, 122, 120, 8, Color(0xFF606060))
+        r(14, 138, 150, 8, Color(0xFF606060))
     }
 }

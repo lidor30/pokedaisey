@@ -65,6 +65,7 @@ import com.pokedaisy.app.companion.data.itemDescriptionsEmeraldGame
 import com.pokedaisy.app.companion.data.itemDescriptionsFireRedGame
 import com.pokedaisy.app.companion.data.itemNamesEmeraldGame
 import com.pokedaisy.app.companion.data.itemNamesFireRedGame
+import com.pokedaisy.app.companion.data.localText
 import com.pokedaisy.app.companion.data.pocketLabel
 import com.pokedaisy.app.companion.data.pocketOrder
 import com.pokedaisy.app.companion.ui.theme.pixelFontFamily
@@ -82,8 +83,11 @@ private enum class ItemSort(val label: String) { DEFAULT(tk("Default")), NAME(tk
 private class GameItemText(val names: Map<Int, String>, val descriptions: Map<Int, String>)
 
 private fun gameItemText(game: GameKind): GameItemText? = when (game) {
-    GameKind.FIRERED -> GameItemText(itemNamesFireRedGame, itemDescriptionsFireRedGame)
-    GameKind.EMERALD -> GameItemText(itemNamesEmeraldGame, itemDescriptionsEmeraldGame)
+    // A localized game's own (GameText), already in its casing.
+    GameKind.FIRERED -> localText?.let { GameItemText(it.items, it.itemDescriptions) }
+        ?: GameItemText(itemNamesFireRedGame, itemDescriptionsFireRedGame)
+    GameKind.EMERALD -> localText?.let { GameItemText(it.items, it.itemDescriptions) }
+        ?: GameItemText(itemNamesEmeraldGame, itemDescriptionsEmeraldGame)
     else -> null
 }
 
@@ -471,8 +475,9 @@ fun ItemsScreen(items: List<ItemView>, modifier: Modifier = Modifier) {
     val font = pixelFontFamily()
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    val tabWidth = remember(tabLabels, capsLabels, m, font) {
-        val style = gbaTextStyle(font, m)
+    val scaleX = gameFontScaleX(m)
+    val tabWidth = remember(tabLabels, capsLabels, m, font, scaleX) {
+        val style = gbaTextStyle(font, m, scaleX)
         val widestTab = tabLabels.maxOf { measurer.measure(it, style).size.width }
         val widestSort = ItemSort.entries.maxOf { measurer.measure(sortLabel(it), style).size.width }
         with(density) {
@@ -791,7 +796,9 @@ private fun ItemDescriptionBar(item: ItemView, pal: BagPalette, m: GbaTextMetric
             .soundClickable(interactionSource = noRipple, indication = null, onClick = onDismiss)
             .padding(start = u * 7, end = u * 7, top = u * 7, bottom = u * 7),
     ) {
-        Box(
+        // No icon box where the game has no item icons (Gen 1): the text takes the room.
+        val hasIcon = item.iconAsset != null
+        if (hasIcon) Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(u * 28)
@@ -810,7 +817,7 @@ private fun ItemDescriptionBar(item: ItemView, pal: BagPalette, m: GbaTextMetric
             item.description.ifEmpty { item.name },
             pal.descText, pal.descTextShadow, m,
             maxLines = Int.MAX_VALUE,
-            modifier = Modifier.padding(start = u * 8).weight(1f),
+            modifier = Modifier.padding(start = if (hasIcon) u * 8 else 0.dp).weight(1f),
         )
     }
 }

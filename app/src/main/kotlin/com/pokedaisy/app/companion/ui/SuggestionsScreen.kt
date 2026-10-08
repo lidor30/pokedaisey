@@ -69,8 +69,9 @@ fun SuggestionsScreen(
     shownFoe: Int = -1,
     onSelectFoe: (Int) -> Unit = {},
 ) {
-    val m = rememberGbaTextMetrics()
-    val small = rememberGbaTextMetrics(1f)
+    // Sized to fit a whole battle: a game font keeps Pixel Operator's metrics here.
+    val m = rememberGbaTextMetrics(gameScaled = false)
+    val small = rememberGbaTextMetrics(1f, gameScaled = false)
     val gap = m.u * 3
     SummaryFrame(
         m, onBack, modifier,

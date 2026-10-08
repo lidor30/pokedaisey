@@ -58,7 +58,8 @@ object FfMenuWatch {
         knownGMain = -1L
         verifyFrame = 0
         verifyPrimed = false
-        inBattleOff = if (gameCode == "AXVE" || gameCode == "AXPE") 0x43DL else 0x439L // Ruby/Sapphire's Main has 4 more bytes
+        // Ruby/Sapphire's Main has 4 more bytes - but not the Japanese ones' (their Main is FireRed's size).
+        inBattleOff = if ((gameCode.startsWith("AXV") || gameCode.startsWith("AXP")) && !gameCode.endsWith("J")) 0x43DL else 0x439L
         frame = 0
         snapshot = null
         scans = 0

@@ -102,7 +102,10 @@ class TelemetrySampler {
         try {
             if (kind == null) detect(reader)
             activeGame = kind ?: GameKind.FIRERED
-            soulGoldV12 = nativeCfg === NATIVE_SOULGOLD_V1_2
+            soulGoldV12 = nativeCfg === NATIVE_SOULGOLD_V1_2 || nativeCfg === NATIVE_SOULGOLD_V1_2B
+            amethystV141 = nativeCfg === NATIVE_AMETHYST_V1_4_1
+            romLanguage = nativeCfg?.language ?: 'E'
+            romGameCode = nativeCfg?.gameCode.orEmpty()
 
             val telemetry = when (kind) {
                 GameKind.UNBOUND -> readNativeTelemetry(reader, NATIVE_UNBOUND_WITH_DEX)
@@ -143,13 +146,13 @@ class TelemetrySampler {
         val code = runCatching { MgbaCore.pkRomCode() }.getOrNull().orEmpty()
         val size = runCatching { MgbaCore.pkRomSize() }.getOrDefault(0L)
 
-        // LeafGreen / Ruby / Sapphire: retail only (no QoL build to probe
-        // for), read natively straight away. LeafGreen looks like FireRed,
-        // Ruby/Sapphire like Emerald (same species / item / map-section ids).
+        // LeafGreen / Ruby / Sapphire / the other Emeralds: retail only (no
+        // QoL build to probe for), read natively straight away. LeafGreen looks
+        // like FireRed, the rest like Emerald (same species / item / map-section ids).
         if (code in OTHER_RETAIL_CODES) {
             val rev = runCatching { reader.readCoreMemory(0x080000BCL, 1)[0].toInt() and 0xFF }.getOrDefault(-1)
             val cfg = otherRetailConfig(code, rev)
-            kind = if (code == "BPGE") GameKind.FIRERED else GameKind.EMERALD
+            kind = if (code.startsWith("BPR") || code.startsWith("BPG")) GameKind.FIRERED else GameKind.EMERALD
             when {
                 size > 0x1000000L -> unsupportedHackLabel =
                     "unrecognized $code-based ROM hack (${size / (1024 * 1024)} MB) - no known RAM addresses for this build"
@@ -191,6 +194,7 @@ class TelemetrySampler {
                 RADICAL_RED_V4_1_SHA1 -> { kind = GameKind.RADICAL_RED; nativeCfg = NATIVE_RADICAL_RED_V4_1 }
                 ODYSSEY_V4_1_1_SHA1 -> { kind = GameKind.ODYSSEY; nativeCfg = NATIVE_ODYSSEY }
                 AMETHYST_V1_3_0_SHA1 -> { kind = GameKind.AMETHYST; nativeCfg = NATIVE_AMETHYST }
+                AMETHYST_V1_4_1_SHA1 -> { kind = GameKind.AMETHYST; nativeCfg = NATIVE_AMETHYST_V1_4_1 }
                 CELIA_V1_1_4_SHA1 -> { kind = GameKind.CELIA; nativeCfg = NATIVE_CELIA }
                 else -> {
                     kind = GameKind.FIRERED
@@ -225,6 +229,7 @@ class TelemetrySampler {
                 TMT2_V1_5_2_SHA1 -> { kind = GameKind.TMT2; nativeCfg = NATIVE_TMT2 }
                 SOULGOLD_V1_1_4_SHA1 -> { kind = GameKind.SOULGOLD; nativeCfg = NATIVE_SOULGOLD }
                 SOULGOLD_V1_2_SHA1 -> { kind = GameKind.SOULGOLD; nativeCfg = NATIVE_SOULGOLD_V1_2 }
+                SOULGOLD_V1_2B_SHA1 -> { kind = GameKind.SOULGOLD; nativeCfg = NATIVE_SOULGOLD_V1_2B }
                 else -> {
                     kind = GameKind.EMERALD
                     unsupportedHackLabel = "unrecognized Emerald-based ROM hack " +
@@ -326,7 +331,16 @@ class TelemetrySampler {
     val knownPartyMenu: Pair<Long, Long>?
         get() = nativeCfg?.takeIf { it.partyMenu != 0L }?.let { it.partyMenu to it.playerParty }
 
+    /** The open battle menu's cursor from the last fast sample, for a Gen 1 game ([readGen1BattleInput]); -1 otherwise. */
+    @Volatile var battleMenuCursor = -1
+        private set
+
     fun sampleBattleInputFast(reader: MemoryReader): Pair<Int, Int>? {
+        if (kind == GameKind.YELLOW) {
+            val (state, cursor) = runCatching { readGen1BattleInput(reader, gen1Cfg ?: GEN1_YELLOW) }.getOrNull() ?: return null
+            battleMenuCursor = cursor
+            return 0 to state
+        }
         // Unbound's `kind` is decided directly in detect() without ever
         // populating nativeCfg (see the GameKind.UNBOUND branch there) -
         // sample() has its own matching special case for the same reason.
@@ -360,14 +374,21 @@ class TelemetrySampler {
         // wasn't always true, see git history if this needs re-deriving on an
         // older checkout.
         /** Retail games read natively with no QoL build: LeafGreen, Ruby, Sapphire. */
-        val OTHER_RETAIL_CODES = setOf("BPGE", "AXVE", "AXPE")
+        val OTHER_RETAIL_CODES = setOf("BPGE", "AXVE", "AXPE") + EMERALD_LOCALIZED_CODES +
+            RETAIL_PORTS.keys.map { it.dropLast(1) }
 
         /** The config for [code] at header revision [rev], or null if that revision isn't mapped. */
-        fun otherRetailConfig(code: String, rev: Int): NativeConfig? = when (code) {
+        fun otherRetailConfig(code: String, rev: Int): NativeConfig? = RETAIL_PORTS["$code$rev"]?.invoke() ?: when (code) {
             "BPGE" -> when (rev) { 0 -> NATIVE_LEAFGREEN_REV0; 1 -> NATIVE_LEAFGREEN_REV1; else -> null }
             // Revs 1 and 2 share every address (both built from pokeruby); rev 0 wasn't checked.
             "AXVE" -> if (rev == 1 || rev == 2) NATIVE_RUBY else null
             "AXPE" -> if (rev == 1 || rev == 2) NATIVE_SAPPHIRE else null
+            // Each European Emerald had one release (rev 0).
+            "BPES" -> if (rev == 0) NATIVE_EMERALD_ES else null
+            "BPED" -> if (rev == 0) NATIVE_EMERALD_DE else null
+            "BPEF" -> if (rev == 0) NATIVE_EMERALD_FR else null
+            "BPEI" -> if (rev == 0) NATIVE_EMERALD_IT else null
+            "BPEJ" -> if (rev == 0) NATIVE_EMERALD_JA else null
             else -> null
         }
 
@@ -375,7 +396,8 @@ class TelemetrySampler {
             "BPGE" -> "LeafGreen"
             "AXVE" -> "Ruby"
             "AXPE" -> "Sapphire"
-            else -> code
+            "BPES", "BPED", "BPEF", "BPEI", "BPEJ" -> "Emerald (${code.last()})"
+            else -> RETAIL_PORT_CODE_TITLES[code] ?: code
         }
 
         const val UNBOUND_V2_1_1_1_SHA1 = "b4776b82a4c7915d0fadeaa27e013523f99dfd94"
@@ -406,6 +428,8 @@ class TelemetrySampler {
         // other two above - confirmed live on-device 2026-09-22; equals a
         // plain `shasum` on the file (00e70c0384a5f1698588034201fd5b849d3542e2).
         const val AMETHYST_V1_3_0_SHA1 = "00e70c0384a5f1698588034201fd5b849d3542e2"
+        // Pokemon Amethyst v1.4.1 - host-side masked hash (GPIO bytes zero, so a plain `shasum`).
+        const val AMETHYST_V1_4_1_SHA1 = "91291aade04b4b111cd03ae7b6e2ff460e1edd8a"
         // Emerald Seaglass v3.0 - GPIO-hole-masked hash computed host-side from
         // the file (its 0x080000C4-C9 bytes are zero, so it also equals a plain
         // `shasum`). NOT yet confirmed via the on-device live-bus log.
@@ -419,6 +443,9 @@ class TelemetrySampler {
         const val SOULGOLD_V1_1_4_SHA1 = "ea5d369cc8a31cbf1cfacb7c9470ea670f08957b"
         // Pokémon SoulGold v1.2 - host-side masked hash (GPIO bytes zero).
         const val SOULGOLD_V1_2_SHA1 = "805d880ee229fb6dc3ce03d7b03baf48f0d759d0"
+        // A second build released as SoulGold v1.2 (its title screen says v1.2 too) - masked hash
+        // (GPIO bytes zero).
+        const val SOULGOLD_V1_2B_SHA1 = "5d6a036260fdbde96f85b5c1b92d0256d3aebafb"
 
         // Pokémon Yellow (USA, Europe) - the Game Boy cart (pret/pokeyellow builds it byte for byte).
         const val YELLOW_SHA1 = "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1"
@@ -427,20 +454,20 @@ class TelemetrySampler {
         val SUPPORTED_GB_SHA1S = setOf(YELLOW_SHA1)
 
         /**
-         * Game Boy / Color (Pokémon Yellow): off for now - the library, folder scan, frontend
-         * launch and archives don't take .gb / .gbc (RomArchive.ROM_EXTENSIONS), and a cart
-         * that arrives anyway gets the "not supported" notice. The reader, art and tables stay
-         * in place; flip this (and the manifest's .gb / .gbc VIEW patterns) to bring it back.
+         * Game Boy / Color (Pokémon Yellow): the library, folder scan, frontend launch and
+         * archives take .gb / .gbc (RomArchive.ROM_EXTENSIONS) and a Yellow cart is read by the
+         * Gen 1 reader. False turns all of it off again (then drop the manifest's .gb / .gbc
+         * VIEW patterns too): a cart that arrives anyway gets the "not supported" notice.
          */
-        const val GAME_BOY_SUPPORT = false
+        const val GAME_BOY_SUPPORT = true
 
         /** Every hack detect() has RAM addresses for - the >16 MB ones it
          * hashes, plus Seaglass (16 MB). [CompanionSupport] checks imports against it. */
         val SUPPORTED_HACK_SHA1S = setOf(
             UNBOUND_V2_1_1_1_SHA1, GAIA_V3_2_SHA1, RADICAL_RED_V4_1_SHA1, ODYSSEY_V4_1_1_SHA1,
-            AMETHYST_V1_3_0_SHA1, CELIA_V1_1_4_SHA1, HEART_AND_SOUL_V2_0_6_SHA1, LAZARUS_V2_0_SHA1,
+            AMETHYST_V1_3_0_SHA1, AMETHYST_V1_4_1_SHA1, CELIA_V1_1_4_SHA1, HEART_AND_SOUL_V2_0_6_SHA1, LAZARUS_V2_0_SHA1,
             ROWE_V2_1_9_1_SHA1, EMERALD_ROGUE_V2_2_1_EX_SHA1, TMT2_V1_5_2_SHA1, EMERALD_SEAGLASS_V3_0_SHA1,
-            SOULGOLD_V1_1_4_SHA1, SOULGOLD_V1_2_SHA1,
+            SOULGOLD_V1_1_4_SHA1, SOULGOLD_V1_2_SHA1, SOULGOLD_V1_2B_SHA1,
         )
     }
 }

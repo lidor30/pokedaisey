@@ -2,6 +2,7 @@ package com.pokedaisy.app
 
 import android.os.Process
 import android.util.Log
+import com.pokedaisy.app.companion.data.EMERALD_LOCALIZED_CODES
 import com.pokedaisy.app.companion.data.FfMusicKey
 import com.pokedaisy.app.companion.data.M4aSongs
 import com.pokedaisy.app.companion.data.MapMusicEmerald
@@ -11,6 +12,32 @@ import com.pokedaisy.app.companion.data.TelemetryDecodeException
 import java.io.File
 import java.util.concurrent.LinkedBlockingDeque
 import java.util.concurrent.TimeUnit
+
+/**
+ * One render core per process (`rg` is a C global): a new game's renderer waits for the last
+ * one (FfMusicRenderer's, or Gen1MusicRenderer's for a Game Boy game).
+ */
+internal object RenderCoreLock {
+    private val lock = Object()
+    private var busy = false
+
+    fun acquire() = synchronized(lock) {
+        while (busy) lock.wait()
+        busy = true
+    }
+
+    fun release() = synchronized(lock) {
+        busy = false
+        lock.notifyAll()
+    }
+}
+
+/** What the activity drives: FfMusicRenderer (GBA) or Gen1MusicRenderer (Game Boy). */
+interface SongRenderer {
+    /** Render [key]'s song soon, unless it's cached or already asked for. */
+    fun request(key: String)
+    fun stop()
+}
 
 /**
  * Records STEADY FF-music clips: each song rendered on its own on a second,
@@ -39,7 +66,7 @@ class FfMusicRenderer(
     private val cache: FfMusicCache,
     private val click: GameClickSound? = null,
     private val fanfare: GameClickSound? = null,
-) {
+) : SongRenderer {
     // String keys (played now: first), Int song ids (prefetch: last) or CLICK (first of all).
     private val queue = LinkedBlockingDeque<Any>()
     private val requested = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
@@ -61,11 +88,11 @@ class FfMusicRenderer(
     }
 
     /** Render [key]'s song soon, unless it's cached (with its intro) or already asked for. */
-    fun request(key: String) {
+    override fun request(key: String) {
         if (!stopped && !cache.complete(key) && requested.add(key)) queue.offerFirst(key)
     }
 
-    fun stop() {
+    override fun stop() {
         stopped = true
         queue.offerFirst(STOP)
     }
@@ -127,8 +154,8 @@ class FfMusicRenderer(
         val code = if (romBytes.size >= 0xB0) String(romBytes, 0xAC, 4, Charsets.US_ASCII) else ""
         val retail = romBytes.size <= RETAIL_MAX_BYTES
         return when {
-            retail && (code == "BPRE" || code == "BPGE") -> MapMusicFireRed.allSongIds.toList()
-            retail && code == "BPEE" -> MapMusicEmerald.allSongIds.toList()
+            retail && (code.startsWith("BPR") || code.startsWith("BPG")) -> MapMusicFireRed.allSongIds.toList()
+            retail && (code == "BPEE" || code in EMERALD_LOCALIZED_CODES) -> MapMusicEmerald.allSongIds.toList()
             else -> songs.bgmSongIds
         }
     }
@@ -144,16 +171,13 @@ class FfMusicRenderer(
         DEFERRED,
     }
 
-    /** The render core booted with this ROM, held (under [coreLock]) until [close]. */
+    /** The render core booted with this ROM, held (under [RenderCoreLock]) until [close]. */
     private inner class RenderCore(songs: M4aSongs) {
         private val sampleRate: Int
         private val scratch = ShortArray(4096)
 
         init {
-            synchronized(coreLock) {
-                while (coreBusy) (coreLock as Object).wait()
-                coreBusy = true
-            }
+            RenderCoreLock.acquire()
             check(MgbaCore.pkRenderInit(rom.absolutePath)) { "render core failed to init" }
             sampleRate = MgbaCore.pkRenderSampleRate()
             // Let boot settle (logos / title) so the sound engine is set up,
@@ -269,10 +293,7 @@ class FfMusicRenderer(
 
         fun close() {
             MgbaCore.pkRenderDeinit()
-            synchronized(coreLock) {
-                coreBusy = false
-                (coreLock as Object).notifyAll()
-            }
+            RenderCoreLock.release()
         }
     }
 
@@ -316,10 +337,6 @@ class FfMusicRenderer(
         val STOP = Any()
         val CLICK = Any()
         val FANFARE = Any()
-
-        /** One render core per process (`rg` is a C global): a new game's renderer waits for the last one. */
-        val coreLock = Any()
-        var coreBusy = false
 
         /** FireRed / Emerald-sized ROMs share the retail music lists; bigger ones are hacks. */
         const val RETAIL_MAX_BYTES = 16 shl 20

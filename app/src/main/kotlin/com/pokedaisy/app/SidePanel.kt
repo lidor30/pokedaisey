@@ -1,11 +1,8 @@
 package com.pokedaisy.app
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
-import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -81,11 +78,11 @@ class SidePanel(
             docked.value = prefs.sidePanelDocked
             open = docked.value
             val at = root.indexOfChild(touchControls) + 1
-            panel = ComposeView(context).apply {
+            panel = CompanionColors.track(ComposeView(context)).apply {
                 setContent { SidePanelCompanion(companion) }
             }.also { root.addView(it, at, FrameLayout.LayoutParams(panelWidth, -1, Gravity.END)) }
-            handle = DragFrame(context).apply {
-                addView(ComposeView(context).apply {
+            handle = DragFrame(context, vertical = false, ::onDragStart, ::onDrag, ::onDragEnd).apply {
+                addView(CompanionColors.track(ComposeView(context)).apply {
                     setContent {
                         CompositionLocalProvider(LocalClickSound provides clickSound) {
                             SidePanelHandle(docked.value, ::toggleDock)
@@ -117,7 +114,7 @@ class SidePanel(
         apply()
     }
 
-    private fun tabView(content: @Composable () -> Unit) = ComposeView(context).apply {
+    private fun tabView(content: @Composable () -> Unit) = CompanionColors.track(ComposeView(context)).apply {
         setContent { CompositionLocalProvider(LocalClickSound provides clickSound, content = content) }
     }
 
@@ -230,46 +227,6 @@ class SidePanel(
         }
         prefs.sidePanelWidth = fraction
         apply()
-    }
-
-    /**
-     * Hands a sideways drag on the tab to the panel, in screen coordinates (the
-     * tab moves with the finger, so its own would chase themselves). A tap
-     * still reaches the tab inside (the lock).
-     */
-    @SuppressLint("ClickableViewAccessibility", "ViewConstructor")
-    private inner class DragFrame(context: Context) : FrameLayout(context) {
-        private val slop = ViewConfiguration.get(context).scaledTouchSlop
-        private var downX = 0f
-        private var dragging = false
-
-        private fun startIfMoved(e: MotionEvent): Boolean {
-            if (!dragging && abs(e.rawX - downX) > slop) {
-                dragging = true
-                onDragStart()
-            }
-            return dragging
-        }
-
-        override fun onInterceptTouchEvent(e: MotionEvent): Boolean {
-            when (e.actionMasked) {
-                MotionEvent.ACTION_DOWN -> { downX = e.rawX; dragging = false }
-                MotionEvent.ACTION_MOVE -> return startIfMoved(e)
-            }
-            return dragging
-        }
-
-        override fun onTouchEvent(e: MotionEvent): Boolean {
-            when (e.actionMasked) {
-                MotionEvent.ACTION_DOWN -> { downX = e.rawX; dragging = false }
-                MotionEvent.ACTION_MOVE -> if (startIfMoved(e)) onDrag(e.rawX - downX)
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (dragging) {
-                    dragging = false
-                    onDragEnd()
-                }
-            }
-            return true
-        }
     }
 
     private companion object {

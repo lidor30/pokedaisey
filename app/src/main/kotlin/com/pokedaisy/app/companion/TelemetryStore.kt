@@ -59,6 +59,9 @@ class TelemetryStore {
      * — see [TelemetrySampler.sampleBattleInputFast]. Call on the emu thread. */
     fun refreshBattleInputFast(): Pair<Int, Int>? = sampler.sampleBattleInputFast(InProcessReader)
 
+    /** The battle menu's cursor from that poll, for a Gen 1 game (else -1). */
+    fun battleMenuCursor(): Int = sampler.battleMenuCursor
+
     /** The detected game's own gMain + inBattle offset, when it has a native config. */
     fun knownGMain(): Pair<Long, Long>? = sampler.knownGMain
 

@@ -19,6 +19,10 @@
 #include <mgba/internal/arm/arm.h>
 #include <mgba/internal/arm/isa-inlines.h>
 #include <mgba/internal/gb/gb.h>
+#include <mgba/internal/gb/io.h>
+#include <mgba/internal/sm83/sm83.h>
+
+#include "pk_cheats.h"
 
 #define LOG_TAG "pokedaisy/jni"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
@@ -41,8 +45,10 @@ static void pk_gb_config(struct mCore* core) {
     if (core->platform(core) != mPLATFORM_GB) {
         return;
     }
+    // Just this one option: mCoreLoadForeignConfig maps the whole config, and with
+    // no "volume" key in it the GB core's master volume went to 0 (Yellow was silent).
     mCoreConfigSetIntValue(&core->config, "sgb.borders", 0);
-    mCoreLoadForeignConfig(core, &core->config);
+    core->reloadConfigOption(core, "sgb.borders", &core->config);
 }
 
 static int pk_is_gba(const struct mCore* core) {
@@ -100,6 +106,7 @@ static pthread_rwlock_t pk_coreLock = PTHREAD_RWLOCK_INITIALIZER;
 static void pkTeardown(void) {
     pthread_rwlock_wrlock(&pk_coreLock);
     if (g.core) {
+        pk_cheats_clear(g.core);        // and forgets the ROM bytes it kept
         g.core->deinit(g.core);         // unloads ROM, flushes save VFile
         g.core = NULL;
     }
@@ -451,6 +458,67 @@ Java_com_pokedaisy_app_MgbaCore_pkRenderPark(JNIEnv* env, jobject thiz, jlong sp
     return JNI_FALSE;
 }
 
+// The Game Boy render core's twins of pkRenderPark / pkRenderForceSong (Gen 1's
+// music: FfMusicRenderer's Game Boy path). Park: once the main loop runs with
+// interrupts on (IME, IE's VBlank bit, the LCD on), its PC goes to `spin` - a
+// `jr @` (18 FE) in ROM bank 0 - and only the VBlank handler, which runs the
+// sound engine every frame, keeps going. Tested with mgba_dump's `gbpark`.
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkRenderGbPark(JNIEnv* env, jobject thiz, jint spin) {
+    if (!rg.core || pk_is_gba(rg.core)) {
+        return JNI_FALSE;
+    }
+    struct mCore* core = rg.core;
+    struct GB* gb = (struct GB*) core->board;
+    struct SM83Core* cpu = (struct SM83Core*) core->cpu;
+    for (int i = 0; i < 5000000; i++) {
+        core->step(core);   // ends on an instruction boundary (SM83_CORE_FETCH)
+        if (gb->memory.ime && (gb->memory.ie & 1) && (gb->memory.io[GB_REG_LCDC] & 0x80) && !cpu->halted && !cpu->irqPending) {
+            cpu->pc = (uint16_t) spin;
+            cpu->memory.setActiveRegion(cpu, cpu->pc);
+            return JNI_TRUE;
+        }
+    }
+    return JNI_FALSE;
+}
+
+// Calls the game's `fn` (bank 0) with A = `a`, C = `c` on the parked GB render core
+// and returns once it comes back to `ret` (the park loop, pushed as the return
+// address), interrupts held off meanwhile so the VBlank handler can't run halfway
+// through it. Gen 1: PlayMusic(a = song id, c = its audio bank).
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkRenderGbCall(JNIEnv* env, jobject thiz, jint fn, jint a, jint c, jint ret) {
+    if (!rg.core || pk_is_gba(rg.core)) {
+        return JNI_FALSE;
+    }
+    struct mCore* core = rg.core;
+    struct GB* gb = (struct GB*) core->board;
+    struct SM83Core* cpu = (struct SM83Core*) core->cpu;
+    bool ime = gb->memory.ime;
+    bool pending = cpu->irqPending;
+    gb->memory.ime = false;
+    cpu->irqPending = false;
+    cpu->sp -= 2;
+    core->busWrite8(core, cpu->sp, (uint8_t) (ret & 0xFF));
+    core->busWrite8(core, (uint16_t) (cpu->sp + 1), (uint8_t) ((ret >> 8) & 0xFF));
+    cpu->a = (uint8_t) a;
+    cpu->c = (uint8_t) c;
+    cpu->halted = false;
+    cpu->pc = (uint16_t) fn;
+    cpu->memory.setActiveRegion(cpu, cpu->pc);
+    int ok = 0;
+    for (int i = 0; i < 2000000; i++) {
+        core->step(core);
+        if (cpu->pc == (uint16_t) ret) {
+            ok = 1;
+            break;
+        }
+    }
+    gb->memory.ime = ime;
+    cpu->irqPending = pending;
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
 // Copies up to out.length interleaved shorts of the most recent frame's audio
 // into `out`; returns the count written.
 JNIEXPORT jint JNICALL
@@ -600,6 +668,9 @@ Java_com_pokedaisy_app_MgbaCore_pkReadBytes(JNIEnv* env, jobject thiz, jlong add
     bool ok = g.core != NULL;
     if (ok) {
         pk_read_range(g.core, (uint32_t) addr, tmp, len);
+        // The ROM as the file has it, under any cheat's hook or ROM patch: the
+        // Poller identifies hacks by hashing it (see pk_cheats.c).
+        pk_cheats_overlay((uint32_t) addr, tmp, len);
     }
     pthread_rwlock_unlock(&pk_coreLock);
     jbyteArray out = ok ? (*env)->NewByteArray(env, len) : NULL;
@@ -724,4 +795,46 @@ Java_com_pokedaisy_app_MgbaCore_pkPlatform(JNIEnv* env, jobject thiz) {
 JNIEXPORT jlong JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRomSize(JNIEnv* env, jobject thiz) {
     return g.core ? (jlong) g.core->romSize(g.core) : 0;
+}
+
+// --- cheats (pk_cheats.c) ----------------------------------------------------
+
+// Checks a cheat's code lines without a core (Settings can run with no game).
+// Returns "<directive>\n<'1' / '0' per line>", null on failure.
+JNIEXPORT jstring JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCheatsCheck(JNIEnv* env, jobject thiz, jstring jCode, jint type, jstring jDirective) {
+    const char* code = (*env)->GetStringUTFChars(env, jCode, NULL);
+    const char* directive = (*env)->GetStringUTFChars(env, jDirective, NULL);
+    char* result = pk_cheats_check(code, (int) type, directive);
+    (*env)->ReleaseStringUTFChars(env, jDirective, directive);
+    (*env)->ReleaseStringUTFChars(env, jCode, code);
+    if (!result) {
+        return NULL;
+    }
+    // Directive names and '0'/'1' only: plain ASCII, safe for NewStringUTF.
+    jstring out = (*env)->NewStringUTF(env, result);
+    free(result);
+    return out;
+}
+
+// Emu thread: replaces the player's core's cheats with `text` (mGBA .cheats
+// format, enabled cheats only; empty = none). Returns the sets loaded, -1 if it
+// didn't parse. Under the core lock, so a ROM read never sees half a swap.
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCheatsApply(JNIEnv* env, jobject thiz, jstring jText) {
+    const char* text = (*env)->GetStringUTFChars(env, jText, NULL);
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int n = g.core ? pk_cheats_apply(g.core, text, strlen(text)) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    (*env)->ReleaseStringUTFChars(env, jText, text);
+    return n;
+}
+
+// For pokedaisy_ra.c: the file's ROM bytes in and out around RA's hash (emu thread).
+void pkRomSwapCheats(void) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    if (g.core && pk_cheats_rom_patched()) {
+        pk_cheats_swap_rom(g.core);
+    }
+    pthread_rwlock_unlock(&pk_coreLock);
 }

@@ -33,12 +33,18 @@ spoiler-free guide. Everything is drawn in the game's own menu style.
 | Retroid Pocket Duo / Duo Lite | Should work, not yet tested on real hardware |
 | Anbernic RG DS                | Should work, not yet tested on real hardware |
 | Retroid Pocket 6              | Single screen: tested                        |
+| Android phones (portrait)     | Should work, checked in screenshots only     |
 
 Any Android 8.0+ device runs the games. On a device with one screen the
 companion is a panel beside the game: press BACK to slide it in over the game,
 tap the padlock on its edge to lock it beside the game (the game moves over),
 and drag that tab sideways to resize it. BACK closes an unlocked panel; hold
 BACK to leave the game.
+
+Hold a phone upright and the game sits across the top with the companion docked
+under it. Drag the grip on the companion's top edge to pick its height, or tap the
+grip to step through small, normal and full. Without a controller, the touch
+controls fill the space between the game and the companion.
 
 ## Install
 
@@ -102,13 +108,17 @@ Settings screen. Pokémon, move and item names and the GUIDE pages stay as the g
 - **Save states** on hotkeys, with undo.
 - **Status bar** (optional): game, location, money, clock and battery above the game.
 - **Aspect**: the GBA's own 3:2, or stretched to fill a 16:9 top screen (Settings shows a preview of both).
-- **Shaders** (optional): an LCD grid, scanlines or a CRT look, and the colours as the GBA's own screen
-  showed them.
+- **Shaders** (optional): an LCD grid (plain or on paper), scanlines or a CRT look, and the colours as the GBA's own screen
+  showed them - on the game and, if you like, the companion screen too.
 - **Controls**: remap every GBA button and hotkey, or turn hotkeys off. X and Y
   are a second START and SELECT, like the menu and registered-item buttons in the
   DS games. On AYN and Retroid devices, A and B match the labels on the buttons.
-  On-screen touch controls appear when no controller is connected.
-- **Themes** to recolor the whole app.
+  On-screen touch controls appear when no controller is connected, and hide once
+  a controller is used. Bluetooth and USB controllers (8BitDo, GameSir, Xbox, ...)
+  connect while a game is running without restarting it, and HOME / guide works
+  like a BACK tap for the companion.
+- **Themes**: PokéDaisy (the default, the website's light backdrop with floating logos) or one of eight game-coloured
+  ones (FireRed, LeafGreen, Emerald, ...) for the library and settings, in Settings > THEME.
 
 ### Library
 
@@ -142,24 +152,32 @@ shows a "not supported" notice).
 | Game                   | Version                 | Party | Bag | Battle | Map | Pokédex | Guide |
 | ---------------------- | ----------------------- | :---: | :-: | :----: | :-: | :-----: | :---: |
 | Pokémon FireRed        | USA/Europe, rev 0 and 1 |  ✅   | ✅  |   ✅   | ✅  |   ✅    |  ✅   |
+| Pokémon FireRed        | ES / DE / FR / IT / JP  |  ✅   | ✅  |   ✅   | ✅  |   ✅    |  ✅   |
 | Pokémon LeafGreen      | USA/Europe, rev 0 and 1 |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
+| Pokémon LeafGreen      | ES / FR / IT / JP       |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
 | Pokémon Emerald        | USA/Europe              |  ✅   | ✅  |   ✅   | ✅  |   ✅    |  ✅   |
-| Pokémon Ruby           | USA, rev 1 and 2        |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
-| Pokémon Sapphire       | USA, rev 1 and 2        |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
+| Pokémon Emerald        | ES / DE / FR / IT / JP  |  ✅   | ✅  |   ✅   | ✅  |   ✅    |  ✅   |
+| Pokémon Ruby           | USA, rev 0, 1 and 2     |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
+| Pokémon Ruby           | ES/DE/FR/IT/JP, rev 0-1 |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
+| Pokémon Sapphire       | USA, rev 0, 1 and 2     |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
+| Pokémon Sapphire       | ES/DE/FR/IT/JP, rev 0-1 |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
 | Pokémon Unbound        | 2.1.1.1                 |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
 | Pokémon Radical Red    | 4.1                     |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
 | Pokémon Gaia           | 3.2                     |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
 | Pokémon Odyssey        | 4.1.1                   |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
 | Pokémon Heart and Soul | 2.0.6                   |  ✅   | ✅  |   ✅   |  ◐  |   ✅    |  ✅   |
-| Pokémon Amethyst       | 1.3.0                   |  ✅   | ✅  |   —    | ✅  |   ✅    |  ✅   |
+| Pokémon Amethyst       | 1.3.0, 1.4.1            |  ✅   | ✅  |   —    | ✅  |   ✅    |  ✅   |
 | Celia's Stupid Romhack | 1.1.4                   |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
 | Pokémon Lazarus        | 2.0                     |  ✅   | ✅  |   ◐    | ✅  |   ✅    |   —   |
 | Emerald Seaglass       | 3.0                     |  ✅   | ✅  |   ◐    | ✅  |   ✅    |   —   |
 | Too Many Types 2       | 1.5.2                   |  ✅   | ✅  |   —    | ✅  |   ✅    |   —   |
 | Emerald Rogue          | 2.2.1-EX                |  ✅   | ✅  |   ✅   | ✅  |    —    |   —   |
-| Pokémon SoulGold       | 1.1.4, 1.2              |  ✅   | ✅  |   ◐    | ✅  |   ✅    |   —   |
+| Pokémon SoulGold       | 1.1.4, 1.2 (two builds) |  ✅   | ✅  |   ◐    | ✅  |   ✅    |   —   |
 | Pokémon R.O.W.E.       | 2.1.9.1 Experimental    |   —   |  —  |   —    |  —  |    —    |   —   |
+| Pokémon Yellow (GB)    | USA/Europe              |  ✅   | ✅  |   ◐    | ✅  |    —    |   —   |
 
+Game Boy / Color games play too; Pokémon Yellow is the first one the companion reads,
+in the game's own look (its font, icons and town map, rebuilt from your ROM).
 R.O.W.E. plays, but its companion is still in progress. Map ◐ means place names
 only, without the map picture. Battle ◐ means the battle panes work but haven't
 been checked in every kind of battle. The guides were

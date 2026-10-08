@@ -64,6 +64,10 @@ class FixtureMemoryReader private constructor(
 
         /** [key] must match a directory under app/src/test/resources/fixtures/
          * (and a line in scripts/roms.conf - that's where it came from). */
+        /** A dump outside the fixtures: [dir]/ewram.bin + iwram.bin (scripts/verify_ports.py's). */
+        fun fromDir(dir: java.io.File): FixtureMemoryReader =
+            FixtureMemoryReader(java.io.File(dir, "ewram.bin").readBytes(), java.io.File(dir, "iwram.bin").readBytes())
+
         fun load(key: String): FixtureMemoryReader {
             fun stream(name: String) = FixtureMemoryReader::class.java.classLoader.getResourceAsStream("fixtures/$key/$name")
             fun read(name: String): ByteArray = stream(name)?.use { it.readBytes() }

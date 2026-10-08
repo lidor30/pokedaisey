@@ -53,7 +53,7 @@ fun GbaPartySlot(
     val sheetImg = remember(sheet) { sheet?.asImageBitmap() }
     // The icon's two-frame animation, at the game's HP-based speed.
     val ticks = mon?.let { iconFrameTicks(st, it) } ?: 0
-    val iconPhase by rememberBlink(gbaFramesMs(ticks), enabled = ticks > 0, label = "party-icon")
+    val iconPhase by rememberBlink(gbaFramesMs(ticks), enabled = ticks > 0 && CompanionTweaks[CompanionTweaks.Tweak.PARTY_ICONS_MOVE], label = "party-icon")
     val phase = if (iconPhase) 1 else 0
 
     Canvas(modifier = modifier.slotClickable(sound, enabled = mon != null, onClick = onClick)) {
@@ -332,6 +332,15 @@ private class Px(
 /** Stands for the game's right-align pad character in number strings. */
 private const val NUM_PAD = '\u2007'
 
+/** The rest of charmap.txt's Western letters - the European Emeralds' names (KÜKEN, VILLA RAÍZ). */
+private val WESTERN_CODES: Map<Char, Int> = HashMap<Char, Int>().apply {
+    // From 0x01, as Gen3Text has them (É / é are mapped above).
+    "ÀÁÂÇÈÉÊËÌ ÎÏÒÓÔŒÙÚÛÑßàá çèéêëì îïòóôœùúûñºª".forEachIndexed { i, c -> if (c != ' ' && c != 'É' && c != 'é') put(c, 0x01 + i) }
+    "ÄÖÜäöü".forEachIndexed { i, c -> put(c, 0xF1 + i) }
+    put('&', 0x2D); put('+', 0x2E); put('¿', 0x51); put('¡', 0x52); put('Í', 0x5A); put('%', 0x5B)
+    put('(', 0x5C); put(')', 0x5D); put('â', 0x68); put('í', 0x6F); put(',', 0xB8)
+}
+
 /** Gen 3 character codes for FONT_SMALL; "{LV}" = the game's level glyph. */
 private fun encodeSmallFont(st: PartySlotStyle, s: String): List<Int> {
     val out = ArrayList<Int>(s.length)
@@ -356,7 +365,7 @@ private fun encodeSmallFont(st: PartySlotStyle, s: String): List<Int> {
             'É' -> 0x1B
             '♂' -> 0xB5
             '♀' -> 0xB6
-            else -> 0xAC // '?' for anything the font doesn't have
+            else -> WESTERN_CODES[c] ?: 0xAC // '?' for anything the font doesn't have
         }
         out.add(code)
         i++

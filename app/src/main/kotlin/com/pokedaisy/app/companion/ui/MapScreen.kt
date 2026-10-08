@@ -173,6 +173,9 @@ private enum class MapLabelStyle(val width: Int, val height: Int) {
     /** Gen 1 (Yellow): the name in black on a white strip over the town map's top row. */
     GEN1(128, 8);
 
+    /** The map cursor's corners: white on the GBA maps, black on Gen 1's light town map. */
+    val cursorColor: Color get() = if (this == GEN1) Color(0xFF181818) else Color.White
+
     /** The player's 16x16 head on the map (regionmap/player_*.png, from the ROM by RomArt). */
     fun headAsset(gender: Int): String = when (this) {
         FIRERED -> if (gender == 1) "player_leaf" else "player_red"
@@ -218,7 +221,7 @@ private fun RegionMap(
     // FireRed's region-map cursor (graphics/region_map/cursor.png) swaps
     // between its two frames every 20 game frames. Read only while drawing,
     // so a swap redraws the map without recomposing it.
-    val bigCursor = rememberBlink(CURSOR_FRAME_MS, label = "map-cursor")
+    val bigCursor = rememberBlink(CURSOR_FRAME_MS, enabled = CompanionTweaks[CompanionTweaks.Tweak.MAP_CURSOR_BLINK], label = "map-cursor")
 
     val image = remember(bitmap) { bitmap.asImageBitmap() }
     val headImage = remember(head) { head?.asImageBitmap() }
@@ -282,6 +285,7 @@ private fun RegionMap(
                     sx = sx,
                     sy = sy,
                     big = bigCursor.value,
+                    color = style.cursorColor,
                 )
             }
         }
@@ -486,14 +490,14 @@ private val FR_SHADOW = Color(0xFF636363)
  * long, 2 pixels out from it, or 3 on the [big] frame - as the cursor sprite
  * draws them around its tile. [sx]/[sy] are screen pixels per map pixel.
  */
-private fun DrawScope.drawMapCursor(left: Int, top: Int, right: Int, bottom: Int, sx: Float, sy: Float, big: Boolean) {
+private fun DrawScope.drawMapCursor(left: Int, top: Int, right: Int, bottom: Int, sx: Float, sy: Float, big: Boolean, color: Color = Color.White) {
     val out = if (big) 3 else 2
     val x0 = left - out
     val y0 = top - out
     val x1 = right + out
     val y1 = bottom + out
     fun px(x: Int, y: Int, w: Int, h: Int) =
-        drawRect(Color.White, Offset(x * sx, y * sy), Size(w * sx, h * sy))
+        drawRect(color, Offset(x * sx, y * sy), Size(w * sx, h * sy))
     for ((cx, cy) in listOf(x0 to y0, x1 - CURSOR_ARM to y0, x0 to y1 - CURSOR_ARM, x1 - CURSOR_ARM to y1 - CURSOR_ARM)) {
         // Each corner: a 5x2 bar on the box's edge row and a 2x5 one on its edge column.
         val barY = if (cy == y0) y0 else y1 - CURSOR_THICK

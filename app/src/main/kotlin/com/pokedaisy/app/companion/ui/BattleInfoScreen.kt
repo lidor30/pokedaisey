@@ -44,6 +44,7 @@ import com.pokedaisy.app.companion.data.typeIdOf
 import com.pokedaisy.app.companion.data.typeMultiplierPct
 import com.pokedaisy.app.companion.i18n.tk
 import com.pokedaisy.app.companion.i18n.tr
+import com.pokedaisy.app.companion.ui.theme.LocalGameFont
 import com.pokedaisy.app.companion.ui.theme.QolColors
 import com.pokedaisy.app.companion.ui.theme.pixelFontFamily
 
@@ -92,8 +93,9 @@ fun BattleInfoScreen(
     onSelectFoe: (Int) -> Unit = {},
     onShowStats: (() -> Unit)? = null,
 ) {
-    val m = rememberGbaTextMetrics()
-    val small = rememberGbaTextMetrics(1f)
+    // Sized to fit a whole battle: a game font keeps Pixel Operator's metrics here.
+    val m = rememberGbaTextMetrics(gameScaled = false)
+    val small = rememberGbaTextMetrics(1f, gameScaled = false)
     val gap = m.u * 3
     SummaryFrame(
         m, onBack, modifier,
@@ -238,12 +240,19 @@ internal fun BattleMoveRow(mv: MoveView?, showHints: Boolean, foeCount: Int, m: 
         if (mv == null) {
             GbaText("—", OptionColors.muted, OptionColors.mutedShadow, small, modifier = Modifier.align(Alignment.CenterStart))
         } else Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceEvenly) {
+            // A fixed-width game font (Gen 1's 8px letters: THUNDERBOLT is 11 of them) gets
+            // the whole line for the name; the verdict moves down beside the type.
+            val wideFont = LocalGameFont.current != null
             Row(verticalAlignment = Alignment.CenterVertically) {
                 GbaText(mv.name, OptionColors.label, OptionColors.labelShadow, m, Modifier.weight(1f))
-                if (showHints && foeCount <= 1) MoveVerdict(mv, foeCount)
+                if (!wideFont && showHints && foeCount <= 1) MoveVerdict(mv, foeCount)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TypeBadge(mv.type)
+                if (wideFont && showHints && foeCount <= 1) {
+                    Spacer(Modifier.width(u * 4))
+                    MoveVerdict(mv, foeCount, short = true)
+                }
                 Spacer(Modifier.weight(1f))
                 Stat(tr("PWR"), powerLabel(mv.power), small)
                 Spacer(Modifier.width(u * 6))
@@ -258,14 +267,16 @@ internal fun BattleMoveRow(mv: MoveView?, showHints: Boolean, foeCount: Int, m: 
 /** How [mv] fares: one plain-words pill against a single foe, a "NAME 2x"
  * chip per foe in a double battle. Status moves ignore the type chart. */
 @Composable
-private fun MoveVerdict(mv: MoveView, foeCount: Int) {
+private fun MoveVerdict(mv: MoveView, foeCount: Int, short: Boolean = false) {
     when {
         mv.pp == 0 -> VerdictPill(tr("NO PP"), VerdictGrey)
-        mv.power == 0 -> VerdictPill(tr("STATUS"), VerdictGrey)
+        mv.power == 0 -> if (!short) VerdictPill(tr("STATUS"), VerdictGrey)   // short: its "PWR -" says it
         mv.vs.isEmpty() -> {}
         foeCount > 1 || mv.vs.size > 1 -> Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             mv.vs.forEach { v -> VerdictPill("${v.vsName} ${v.label}", verdictColor(v.pct)) }
         }
+        // Just the multiplier, where the line is short (its colour still says which).
+        short -> mv.vs[0].let { v -> VerdictPill(v.label, verdictColor(v.pct)) }
         else -> mv.vs[0].let { v ->
             val words = when {
                 v.pct == 0 -> tr("IMMUNE {0}", v.label)

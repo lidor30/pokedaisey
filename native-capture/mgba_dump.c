@@ -31,6 +31,18 @@
 //   shot FILE          - write the current frame to FILE as a binary PPM (P6) -
 //                        no PNG dependency; `python3 -c 'from PIL import Image;
 //                        Image.open("x.ppm").save("x.png")'` converts it
+//   cheat TYPE CODE    - add a cheat (TYPE auto/cb/gs/ar, CODE's lines joined by
+//                        '+') and load the list into the core the way the app
+//                        does (app/src/main/cpp/pk_cheats.c, compiled in below)
+//   cheatclear         - take every cheat out again
+//   gbpark SPIN        - GB: park the main loop on SPIN (a `jr @`) once interrupts are on
+//                        (the app's pkRenderGbPark)
+//   gbcall FN A C RET  - GB: call FN with A / C until it returns to RET (pkRenderGbCall)
+//   gbloop N           - GB: run N frames and report where Gen 1's music channel state
+//                        (Gen1LoopWatch: Yellow's addresses) first repeats
+//   romcheck ROMFILE   - compare the ROM as the companion reads it (bus +
+//                        pk_cheats_overlay) and as RA hashes it (swapped) with
+//                        the file
 //
 // Usage: mgba_dump <rom.gba> [save.sav] < commands.txt
 
@@ -44,11 +56,25 @@
 #include <stdarg.h>
 
 #include <mgba/core/core.h>
+#include <mgba/core/config.h>
 #include <mgba/core/blip_buf.h>
 #include <mgba/core/log.h>
 #include <mgba-util/vfs.h>
 #include <mgba/internal/arm/arm.h>
 #include <mgba/internal/arm/isa-inlines.h>
+#include <mgba/internal/gb/gb.h>
+#include <mgba/internal/gb/io.h>
+#include <mgba/internal/sm83/sm83.h>
+
+// The app's own cheat code, so `cheat` tests exactly what ships - when the
+// repo is there to compile it from (the capture scripts mount native-capture/
+// alone; mount the repo root and build from native-capture/ to get it).
+#if defined(__has_include)
+#if __has_include("../app/src/main/cpp/pk_cheats.c")
+#include "../app/src/main/cpp/pk_cheats.c"
+#define HAVE_PK_CHEATS 1
+#endif
+#endif
 
 // GBA key bit positions (GBA_KEY_* in mgba/gba/input.h) — kept local, same
 // as pokedaisy_jni.c, so this file doesn't depend on the GBA-specific
@@ -215,6 +241,78 @@ static void cmdVdump(const char* outDir) {
 // instruction with IRQs masked until the call returns to SENTINEL, an address
 // in the ROM header that is never executed. Mirrors pokedaisy_jni.c's pk_call.
 #define PK_CALL_SENTINEL 0x080000C0u
+
+// --- Game Boy: the app's pkRenderGbPark / pkRenderGbCall, for Gen 1's music ---
+static bool gb_park(struct mCore* core, uint16_t spin) {
+    struct GB* gb = (struct GB*) core->board;
+    struct SM83Core* cpu = (struct SM83Core*) core->cpu;
+    for (int i = 0; i < 5000000; i++) {
+        core->step(core);
+        if (gb->memory.ime && (gb->memory.ie & 1) && (gb->memory.io[GB_REG_LCDC] & 0x80) && !cpu->halted && !cpu->irqPending) {
+            cpu->pc = spin;
+            cpu->memory.setActiveRegion(cpu, cpu->pc);
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool gb_call(struct mCore* core, uint16_t fn, uint8_t a, uint8_t c, uint16_t ret) {
+    struct GB* gb = (struct GB*) core->board;
+    struct SM83Core* cpu = (struct SM83Core*) core->cpu;
+    bool ime = gb->memory.ime, pending = cpu->irqPending;
+    gb->memory.ime = false;
+    cpu->irqPending = false;
+    cpu->sp -= 2;
+    core->busWrite8(core, cpu->sp, ret & 0xFF);
+    core->busWrite8(core, (uint16_t) (cpu->sp + 1), ret >> 8);
+    cpu->a = a;
+    cpu->c = c;
+    cpu->halted = false;
+    cpu->pc = fn;
+    cpu->memory.setActiveRegion(cpu, cpu->pc);
+    bool ok = false;
+    for (int i = 0; i < 2000000 && !ok; i++) {
+        core->step(core);
+        ok = cpu->pc == ret;
+    }
+    gb->memory.ime = ime;
+    cpu->irqPending = pending;
+    return ok;
+}
+
+// Gen1LoopWatch's state: Yellow's wChannelCommandPointers, ReturnAddresses (CHAN1-4),
+// SoundIDs, NoteDelayCounters, LoopCounters.
+static void gb_music_state(struct mCore* core, uint8_t* out) {
+    static const struct { uint16_t a; int n; } R[] = {{0xC006, 8}, {0xC016, 8}, {0xC026, 4}, {0xC0B6, 4}, {0xC0BE, 4}};
+    int k = 0;
+    for (int r = 0; r < 5; r++) for (int i = 0; i < R[r].n; i++) out[k++] = core->busRead8(core, R[r].a + i);
+}
+
+static void gb_loop(struct mCore* core, int frames) {
+    enum { W = 28 };
+    uint8_t* states = malloc((size_t) frames * W);
+    int still = 0;
+    for (int f = 0; f < frames; f++) {
+        core->runFrame(core);
+        uint8_t* st = states + (size_t) f * W;
+        gb_music_state(core, st);
+        if (f > 0 && !memcmp(st, st - W, W)) {
+            if (++still >= 90) { printf("gbloop: still from frame %d - ended\n", f - 90); free(states); return; }
+        } else still = 0;
+        for (int g = 0; g <= f - 120; g++) {
+            if (!memcmp(states + (size_t) g * W, st, W)) {
+                printf("gbloop: state after frame %d repeats after frame %d: loop [%d, %d), %.2f s, intro %.2f s\n",
+                       g, f, g + 1, f + 1, (f - g) / 59.7275, (g + 1) / 59.7275);
+                free(states);
+                return;
+            }
+        }
+    }
+    printf("gbloop: no repeat in %d frames\n", frames);
+    free(states);
+}
+
 static bool pk_call(struct mCore* core, uint32_t fn, uint32_t arg0, uint32_t arg1) {
     struct ARMCore* cpu = (struct ARMCore*) core->cpu;
     struct ARMRegisterFile saved = cpu->regs;
@@ -270,6 +368,85 @@ static bool pk_park(struct mCore* core, uint32_t spin) {
     return false;
 }
 
+#ifdef HAVE_PK_CHEATS
+// `cheat`: the cheats added so far as one mGBA .cheats text, rebuilt into the
+// core on every change - what CheatStore + pkCheatsApply do in the app.
+static char cheatText[16384];
+
+static int cheatTypeFor(const char* name) {
+    if (!strcmp(name, "cb")) return PK_CHEAT_CODEBREAKER;
+    if (!strcmp(name, "gs")) return PK_CHEAT_GAMESHARK;
+    if (!strcmp(name, "ar")) return PK_CHEAT_ACTION_REPLAY;
+    return PK_CHEAT_AUTO;
+}
+
+static void cmdCheat(const char* type, const char* code) {
+    char lines[1024];
+    snprintf(lines, sizeof(lines), "%s", code);
+    for (char* c = lines; *c; c++) {
+        if (*c == '+') *c = '\n';
+    }
+    char* check = pk_cheats_check(lines, cheatTypeFor(type), "");
+    if (!check) {
+        printf("cheat: check failed\n");
+        return;
+    }
+    char* nl = strchr(check, '\n');
+    *nl = '\0';
+    printf("cheat %s: directive '%s', lines ok %s\n", type, check, nl + 1);
+    size_t len = strlen(cheatText);
+    len += snprintf(cheatText + len, sizeof(cheatText) - len, "!reset\n");
+    if (check[0]) {
+        len += snprintf(cheatText + len, sizeof(cheatText) - len, "!%s\n", check);
+    }
+    snprintf(cheatText + len, sizeof(cheatText) - len, "# %s\n%s\n", code, lines);
+    free(check);
+    printf("cheat: %d set(s) loaded, rom patched: %s\n",
+           pk_cheats_apply(core, cheatText, strlen(cheatText)), pk_cheats_rom_patched() ? "yes" : "no");
+}
+
+static int romDiffs(const uint8_t* file, size_t size, bool overlay) {
+    int diffs = 0;
+    uint8_t buf[4096];
+    for (size_t off = 0; off < size; off += sizeof(buf)) {
+        int n = size - off < sizeof(buf) ? (int) (size - off) : (int) sizeof(buf);
+        for (int i = 0; i < n; i++) buf[i] = (uint8_t) core->busRead8(core, 0x08000000u + off + i);
+        if (overlay) pk_cheats_overlay(0x08000000u + off, buf, n);
+        for (int i = 0; i < n; i++) {
+            // The RTC's GPIO registers read back live (Poller's GPIO hole).
+            uint32_t a = off + i;
+            if (a >= 0xC4 && a < 0xCA) continue;
+            if (buf[i] != file[a]) {
+                if (diffs < 4) printf("  %08x: bus %02x file %02x\n", 0x08000000u + a, buf[i], file[a]);
+                diffs++;
+            }
+        }
+    }
+    return diffs;
+}
+
+static void cmdRomCheck(const char* path) {
+    FILE* f = fopen(path, "rb");
+    if (!f) {
+        printf("romcheck: cannot open %s\n", path);
+        return;
+    }
+    fseek(f, 0, SEEK_END);
+    size_t size = (size_t) ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t* file = malloc(size);
+    if (fread(file, 1, size, f) != size) size = 0;
+    fclose(f);
+    printf("romcheck raw bus: %d byte(s) differ\n", romDiffs(file, size, false));
+    printf("romcheck overlay: %d byte(s) differ\n", romDiffs(file, size, true));
+    pk_cheats_swap_rom(core);
+    printf("romcheck swapped: %d byte(s) differ\n", romDiffs(file, size, false));
+    pk_cheats_swap_rom(core);
+    printf("romcheck swapped back: %d byte(s) differ\n", romDiffs(file, size, false));
+    free(file);
+}
+#endif
+
 int main(int argc, char** argv) {
     bool verbose = false;
     const char* args[8];
@@ -306,6 +483,11 @@ int main(int argc, char** argv) {
         return 1;
     }
     mCoreInitConfig(core, NULL);
+    if (core->platform(core) == mPLATFORM_GB) {
+        // As the app (pokedaisy_jni.c's pk_gb_config): no SGB border, the 160x144 screen.
+        mCoreConfigSetIntValue(&core->config, "sgb.borders", 0);
+        core->reloadConfigOption(core, "sgb.borders", &core->config);
+    }
 
     unsigned w, h;
     core->desiredVideoDimensions(core, &w, &h);
@@ -404,6 +586,18 @@ int main(int argc, char** argv) {
             char a[64] = {0};
             sscanf(line, "%*s %63s", a);
             printf("park %s: %s\n", a, pk_park(core, (uint32_t) strtoul(a, NULL, 0)) ? "parked" : "FAILED");
+        } else if (!strcmp(cmd, "gbpark")) {
+            char a[64] = {0};
+            sscanf(line, "%*s %63s", a);
+            printf("gbpark %s: %s\n", a, gb_park(core, (uint16_t) strtoul(a, NULL, 0)) ? "parked" : "FAILED");
+        } else if (!strcmp(cmd, "gbcall")) {
+            char f[64] = {0}, a[64] = {0}, c[64] = {0}, r[64] = {0};
+            sscanf(line, "%*s %63s %63s %63s %63s", f, a, c, r);
+            bool ok = gb_call(core, (uint16_t) strtoul(f, NULL, 0), (uint8_t) strtoul(a, NULL, 0), (uint8_t) strtoul(c, NULL, 0), (uint16_t) strtoul(r, NULL, 0));
+            printf("gbcall %s(a=%s, c=%s): %s\n", f, a, c, ok ? "returned" : "DID NOT RETURN");
+        } else if (!strcmp(cmd, "gbloop")) {
+            sscanf(line, "%*s %d", &n);
+            gb_loop(core, n);
         } else if (!strcmp(cmd, "peek32")) {
             char a[64] = {0};
             sscanf(line, "%*s %63s", a);
@@ -419,6 +613,19 @@ int main(int argc, char** argv) {
         } else if (!strcmp(cmd, "wav")) {
             sscanf(line, "%*s %255s %d", arg1, &n);
             cmdWav(arg1, n);
+#ifdef HAVE_PK_CHEATS
+        } else if (!strcmp(cmd, "cheat")) {
+            char t[16] = {0};
+            sscanf(line, "%*s %15s %255[^\n]", t, arg1);
+            cmdCheat(t, arg1);
+        } else if (!strcmp(cmd, "cheatclear")) {
+            cheatText[0] = '\0';
+            pk_cheats_clear(core);
+            printf("cheatclear: rom patched: %s\n", pk_cheats_rom_patched() ? "yes" : "no");
+        } else if (!strcmp(cmd, "romcheck")) {
+            sscanf(line, "%*s %255[^\n]", arg1);
+            cmdRomCheck(arg1);
+#endif
         } else if (!strcmp(cmd, "shot")) {
             sscanf(line, "%*s %255s", arg1);
             cmdShot(arg1);

@@ -33,12 +33,18 @@ import com.pokedaisy.app.Hotkeys
 import com.pokedaisy.app.companion.COMPANION_TABS
 import com.pokedaisy.app.companion.CompanionSettings
 import com.pokedaisy.app.companion.FfMode
-import com.pokedaisy.app.companion.ScreenFilter
+import com.pokedaisy.app.companion.hasGrid
+import com.pokedaisy.app.companion.next
 import com.pokedaisy.app.companion.FfMusicMode
 import com.pokedaisy.app.companion.MAX_BAR_TABS
 
 private val FF_RATES = floatArrayOf(0f, 2f, 3f, 4f, 5f, 6f, 8f, 10f)
 private val TOUCH_NAMES = listOf(tk("AUTO"), tk("ALWAYS"), tk("NEVER"))
+
+/** SETTINGS > STATUS BAR's choices: off, over the game, over the companion's tabs. */
+internal val STATUS_BAR_PLACES = listOf(tk("OFF"), tk("GAME"), tk("COMPANION"))
+
+internal fun statusBarLabel(on: Boolean, onCompanion: Boolean) = STATUS_BAR_PLACES[if (!on) 0 else if (onCompanion) 2 else 1]
 
 // Names selectable in the tap-a-name rebind picker — every entry must resolve
 // via KeyEvent.keyCodeFromString("KEYCODE_" + name), i.e. match the suffix of
@@ -56,7 +62,7 @@ private val PICKABLE_KEYS = listOf(
     "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
 )
 
-private enum class Page(val title: String) { HOME(tk("OPTION")), TABS(tk("TAB BAR")), BUTTONS(tk("GAME BUTTONS")), HOTKEYS(tk("HOTKEYS")), SHADERS(tk("SHADERS")) }
+internal enum class Page(val title: String) { HOME(tk("SETTINGS")), TABS(tk("TAB BAR")), BUTTONS(tk("GAME BUTTONS")), HOTKEYS(tk("HOTKEYS")), SHADERS(tk("SHADERS")), CHEATS(tk("CHEATS")), TWEAKS(tk("TWEAKS")) }
 
 /**
  * The bottom-screen SETTINGS tab, laid out like FireRed's OPTION screen over
@@ -85,13 +91,24 @@ fun CompanionSettingsScreen(
     barChips: Int = MAX_BAR_TABS,
     onOpenTab: (String) -> Unit = {},
     onTabsChanged: (List<String>) -> Unit = {},
+    /** A sub-page to open on (a [Page] name, "CHEATS") - for screenshot tests. */
+    initialPage: String? = null,
+    /** Where SETTINGS was (page, row, scroll), held by CompanionScreen so another tab and back keeps it. */
+    ui: SettingsUiState = remember { SettingsUiState(initialPage) },
+    /** The game's status bar is drawn over the companion's tabs (it shows the game and battery). */
+    statusBarShown: Boolean = false,
 ) {
     val m = rememberGbaTextMetrics()
-    var page by remember { mutableStateOf(Page.HOME) }
+    var page by ui::page
     // Settings aren't Compose state: bump this after each change to redraw the values.
     var tick by remember { mutableStateOf(0) }
-    // HOME starts with a group title, so its first row is index 1.
-    var cursor by remember(page) { mutableStateOf(if (page == Page.HOME) 1 else 0) }
+    // HOME starts with a group title, so its first row is index 1. HOME's cursor and
+    // scroll outlive its sub-pages: coming back lands on the row that opened one.
+    var homeCursor by ui::homeCursor
+    var pageCursor by remember(page) { mutableStateOf(0) }
+    val cursor = if (page == Page.HOME) homeCursor else pageCursor
+    fun moveCursor(i: Int) { if (page == Page.HOME) homeCursor = i else pageCursor = i }
+    val homeScroll = ui.homeScroll
     var picking by remember { mutableStateOf<Pair<String, (String) -> Unit>?>(null) }
     var confirm by remember { mutableStateOf<Confirm?>(null) }
     var selector by remember { mutableStateOf<Selector?>(null) }
@@ -100,13 +117,24 @@ fun CompanionSettingsScreen(
     val gameName = settings?.gameName?.uppercase()?.replace('É', 'é') ?: ""
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            val trailing = if (page == Page.TABS && settings != null) "${barCount(settings, availableTabs)}/$MAX_BAR_TABS" else gameName.ifEmpty { null }
-            // A sub-page's arrow (and BACK, through it) returns to the options.
-            OptionTitleWindow(page.title, m, trailing = trailing, onBack = if (page != Page.HOME) ({ page = Page.HOME }) else null) {
-                Spacer(Modifier.width(m.u * 8))
-                BatteryIndicator(m)
+            // With the status bar over the tabs (STATUS BAR > COMPANION) it already shows the game and
+            // the battery: HOME drops its title window, a sub-page keeps just its name and back arrow.
+            val trailing = when {
+                page == Page.TABS && settings != null -> "${barCount(settings, availableTabs)}/$MAX_BAR_TABS"
+                statusBarShown -> null
+                else -> gameName.ifEmpty { null }
             }
-            Spacer(Modifier.height(m.u * 4))
+            if (!(statusBarShown && page == Page.HOME)) {
+                // A sub-page's arrow (and BACK, through it) returns to the options.
+                val titleM = rememberGbaTextMetrics()
+                OptionTitleWindow(page.title, titleM, trailing = trailing, onBack = if (page != Page.HOME) ({ page = Page.HOME }) else null) {
+                    if (!statusBarShown) {
+                        Spacer(Modifier.width(titleM.u * 8))
+                        BatteryIndicator(titleM)
+                    }
+                }
+                Spacer(Modifier.height(m.u * 4))
+            }
             val rows = remember(settings, page, tick, hiddenTabs, availableTabs) {
                 if (settings == null) return@remember listOf(SettingRow(tk("NO GAME RUNNING"), null) {})
                 when (page) {
@@ -146,39 +174,66 @@ fun CompanionSettingsScreen(
                             picking = title to { name -> settings.setHotkeyBinding(action, name); tick++ }
                         }
                     } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
-                    Page.SHADERS -> shaderRows(settings, { tick++ }, { selector = it }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
+                    Page.SHADERS -> shaderRows(settings) { tick++ } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
+                    Page.CHEATS -> cheatRows(settings) { tick++ } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
+                    // Small preferences, each on by default (CompanionTweaks).
+                    Page.TWEAKS -> CompanionTweaks.Tweak.entries.map { t ->
+                        SettingRow(t.label, if (CompanionTweaks[t]) tk("ON") else tk("OFF")) {
+                            CompanionTweaks[t] = !CompanionTweaks[t]
+                            settings.setTweak(t.key, CompanionTweaks[t])
+                            tick++
+                        }
+                    } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                 }
             }
             OptionListWindow(m, Modifier.fillMaxWidth().weight(1f)) {
                 // Rows share out the window's height (big touch targets) down
                 // to a floor, past which the list scrolls instead.
-                if (rows.any { it.header }) {
-                    GroupedRows(rows, m, cursor, onClick = { i -> cursor = i; rows[i].onClick() }) {
+                // SHADERS too: OptionRows shares the window out, so its 4 rows came out taller than SETTINGS'.
+                if (rows.any { it.header } || page == Page.SHADERS) {
+                    GroupedRows(rows, m, cursor, onClick = { i -> moveCursor(i); rows[i].onClick() }, scroll = if (page == Page.HOME) homeScroll else rememberScrollState()) {
                         // Actions, not settings: the list's last line, out of the way of the options.
                         if (page == Page.HOME && settings != null) {
                             // A summary-window line sets them apart from the last group.
                             Separator(m, Modifier.fillMaxWidth().padding(start = m.u * 4, end = m.u * 4, top = m.u * 8))
+                            // Room around them, so they don't read as one more row of the list.
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(m.u * 4),
-                                modifier = Modifier.padding(start = m.u * 4, end = m.u * 4, top = m.u * 6, bottom = m.u * 4),
+                                horizontalArrangement = Arrangement.spacedBy(m.u * 8),
+                                modifier = Modifier.padding(start = m.u * 10, end = m.u * 10, top = m.u * 10, bottom = if (settings.canCloseCompanion) m.u * 8 else m.u * 10),
                             ) {
                                 OptionButton(tk("CLOSE GAME"), m, modifier = Modifier.weight(1f), onClick = {
-                                    confirm = Confirm(tk("CLOSE GAME?"), tr("Returns to the ROM list. Progress is saved automatically."), tk("CLOSE"), settings::closeGame)
+                                    confirm = Confirm(
+                                        tk("CLOSE GAME?"),
+                                        if (settings.autoResume) tr("Returns to the ROM list. Progress is saved automatically.")
+                                        else tr("Returns to the ROM list. RESUME GAMES is off: progress since your last in-game save will be lost."),
+                                        tk("CLOSE"), settings::closeGame,
+                                    )
                                 })
                                 OptionButton(tk("RESTART GAME"), m, emphasis = true, modifier = Modifier.weight(1f), onClick = {
                                     confirm = Confirm(
                                         tk("RESTART GAME?"),
-                                        tr("Reboots the game and reloads its save from disk. Unsaved progress is lost."),
+                                        if (settings.autoResume) tr("Reboots the game and reloads its save from disk. Unsaved progress is lost.")
+                                        else tr("Reboots the game and reloads its save from disk. Progress since your last in-game save will be lost."),
                                         tk("RESTART"), settings::restartGame,
                                     )
                                 })
+                            }
+                            // Its screen for other apps while the game keeps running; BACK on the game reopens it.
+                            if (settings.canCloseCompanion) {
+                                OptionButton(
+                                    tk("CLOSE COMPANION"), m,
+                                    modifier = Modifier.fillMaxWidth().padding(start = m.u * 10, end = m.u * 10, bottom = m.u * 10),
+                                    onClick = settings::closeCompanion,
+                                )
                             }
                         }
                     }
                 } else {
                     OptionRows(
-                        rows.mapIndexed { i, row -> Triple(row.label, row.value) { cursor = i; row.onClick() } },
+                        rows.mapIndexed { i, row -> Triple(row.label, row.value) { moveCursor(i); row.onClick() } },
                         m, Modifier.fillMaxSize(), selected = cursor, minRow = m.rowHeight * 1.2f,
+                        // Cheat names are the player's own, often long: more room before ON / OFF.
+                        labelWeight = if (page == Page.CHEATS) 0.75f else 0.58f,
                         valueBadge = { rows[it].badge },
                         enabled = { rows[it].enabled },
                     )
@@ -225,6 +280,17 @@ fun CompanionSettingsScreen(
             )
         }
     }
+}
+
+/**
+ * SETTINGS' place - the page, HOME's highlighted row and its scroll - kept outside the tab
+ * (CompanionScreen remembers it), so a visit to MAP and back lands where the player was.
+ */
+class SettingsUiState(initialPage: String? = null) {
+    internal var page by mutableStateOf(Page.entries.firstOrNull { it.name == initialPage } ?: Page.HOME)
+    // HOME starts with a group title, so its first row is index 1.
+    internal var homeCursor by mutableStateOf(1)
+    internal val homeScroll = androidx.compose.foundation.ScrollState(0)
 }
 
 /** How many chips the player's pick puts in this game's tab bar. */
@@ -295,6 +361,8 @@ private fun homeRows(
             })
         },
         SettingRow(tk("TAB BAR"), tr("{0} TABS", barTabs)) { navigate(Page.TABS) },
+        // Small on / off preferences: the icons' bounce, the map cursor's blink, tab slides, the battle jump.
+        SettingRow(tk("TWEAKS"), null) { navigate(Page.TWEAKS) },
         // Move effectiveness and the foe's weak-to/resists during battle.
         SettingRow(tk("BATTLE HINTS"), onOff(s.showHints)) { s.setShowHints(!s.showHints); changed() },
         // A STATS page in battle INFO with the foe's IVs / EVs / nature.
@@ -302,29 +370,73 @@ private fun homeRows(
         // The game's menu click on every companion button.
         SettingRow(tk("CLICK SOUND"), onOff(s.clickSound)) { s.setClickSound(!s.clickSound); changed() },
         groupTitle(tk("SCREEN")),
-        // Game, location, money, clock and battery above the game.
-        SettingRow(tk("STATUS BAR"), onOff(s.statusBar)) { s.setStatusBar(!s.statusBar); changed() },
+        // Game, location, money, clock and battery: OFF, over the game, or over these tabs.
+        SettingRow(tk("STATUS BAR"), statusBarLabel(s.statusBar, s.statusBarOnCompanion)) {
+            select(Selector(tk("STATUS BAR"), STATUS_BAR_PLACES, statusBarLabel(s.statusBar, s.statusBarOnCompanion)) {
+                val i = STATUS_BAR_PLACES.indexOf(it)
+                if (i > 0) s.setStatusBarOnCompanion(i == 2)
+                s.setStatusBar(i > 0)
+            })
+        },
         // The game at the GBA's 3:2, or stretched to fill the top screen; flips in place.
         SettingRow(tk("ASPECT"), aspectLabel(s.stretchGame)) { s.setStretchGame(!s.stretchGame); changed() },
-        // FILTER (LCD / SCANLINES / CRT) and GBA COLORS, on their own page.
+        // FILTER (LCD / LCD PAPER / SCANLINES / CRT) and GBA COLORS, on their own page.
         SettingRow(tk("SHADERS"), s.screenFilter.label) { navigate(Page.SHADERS) },
+        // A phone upright: the companion along the screen's bottom, or right under the game (the touch pad below it).
+        s.portraitUnderGame?.let { under ->
+            SettingRow(tk("COMPANION"), portraitPlaceLabel(under)) { s.setPortraitUnderGame(!under); changed() }
+        },
         // Game and companion trade screens (this companion moves with them).
         SettingRow(tk("SWAP SCREENS"), onOff(s.swapScreens)) { s.setSwapScreens(!s.swapScreens); changed() }
             .takeIf { s.hasSecondScreen },
+        groupTitle(tk("GAME")),
+        // This game's cheats on / off (the codes are typed or imported in the top screen's Settings).
+        SettingRow(tk("CHEATS"), cheatsValue(s)) { navigate(Page.CHEATS) },
     )
+}
+
+/** CHEATS' value on the options: OFF, or how many of this game's cheats are on. */
+private fun cheatsValue(s: CompanionSettings): String =
+    if (!s.cheatsEnabled) tk("OFF") else tr("{0} ON", s.cheats.count { it.enabled })
+
+/**
+ * CHEATS: the master switch, then one row per cheat of this game, each flipping
+ * live (the game loads it on the next frame). Adding codes needs a keyboard, so
+ * that's the top screen's Settings > CHEATS; with none yet, this page says so.
+ */
+private fun cheatRows(s: CompanionSettings, changed: () -> Unit): List<SettingRow> {
+    fun onOff(on: Boolean) = if (on) tk("ON") else tk("OFF")
+    val master = s.cheatsEnabled
+    val cheats = s.cheats
+    return listOf(SettingRow(tk("CHEATS"), onOff(master)) { s.setCheatsEnabled(!master); changed() }) +
+        if (cheats.isEmpty()) {
+            listOf(
+                SettingRow(tk("NO CHEATS FOR THIS GAME"), null, enabled = false) {},
+                SettingRow(tk("ADD THEM IN SETTINGS ON THE TOP SCREEN"), null, enabled = false) {},
+            )
+        } else {
+            // Greyed out with the master switch off, like HOTKEYS' binds.
+            cheats.mapIndexed { i, c ->
+                SettingRow(c.name, onOff(c.enabled), enabled = master) { s.setCheatEnabled(i, !c.enabled); changed() }
+            }
+        }
 }
 
 
 /** SHADERS: what the game is drawn through - flips live, the game shows it at once. */
-private fun shaderRows(s: CompanionSettings, changed: () -> Unit, select: (Selector) -> Unit): List<SettingRow> {
-    val filters = ScreenFilter.entries
+private fun shaderRows(s: CompanionSettings, changed: () -> Unit): List<SettingRow> {
     return listOf(
-        // NONE / LCD grid / SCANLINES / CRT.
-        SettingRow(tk("FILTER"), s.screenFilter.label) {
-            select(Selector(tk("FILTER"), filters.map { it.label }, s.screenFilter.label) { l -> s.setScreenFilter(filters.first { it.label == l }) })
+        // NONE / LCD grid / LCD PAPER / SCANLINES / CRT.
+        // Each tap steps to the next filter, so the game shows each look in turn.
+        SettingRow(tk("FILTER"), s.screenFilter.label) { s.setScreenFilter(s.screenFilter.next()); changed() },
+        // SOFT / MEDIUM / STRONG, cycling too; greyed out for a filter with no grid.
+        SettingRow(tk("GRID"), s.gridStrength.label, enabled = s.screenFilter.hasGrid) {
+            if (s.screenFilter.hasGrid) { s.setGridStrength(s.gridStrength.next()); changed() }
         },
         // The colours as the GBA's own LCD showed them; stacks with any filter.
         SettingRow(tk("GBA COLORS"), if (s.gbaColors) tk("ON") else tk("OFF")) { s.setGbaColors(!s.gbaColors); changed() },
+        // FILTER and GBA COLORS over this screen too (and the status bar).
+        SettingRow(tk("ON COMPANION"), if (s.companionShaders) tk("ON") else tk("OFF")) { s.setCompanionShaders(!s.companionShaders); changed() },
     )
 }
 

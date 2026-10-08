@@ -1,0 +1,15 @@
+{
+  "name": "pokedaisy-website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "test": "node --test test/*.test.js",
+    "cover": "astro build && node scripts/cover.mjs"
+  },
+  "dependencies": {
+    "astro": "^7.3.7"
+  }
+}

@@ -39,7 +39,8 @@ private val natureNames = listOf(
     "Calm", "Gentle", "Sassy", "Careful", "Quirky",
 )
 
-fun natureName(nature: Int): String = gameCase(natureNames.getOrElse(nature) { "?" })
+fun natureName(nature: Int): String =
+    localText?.natures?.getOrNull(nature) ?: gameCase(natureNames.getOrElse(nature) { "?" })
 
 // gNatureStatTable: nature / 5 is the raised stat, nature % 5 the lowered one,
 // counting ATTACK, DEFENSE, SPEED, SP. ATK, SP. DEF; equal = neutral.

@@ -56,6 +56,7 @@ val itemDescriptionsSeaglass: Map<Int, String> = mapOf(
     50 to "Fully restores the PP of a selected move.",
     51 to "Restores the PP of all moves by 10.",
     52 to "Fully restores the PP of a Pokémon's moves.",
+    53 to "A 100% pure juice that restores HP by 20 points.",
     54 to "Fully revives and restores all fainted Pokémon.",
     55 to "A sweet chocolate that restores HP by 20 points.",
     56 to "Revives a fainted Pokémon with all its HP.",

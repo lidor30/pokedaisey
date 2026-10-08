@@ -51,6 +51,12 @@ class RomRegionMapTest {
         assertEquals(1, m.sections[0x99]!!.region)
     }
 
+    @Test fun amethystV141KeepsSeviiScreens() {
+        val m = read("Pokemon Amethyst (v1.4.1).gba")
+        assertEquals(0, m.sections[0x98]!!.region)
+        assertEquals(1, m.sections[0x99]!!.region)
+    }
+
     @Test fun gaiaIsOneMap() {
         val m = read("Pokemon - Gaia (v3.2).gba")
         assertEquals(setOf(0), m.sections.values.map { it.region }.toSet())

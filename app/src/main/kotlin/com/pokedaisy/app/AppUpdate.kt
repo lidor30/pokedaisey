@@ -131,9 +131,14 @@ class AppUpdateFlow(private val activity: ComponentActivity) {
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         // Straight to Android's installer: the library's VIEW filter (any type, see the
         // manifest) otherwise put PokeDaisy itself next to it in an "Open with" prompt.
+        // The system's installer first: other apps can claim APKs too (on the Thor, another
+        // emulator front-end's own VIEW filter answered before it).
         @Suppress("DEPRECATION")
-        activity.packageManager.queryIntentActivities(intent, 0)
-            .firstOrNull { it.activityInfo.packageName != activity.packageName }
+        val candidates = activity.packageManager.queryIntentActivities(intent, 0)
+            .filter { it.activityInfo.packageName != activity.packageName }
+        (candidates.firstOrNull { it.activityInfo.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0 }
+            ?: candidates.firstOrNull { "packageinstaller" in it.activityInfo.packageName }
+            ?: candidates.firstOrNull())
             ?.let { intent.setClassName(it.activityInfo.packageName, it.activityInfo.name) }
         runCatching { activity.startActivity(intent) }
             .onSuccess { release = null }

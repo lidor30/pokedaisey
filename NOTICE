@@ -28,7 +28,9 @@ THIRD-PARTY COMPONENTS
 - Shaders (app/src/main/kotlin/com/pokedaisy/app/ScreenShaders.kt): LCD and
   scanlines adapted from mGBA's, Copyright (C) 2017 Dominus Iniquitatis, MIT
   License (the full notice is in third_party/mgba/res/shaders/lcd.shader/lcd.fs);
-  GBA colours from mGBA's gba-color shader by Pokefan531 and hunterk.
+  GBA colours from mGBA's gba-color shader by Pokefan531 and hunterk. LCD PAPER
+  follows RetroArch's simpletex_lcd (jdgleaver, GPL-2.0-or-later) and its grid
+  curve zfast_lcd (Copyright Greg Hogan (SoltanGris42), GPL-2.0-or-later).
 - Pixel Operator font (app/src/main/assets/fonts), by Jayvee Enaguas,
   CC0 1.0 (public domain dedication).
 

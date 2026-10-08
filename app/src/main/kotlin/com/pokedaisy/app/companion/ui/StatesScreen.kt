@@ -70,16 +70,27 @@ fun StatesScreen(slots: StateSlots?, tick: Long) {
     LaunchedEffect(slots, tick) {
         if (tick != firstTick) list = withContext(Dispatchers.IO) { slots.list() }
     }
+    // A SAVE / LOAD tap: re-list a few times over the next ~2 s rather than waiting for the
+    // sample tick, so the new screenshot shows as soon as the emulator has written it.
+    var requests by remember(slots) { mutableStateOf(0) }
+    LaunchedEffect(slots, requests) {
+        if (requests == 0) return@LaunchedEffect
+        for (wait in longArrayOf(250, 500, 750, 1000)) {
+            kotlinx.coroutines.delay(wait)
+            list = withContext(Dispatchers.IO) { slots.list() }
+        }
+    }
     Column(modifier = Modifier.fillMaxSize()) {
         OptionTitleWindow(tr("SAVE STATES"), m, trailing = tr("SLOT {0}", slots.currentIndex))
         Spacer(Modifier.height(m.u * 4))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.u * 4)) {
-            OptionButton(tr("UNDO SAVE"), m, onClick = { slots.requestUndoSave() }, modifier = Modifier.weight(1f))
+            OptionButton(tr("UNDO SAVE"), m, onClick = { slots.requestUndoSave(); requests++ }, modifier = Modifier.weight(1f))
             OptionButton(tr("UNDO LOAD"), m, onClick = { slots.requestUndoLoad() }, modifier = Modifier.weight(1f))
         }
         Spacer(Modifier.height(m.u * 4))
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 150.dp),
+            // Wide enough for SAVE and LOAD side by side (at 150 dp the wide screen fit six and cut them to "S…").
+            columns = GridCells.Adaptive(minSize = 210.dp),
             horizontalArrangement = Arrangement.spacedBy(m.u * 4),
             verticalArrangement = Arrangement.spacedBy(m.u * 4),
             contentPadding = PaddingValues(bottom = m.u * 4),
@@ -90,8 +101,8 @@ fun StatesScreen(slots: StateSlots?, tick: Long) {
                     slot = slot,
                     isCurrent = slot.index == slots.currentIndex,
                     m = m, small = small,
-                    onLoad = { slots.requestLoad(slot.index) },
-                    onSave = { slots.requestSave(slot.index) },
+                    onLoad = { slots.requestLoad(slot.index); requests++ },
+                    onSave = { slots.requestSave(slot.index); requests++ },
                 )
             }
         }
@@ -139,7 +150,12 @@ private fun SlotCard(
             ) {
                 if (slot.present) {
                     val thumbPath = slot.thumbPath
-                    val thumbKey = thumbPath?.let { "$it@${slot.savedAtMillis}" }
+                    // Keyed by the thumbnail's own write time, not the state's: a save writes
+                    // the state, then the thumbnail, and a list read between the two paired the
+                    // new save time with the old picture - cached, so the slot kept showing it.
+                    // The time comes with the list (Slot.thumbModifiedMillis), not read here: an
+                    // unchanged Slot skips this card's redraw, so a file read here went stale.
+                    val thumbKey = thumbPath?.let { "$it@${slot.savedAtMillis}@${slot.thumbModifiedMillis}" }
                     val bmp by produceState(thumbKey?.let(StateThumbs::get), thumbKey) {
                         if (value != null || thumbPath == null || thumbKey == null) return@produceState
                         value = withContext(Dispatchers.IO) {
@@ -178,7 +194,7 @@ private fun SlotCard(
 
 private val slotDateFormat: DateFormat by lazy { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT) }
 
-/** Decoded slot thumbnails by path + save time, so a STATES visit doesn't decode all ten again. */
+/** Decoded slot thumbnails by path + save / thumbnail time, so a STATES visit doesn't decode all ten again. */
 private object StateThumbs {
     private val map = object : LinkedHashMap<String, Bitmap>(16, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>?) = size > 16

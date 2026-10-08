@@ -177,6 +177,8 @@ GAMES = {
         # v1.2 (sha1 805d880e...) has these same tables, byte for byte but TM75 (hand-patched in
         # ActiveTables: soulGoldV12), at species_name1 0x087D5E23 / stride 0x120, items 0x08753834,
         # moves 0x08777EFC, chart 0x0843E6E4, mapsecs 0x08F42978, grid 0x08F447C8 / 0x08F44480.
+        # A second v1.2 build (sha1 5d6a0362...) generates the same files again: species / items /
+        # moves / chart 0x98 bytes earlier, mapsecs and the grid 0xA4.
         region_map=dict(image="soulgold", layout=0x08F3967C, extra_layers=[0x08F39334], cell=2,
                         w=28, h=15, ox=1, oy=1, none=0x13A),
         checks=dict(species={1: "Bulbasaur", 25: "Pikachu", 152: "Chikorita", 155: "Cyndaquil"},
@@ -188,7 +190,7 @@ GAMES = {
 
 CHARS = {0x00: " ", 0x1B: "é", 0xAB: "!", 0xAC: "?", 0xAD: ".", 0xAE: "-", 0xB0: "…", 0xB1: "“", 0xB2: "”",
          0xB3: "‘", 0xB4: "'", 0xB5: "♂", 0xB6: "♀", 0xB8: ",", 0xBA: "/", 0xF0: ":", 0x2D: "&", 0x5C: "(",
-         0x5D: ")", 0x35: "=", 0x36: ";", 0x53: "PK", 0x54: "MN"}
+         0x5D: ")", 0x5B: "%", 0x35: "=", 0x36: ";", 0x53: "PK", 0x54: "MN"}
 # Line / paragraph breaks: descriptions are wrapped for the game's box, the app rewraps.
 CHARS.update({0xFA: " ", 0xFB: " ", 0xFE: " "})
 CHARS.update({0xA1 + i: str(i) for i in range(10)})

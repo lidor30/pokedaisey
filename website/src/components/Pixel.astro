@@ -1,0 +1,26 @@
+---
+// A pixel sprite from src/lib/pixel.js, [scale] pixel units (--px) per sprite pixel. Base.astro's script then
+// rounds that to whole device pixels (a fraction drew some pixels a pixel wider than the rest).
+import { spriteSvg } from '../lib/pixel.js';
+
+interface Props { name: string; scale?: number; class?: string; label?: string }
+const { name, scale = 1, class: cls = '', label } = Astro.props;
+const { w, h, svg } = spriteSvg(name, label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"');
+---
+<span
+  class:list={['pixel', cls]}
+  data-s={scale}
+  style={`--w:${w};--h:${h};--s:${scale}`}
+  set:html={svg}
+/>
+
+<style>
+  .pixel {
+    display: inline-block;
+    flex: none;
+    width: calc(var(--w) * var(--s) * var(--px));
+    height: calc(var(--h) * var(--s) * var(--px));
+    line-height: 0;
+  }
+  .pixel :global(svg) { width: 100%; height: 100%; display: block; }
+</style>

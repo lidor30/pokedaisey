@@ -98,8 +98,12 @@ data class PokedexTables(
     val abilityNameStride: Int = 0,
     /** gSpeciesInfo offset of a third (hidden) ability byte; -1 = none (vanilla). */
     val hiddenAbilityOff: Int = -1,
-    /** After the category on the dex page, in the game's own casing. */
+    /** After the category on the dex page, in the game's own casing ("" = none: German, French). */
     val categorySuffix: String = "POKéMON",
+    /** Before it instead (Spanish / Italian Emerald: "POKéMON POLLUELO"). */
+    val categoryPrefix: String = "",
+    /** HT / WT in metres and kilograms with a decimal comma, as the European releases print them. */
+    val metric: Boolean = false,
     /** FireRed's entries carry an extra unused description pointer (0x24); Emerald's don't (0x20). */
     val entryStride: Int = 0x24,
     /** Ruby/Sapphire split the dex text over two pages: the second page's
@@ -125,6 +129,8 @@ data class PokedexTables(
     val entriesBySpecies: Boolean = false,
     /** The dex page lives in gSpeciesInfo (pokeemerald-expansion); null = vanilla tables. */
     val expansion: SpeciesInfoDex? = null,
+    /** A Game Boy game's dex ([Gen1Dex]: read from the cart's bytes); null = a GBA one. */
+    val gen1: Gen1DexTables? = null,
     val flags: DexFlags = FIRERED_DEX_FLAGS,
     /** The flags' SaveBlock2 struct Pokedex, whose nationalMagic says the National Dex is unlocked. */
     val sb2DexOff: Long = 0x18,
@@ -136,6 +142,17 @@ data class PokedexTables(
      * (see [EvolutionSource]); 0 = not located for this game yet. Found by
      * searching the retail ROMs for BULBASAUR's row (LEVEL 16 -> IVYSAUR). */
     val evolutions: Long = 0,
+    /** Entry 1's category, as [pokedexMatchesRom] expects to read it: the game's own language. */
+    val probeCategory: String = "SEED",
+    /** Japanese Emerald's 0x1C-byte entries: categoryName[6], height at +6, weight +8, the text at +0x0C. */
+    val entryCategoryLen: Int = 12,
+    val entryHeightOff: Int = 0x0C,
+    val entryDescOff: Int = 0x10,
+    /** Between the category and [categorySuffix]: none in Japanese ("ひよこポケモン"). */
+    val categorySeparator: String = " ",
+    /** [metric]'s decimal mark and unit spacing: "0,4 m" in Europe, "0.4m" in Japan. */
+    val decimalPoint: Char = ',',
+    val unitSpace: Boolean = true,
 ) {
     val hasRegional: Boolean get() = regionName != null
 }
@@ -265,6 +282,54 @@ val POKEDEX_EMERALD = PokedexTables(
 )
 
 /*
+ * The European Emerald releases: English's dex, its tables moved (localized
+ * text has other lengths) - each address is the word English's code loads it
+ * from, read at the same place in the language's code. The page is worded as
+ * each game's own (headless screenshots of TORCHIC's): German / French print
+ * the category alone, Spanish / Italian put POKéMON first; all four in metres
+ * and kilograms.
+ */
+val POKEDEX_EMERALD_ES = POKEDEX_EMERALD.copy(
+    entries = 0x0856F078L, frontPics = 0x083103F0L, palettes = 0x083098DCL, speciesInfo = 0x08326688L,
+    speciesToNational = 0x08323F3EL, abilityNames = 0x08321999L, footprints = 0x0857215CL,
+    regionalOrder = 0x08324274L, evolutions = 0x0832B5D8L,
+    probeCategory = "SEMILLA", categoryPrefix = "POKéMON", categorySuffix = "", metric = true,
+)
+val POKEDEX_EMERALD_DE = POKEDEX_EMERALD.copy(
+    entries = 0x0857D39CL, frontPics = 0x0831EAFCL, palettes = 0x08317FE8L, speciesInfo = 0x08334D8CL,
+    speciesToNational = 0x08332642L, abilityNames = 0x0833009EL, footprints = 0x08580480L,
+    regionalOrder = 0x08332978L, evolutions = 0x08339CDCL,
+    probeCategory = "SAMEN", categorySuffix = "", metric = true,
+)
+val POKEDEX_EMERALD_FR = POKEDEX_EMERALD.copy(
+    entries = 0x08570914L, frontPics = 0x08311CBCL, palettes = 0x0830B1A8L, speciesInfo = 0x08327F3CL,
+    speciesToNational = 0x083257F2L, abilityNames = 0x0832324EL, footprints = 0x085739F8L,
+    regionalOrder = 0x08325B28L, evolutions = 0x0832CE8CL,
+    probeCategory = "GRAINE", categorySuffix = "", metric = true,
+)
+val POKEDEX_EMERALD_IT = POKEDEX_EMERALD.copy(
+    entries = 0x08568C80L, frontPics = 0x08309B50L, palettes = 0x0830303CL, speciesInfo = 0x0831FDCCL,
+    speciesToNational = 0x0831D682L, abilityNames = 0x0831B0DBL, footprints = 0x0856BD64L,
+    regionalOrder = 0x0831D9B8L, evolutions = 0x08324D1CL,
+    probeCategory = "SEME", categoryPrefix = "POKéMON", categorySuffix = "", metric = true,
+)
+
+/**
+ * Japanese Emerald: its own build, the same tables at other addresses (English's
+ * literal pools again), but 0x1C-byte entries - categoryName[6], height +6,
+ * weight +8, the text at +0x0C - and 8-byte ability names. Its page reads
+ * "ひよこポケモン", "0.4m", "2.5kg" (TORCHIC's, headless).
+ */
+val POKEDEX_EMERALD_JA = POKEDEX_EMERALD.copy(
+    entries = 0x0854069CL, frontPics = 0x082DDA1CL, palettes = 0x082D6F08L, speciesInfo = 0x082F0D54L,
+    speciesToNational = 0x082EE60AL, abilityNames = 0x082EBDC4L, footprints = 0x08543168L,
+    regionalOrder = 0x082EE940L, evolutions = 0x082F5CA4L,
+    entryStride = 0x1C, entryCategoryLen = 6, entryHeightOff = 6, entryDescOff = 0x0C, abilityNameLength = 8,
+    probeCategory = "たね", categorySuffix = "ポケモン", categorySeparator = "",
+    metric = true, decimalPoint = '.', unitSpace = false,
+)
+
+/*
  * The FireRed-engine hacks below keep vanilla's record layouts (28-byte
  * gBaseStats, 0x24-byte gPokedexEntries, {ptr, size, tag} pic tables), just
  * relocated and longer. Each table was found in the hack's own ROM by content
@@ -347,6 +412,17 @@ val POKEDEX_AMETHYST = PokedexTables(
     nationalCount = 690,
     regionalCount = 390,
     flags = CFRU_DEX_FLAGS,
+)
+
+/** Amethyst v1.4.1: the same dex (entries byte for byte), its tables moved; 26 more species. */
+val POKEDEX_AMETHYST_V1_4_1 = POKEDEX_AMETHYST.copy(
+    entries = 0x09AEB678L,
+    frontPics = 0x09AD4E34L,
+    palettes = 0x09AE8BD0L,
+    speciesInfo = 0x09A98390L,
+    speciesToNational = 0x09AF5F14L,
+    abilityNames = 0x0894DD1CL,
+    speciesCount = 1294,
 )
 
 /**
@@ -557,6 +633,13 @@ val POKEDEX_SOULGOLD_V1_2 = POKEDEX_SOULGOLD.copy(
     expansion = POKEDEX_SOULGOLD.expansion!!.copy(stride = 0x120),
 )
 
+/** The second SoulGold v1.2 build (sha1 5d6a0362...): the same tables 0x98 / 0x9C earlier. */
+val POKEDEX_SOULGOLD_V1_2B = POKEDEX_SOULGOLD_V1_2.copy(
+    speciesInfo = 0x087D5C38L,
+    abilityNames = 0x08F0FC2CL,
+    regionalOrder = 0x08F0EDDCL,
+)
+
 /**
  * Whether the running ROM really has these tables where [t] says: entry 1 is
  * BULBASAUR's (SEED, 7 dm, 69 hg), species 1 is dex number 1 and its front
@@ -565,7 +648,8 @@ val POKEDEX_SOULGOLD_V1_2 = POKEDEX_SOULGOLD.copy(
  */
 fun pokedexMatchesRom(c: MemoryReader, t: PokedexTables): Boolean = runCatching {
     val e = c.readCoreMemory(t.entries + t.entryStride, 0x10)
-    Gen3Text.decode(e, 0, 12).equals("SEED", ignoreCase = true) && u16le(e, 0x0C) == 7 && u16le(e, 0x0E) == 69 &&
+    Gen3Text.decode(e, 0, t.entryCategoryLen).equals(t.probeCategory, ignoreCase = true) &&
+        u16le(e, t.entryHeightOff) == 7 && u16le(e, t.entryHeightOff + 2) == 69 &&
         u16le(c.readCoreMemory(t.speciesToNational, 2), 0) == 1 &&
         u16le(c.readCoreMemory(t.frontPics + 8 + 6, 2), 0) == 1
 }.getOrDefault(false)
@@ -637,6 +721,9 @@ data class DexEntry(
     /** 0 = always male, 254 = always female, 255 = genderless. */
     val genderRatio: Int,
     val eggGroups: List<String>,
+    /** Gen 1 keeps feet / inches and pounds x 10 exactly: shown as stored, not via [heightDm] / [weightHg]. */
+    val heightIn: Int? = null,
+    val weightLbs10: Int? = null,
 ) {
     val types: List<String> get() = monTypes(type1, type2)
 }
@@ -673,9 +760,13 @@ object PokedexSource {
     fun cachedEntry(t: PokedexTables, national: Int): DexEntry? = if (cachedFor == t) entries[national] else null
     fun cachedFrontSprite(t: PokedexTables, species: Int): Bitmap? = if (cachedFor == t) sprites[species] else null
     fun cachedFootprint(t: PokedexTables, species: Int): Bitmap? = if (cachedFor == t) footprints[species] else null
-    fun cachedSpeciesMap(t: PokedexTables): IntArray? = if (cachedFor == t) nationalToSpecies else null
+    fun cachedSpeciesMap(t: PokedexTables): IntArray? = when {
+        t.gen1 != null -> IntArray(t.nationalCount + 1) { it }   // Gen 1's tables are by Dex number
+        cachedFor == t -> nationalToSpecies
+        else -> null
+    }
     fun cachedRegionalOrder(t: PokedexTables): IntArray? =
-        if (t.regionalOrder == 0L) IntArray(t.regionalCount) { it + 1 } else if (cachedFor == t) regional else null
+        if (t.regionalOrder == 0L || t.gen1 != null) IntArray(t.regionalCount) { it + 1 } else if (cachedFor == t) regional else null
 
     /** National numbers in regional-dex order ([PokedexTables.regionalCount] of them). */
     fun regionalOrder(t: PokedexTables): IntArray? {
@@ -693,6 +784,7 @@ object PokedexSource {
 
     /** Species id for a national dex number (the first species that maps to it), or 0. */
     fun speciesFor(t: PokedexTables, national: Int): Int {
+        if (t.gen1 != null) return if (national in 1..t.nationalCount) national else 0   // its tables are by Dex number
         sync(t)
         val map = nationalToSpecies ?: runCatching {
             if (t.nationalToSpecies != 0L) {
@@ -713,6 +805,7 @@ object PokedexSource {
 
     /** National dex number of a species id (Hoenn species aren't in national order), or 0. */
     fun nationalOf(t: PokedexTables, species: Int): Int {
+        if (t.gen1 != null) return if (species in 1..t.nationalCount) species else 0
         sync(t)
         val map = speciesToNational ?: runCatching { speciesNationals(t) }.getOrNull()?.also { speciesToNational = it } ?: return 0
         return map.getOrElse(species) { 0 }
@@ -743,6 +836,7 @@ object PokedexSource {
     fun entry(t: PokedexTables, national: Int): DexEntry? {
         sync(t)
         entries[national]?.let { return it }
+        t.gen1?.let { g -> return Gen1Dex.entry(g, national)?.also { entries[national] = it } }
         return runCatching { readEntry(t, national) }
             .onFailure { android.util.Log.w("pokedaisy", "dex entry $national failed", it) }
             .getOrNull()?.also { entries[national] = it }
@@ -753,6 +847,10 @@ object PokedexSource {
         sync(t)
         if (species <= 0) return null
         sprites[species]?.let { return it }
+        t.gen1?.let { g ->
+            return runCatching { Gen1Dex.frontPixels(g, species)?.let { Bitmap.createBitmap(it, 56, 56, Bitmap.Config.ARGB_8888) } }
+                .getOrNull()?.also { sprites[species] = it }
+        }
         return runCatching {
             val x = t.expansion
             val tilesPtr: Long
@@ -812,7 +910,7 @@ object PokedexSource {
         if (species == 0) return null
         t.expansion?.let { return readExpansionEntry(t, it, national, species) }
         val e = rd(t.entries + (if (t.entriesBySpecies) species else national).toLong() * t.entryStride, t.entryStride)
-        val descPtr = Gfx.u32(e, 0x10)
+        val descPtr = Gfx.u32(e, t.entryDescOff)
         val info = rd(t.speciesInfo + species * 28L, 28)
         fun b(i: Int) = info[i].toInt() and 0xFF
         val abilities = listOf(b(0x16), b(0x17)).filter { it != 0 }.distinct().map { ability(t, it) }
@@ -820,9 +918,9 @@ object PokedexSource {
         return DexEntry(
             national = national,
             species = species,
-            category = Gen3Text.decode(e, 0, 12),
-            heightDm = u16le(e, 0x0C),
-            weightHg = u16le(e, 0x0E),
+            category = Gen3Text.decode(e, 0, t.entryCategoryLen),
+            heightDm = u16le(e, t.entryHeightOff),
+            weightHg = u16le(e, t.entryHeightOff + 2),
             description = listOfNotNull(
                 descPtr.takeIf(Gfx::inRom),
                 t.descriptionPage2Off.takeIf { it >= 0 }?.let { Gfx.u32(e, it) }?.takeIf(Gfx::inRom),
@@ -879,6 +977,28 @@ private val EGG_GROUP_NAMES = listOf(
     "WATER 3", "MINERAL", "AMORPHOUS", "WATER 2", "DITTO", "DRAGON", "UNDISCOVERED",
 )
 
+/** The dex page's category line, worded as [t]'s game does: "SEED POKéMON", "KÜKEN", "POKéMON POLLUELO". */
+fun dexCategoryLine(t: PokedexTables, category: String): String =
+    listOf(t.categoryPrefix, category, t.categorySuffix).filter { it.isNotEmpty() }.joinToString(t.categorySeparator)
+
+/** HT as [t]'s game prints it: "2'04"" or, in the European releases, "0,7 m". */
+/** HT / WT for [e] - a Gen 1 page's own feet / inches and pounds when it has them. */
+fun formatDexHeight(t: PokedexTables, e: DexEntry): String =
+    e.heightIn?.let { "%d'%02d\"".format(it / 12, it % 12) } ?: formatDexHeight(t, e.heightDm)
+
+fun formatDexWeight(t: PokedexTables, e: DexEntry): String =
+    e.weightLbs10?.let { "%d.%d lbs.".format(it / 10, it % 10) } ?: formatDexWeight(t, e.weightHg)
+
+fun formatDexHeight(t: PokedexTables, dm: Int): String =
+    if (t.metric) metric(t, dm, "m") else formatDexHeight(dm)
+
+private fun metric(t: PokedexTables, tenths: Int, unit: String) =
+    "${tenths / 10}${t.decimalPoint}${tenths % 10}${if (t.unitSpace) " " else ""}$unit"
+
+/** WT as [t]'s game prints it: "15.2 lbs." or "6,9 kg". */
+fun formatDexWeight(t: PokedexTables, hg: Int): String =
+    if (t.metric) metric(t, hg, "kg") else formatDexWeight(hg)
+
 /** "HT 2'04"", the game's own rounding (DexScreen_PrintMonHeight). */
 fun formatDexHeight(dm: Int): String {
     var inches = 10000L * dm / 254 // tenths of an inch
@@ -915,6 +1035,17 @@ object Gen3Text {
         "ÀÁÂÇÈÉÊËÌ ÎÏÒÓÔŒÙÚÛÑßàá çèéêëì îïòóôœùúûñ".forEachIndexed { i, c -> if (c != ' ') t[0x01 + i] = c }
         t[0x2B] = 'ª'; t[0x51] = '¿'; t[0x52] = '¡'; t[0x5A] = 'Í'; t[0x68] = 'â'; t[0x6F] = 'í'
         t[0x85] = '<'; t[0x86] = '>'; t[0xAF] = '·'; t[0xB9] = '×'
+        "ÄÖÜäöü".forEachIndexed { i, c -> t[0xF1 + i] = c } // German Emerald's dex text
+    }
+
+    /** Japanese Emerald's text ([romLanguage] 'J'): hiragana then katakana where the Western letters
+     * are (charmap.txt's Japanese half), full-width punctuation, the rest as above. */
+    private val japanese = table.copyOf().also { t ->
+        ("　あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん" +
+            "ぁぃぅぇぉゃゅょがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽっ" +
+            "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン" +
+            "ァィゥェォャュョガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポッ").forEachIndexed { i, c -> t[i] = c }
+        t[0xAB] = '！'; t[0xAC] = '？'; t[0xAD] = '。'; t[0xAE] = 'ー'; t[0xB0] = '⋯'
     }
 
     // Argument bytes after an 0xFC control code (text colour, font, pause, ...),
@@ -925,6 +1056,8 @@ object Gen3Text {
      * spaces, control codes (0xFC + args, e.g. a font change) are dropped. */
     fun decode(b: ByteArray, off: Int = 0, max: Int = b.size - off): String = buildString {
         val end = minOf(b.size, off + max)
+        val jp = romLanguage == 'J'
+        val chars = if (jp) japanese else table
         var i = off
         while (i < end) {
             val c = b[i].toInt() and 0xFF
@@ -933,7 +1066,8 @@ object Gen3Text {
                 i += 2 + FC_ARGS.getOrElse(b[i + 1].toInt() and 0xFF) { 0 }
                 continue
             }
-            append(if (c == 0xFE || c == 0xFA || c == 0xFB) ' ' else table[c])
+            // A line break reads as a space; in Japanese, the full-width one its phrases are spaced with.
+            append(if (c == 0xFE || c == 0xFA || c == 0xFB) (if (jp) '　' else ' ') else chars[c])
             i++
         }
     }.trim()

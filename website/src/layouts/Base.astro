@@ -1,0 +1,323 @@
+---
+// Light, modern page - soft colour, lots of air - with every border, button and icon drawn in
+// whole pixels and every word in the app's pixel font (Pixel Operator).
+import Pixel from '../components/Pixel.astro';
+import { frameCss, spriteSvg } from '../lib/pixel.js';
+import { REPO_URL } from '../lib/releases.js';
+
+interface Props { title: string; description: string; noindex?: boolean }
+const { title, description, noindex = false } = Astro.props;
+const site = Astro.site ?? new URL('https://pokedaisy.web.app');
+const ogImage = new URL('/og.png', site).href;
+const favicon = `data:image/svg+xml,${encodeURIComponent(spriteSvg('logo').svg)}`;
+const path = Astro.url.pathname;
+const nav = [
+  ['FEATURES', '/#features'],
+  ['GAMES', '/#games'],
+  ['ROM CHECK', '/compatibility/'],
+  ['RELEASES', '/releases/'],
+];
+// Petals drifting behind the page: [left %, top %, size, delay s, duration s].
+const petals = [[4, 22, 1, 0, 22], [91, 10, 2, 4, 26], [70, 62, 1, 9, 24], [10, 78, 2, 2, 28], [46, 92, 1, 6, 25], [95, 70, 1, 12, 30]];
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex" />}
+    <meta name="theme-color" content="#f7f6fb" />
+    <link rel="icon" href={favicon} />
+    <link rel="preload" href="/fonts/PixelOperator.ttf" as="font" type="font/ttf" crossorigin />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script is:inline>
+      // Pixel Operator's pixel is 1/16 em: it's pixel-perfect only where size x device pixel ratio is a
+      // multiple of 16, and at 110% zoom on a 2x screen those sizes are 14.5 / 21.8 / 29.1... - too coarse
+      // to design with. So each size takes a crisp one when it's within 6% of its target, and otherwise
+      // stays at the target, anti-aliased (even strokes, a little softer) - again when the zoom changes.
+      (function () {
+        var root = document.documentElement;
+        root.classList.add('js');
+        var DESKTOP = { xs: 16, s: 22, m: 26, l: 36, xl: 52, xxl: 80, px: 3 };
+        var PHONE = { xs: 16, s: 19, m: 20, l: 28, xl: 34, xxl: 64, px: 2 };
+        function snap() {
+          var r = window.devicePixelRatio || 1;
+          var t = matchMedia('(max-width: 760px)').matches ? PHONE : DESKTOP;
+          for (var k in t) {
+            if (k === 'px') { root.style.setProperty('--px', Math.max(1, Math.round(t.px * r)) / r + 'px'); continue; }
+            var crisp = Math.max(1, Math.round((t[k] * r) / 16)) * 16 / r;
+            root.style.setProperty('--t-' + k, (Math.abs(crisp - t[k]) <= t[k] * 0.06 ? crisp : t[k]) + 'px');
+          }
+        }
+        // Sprites the same way: each sprite pixel a whole number of device pixels. (Not inside an app
+        // screen, which is scaled as one, or the handheld's controls, which size to their column.)
+        function snapSprites() {
+          var r = window.devicePixelRatio || 1;
+          var all = document.querySelectorAll('.pixel[data-s]');
+          for (var i = 0; i < all.length; i++) {
+            var el = all[i];
+            if (el.closest('[data-app], .ctl')) continue;
+            var cs = getComputedStyle(el);
+            var unit = parseFloat(cs.getPropertyValue('--px')) * Number(el.dataset.s);
+            var cell = Math.max(1, Math.round(unit * r)) / r;
+            el.style.width = Number(cs.getPropertyValue('--w')) * cell + 'px';
+            el.style.height = Number(cs.getPropertyValue('--h')) * cell + 'px';
+          }
+        }
+        snap();
+        addEventListener('resize', function () { snap(); snapSprites(); });
+        document.addEventListener('DOMContentLoaded', snapSprites);
+      })();
+    </script>
+    <style is:global set:html={frameCss()}></style>
+  </head>
+  <body>
+    <div class="backdrop" aria-hidden="true">
+      <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+      <div class="dots"></div>
+      {petals.map(([x, y, s, d, t]) => (
+        <span class="petal" style={`left:${x}%;top:${y}%;animation-delay:-${d}s;animation-duration:${t}s`}>
+          <Pixel name="logo" scale={s * 0.667} />
+        </span>
+      ))}
+    </div>
+
+    <header class="topbar">
+      <div class="container bar">
+        <a class="brand" href="/" aria-label="PokeDaisy home">
+          <span class="brand-mark"><Pixel name="logo" scale={0.5} /></span>
+          <span class="brand-name"><span class="red">POKE</span>DAISY</span>
+        </a>
+        <nav class="links" aria-label="Main">
+          {nav.map(([label, href]) => (
+            <a href={href} aria-current={path === href ? 'page' : undefined}>{label}</a>
+          ))}
+          <a href={REPO_URL} class="icon-link" aria-label="GitHub"><Pixel name="github" scale={0.5} /></a>
+        </nav>
+        <a class="btn f-coffee h-coffeeHot small coffee-nav" href="https://buymeacoffee.com/lidor30g">
+          <Pixel name="cup" scale={0.5} /> <span>COFFEE</span>
+        </a>
+      </div>
+    </header>
+
+    <main><slot /></main>
+
+    <footer class="footer">
+      <div class="container foot">
+        <div class="foot-brand">
+          <Pixel name="logo" scale={1} />
+          <div>
+            <p class="foot-name"><span class="red">POKE</span>DAISY</p>
+            <p class="muted tiny">Free and open source, GPL v3. No ads, no accounts, no tracking.</p>
+          </div>
+        </div>
+        <div class="foot-links tiny">
+          <a href={`${REPO_URL}/releases/latest`}>DOWNLOAD</a>
+          <a href="/compatibility/">ROM CHECK</a>
+          <a href="/releases/">RELEASES</a>
+          <a href={`${REPO_URL}/issues/new/choose`}>REPORT A BUG</a>
+          <a href={REPO_URL}>GITHUB</a>
+          <a href="https://buymeacoffee.com/lidor30g">BUY ME A COFFEE</a>
+        </div>
+        <p class="legal tiny muted">
+          PokeDaisy is a fan project, not affiliated with or endorsed by Nintendo, Game Freak, Creatures or
+          The Pokémon Company. Pokémon and all related names are trademarks of their respective owners. ROM hacks
+          belong to their creators. No games are included: use your own legally dumped ROMs. Games run on{' '}
+          <a href="https://mgba.io">mGBA</a>; font: Pixel Operator by Jayvee Enaguas (CC0).
+        </p>
+      </div>
+    </footer>
+
+    <script>
+      // Windows open as they scroll into view, a few at a time.
+      const reveal = new IntersectionObserver((entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          e.target.classList.add('in');
+          reveal.unobserve(e.target);
+        }
+      }, { rootMargin: '0px 0px -5% 0px' });
+      document.querySelectorAll('[data-reveal]').forEach((el) => reveal.observe(el));
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  @font-face {
+    font-family: 'Pixel Operator';
+    src: url('/fonts/PixelOperator.ttf') format('truetype');
+    font-display: block;
+  }
+  :root {
+    /* One GBA pixel on screen, and the text sizes - the script in <head> snaps them to whole device
+       pixels for the zoom in use; these are its targets (and what shows without JS). */
+    --px: 3px;
+    --t-xs: 16px;
+    --t-s: 22px;
+    --t-m: 26px;
+    --t-l: 36px;
+    --t-xl: 52px;
+    --t-xxl: 80px;
+    /* Pixel bold: each glyph again, one font pixel to the right (how the app bolds Gen 1's font). */
+    --bold: 0.0625em 0 0 currentColor;
+    --ink: #1d1b26;
+    --ink-2: #4f4c5e;
+    --muted: #6f6c82;
+    --bg: #f7f6fb;
+    --red: #e83028;
+    --red-ink: #c41e16;
+    --yellow: #f8d030;
+    --blue: #3d6fe0;
+    --green: #2c9a44;
+    --hard-shadow: drop-shadow(calc(var(--px) * 2) calc(var(--px) * 2) 0 rgba(29, 27, 38, 0.14));
+    --step: steps(4, end);
+  }
+  @media (max-width: 560px) {
+    .topbar .links { font-size: var(--t-xs); }
+    .topbar .links a { padding: 6px 6px; }
+  }
+  @media (max-width: 760px) {
+    :root { --px: 2px; --t-s: 19px; --t-m: 20px; --t-l: 28px; --t-xl: 34px; --t-xxl: 64px; }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 96px; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    font-family: 'Pixel Operator', monospace;
+    font-size: var(--t-m);
+    line-height: 1.5;
+    color: var(--ink);
+    background: var(--bg);
+    /* Grayscale anti-aliasing: crisp at the snapped sizes, even (not jagged) in between. */
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  ::selection { background: var(--yellow); color: var(--ink); }
+  a { color: inherit; }
+  img { max-width: 100%; }
+  h1, h2, h3, h4 { font-weight: normal; margin: 0; line-height: 1.15; }
+  p { margin: 0; }
+  .small { font-size: var(--t-s); }
+  .tiny { font-size: var(--t-xs); }
+  .bold { text-shadow: var(--bold); letter-spacing: 0.0625em; }
+  .muted { color: var(--muted); }
+  .red { color: var(--red); }
+  .container { width: min(1200px, 100% - 32px); margin: 0 auto; }
+
+  /* Backdrop: soft colour that drifts, a pixel dot grid, a few daisies floating by. */
+  .backdrop { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+  .blob { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.55; animation: drift 30s ease-in-out infinite alternate; }
+  .b1 { width: 46vw; height: 46vw; left: -12vw; top: -14vw; background: #ffd2cc; }
+  .b2 { width: 40vw; height: 40vw; right: -10vw; top: 18vh; background: #fff0b0; animation-delay: -10s; }
+  .b3 { width: 50vw; height: 50vw; left: 20vw; bottom: -30vw; background: #d6e2ff; animation-delay: -20s; }
+  @keyframes drift { to { transform: translate(6vw, 4vh) scale(1.08); } }
+  .dots {
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect x='0' y='0' width='2' height='2' fill='%231d1b26' fill-opacity='0.09'/%3E%3C/svg%3E");
+    mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.35) 60%, #000 100%);
+  }
+  .petal { position: absolute; opacity: 0.13; animation: float 24s steps(48) infinite; }
+  @keyframes float {
+    0% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-60px) rotate(180deg); }
+    100% { transform: translateY(0) rotate(360deg); }
+  }
+
+  /* Top bar: frosted, with a pixel rule under it. */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(247, 246, 251, 0.78);
+    backdrop-filter: blur(14px) saturate(1.4);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    border-bottom: var(--px) solid var(--ink);
+  }
+  .bar { display: flex; align-items: center; gap: 24px; min-height: 72px; }
+  .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; font-size: var(--t-l); text-shadow: var(--bold); letter-spacing: 0.0625em; }
+  .brand-mark { display: inline-flex; transition: transform 0.4s var(--step); }
+  .brand:hover .brand-mark { transform: rotate(-90deg); }
+  .links { display: flex; align-items: center; gap: 4px; margin-left: auto; font-size: var(--t-s); }
+  .links a { text-decoration: none; padding: 6px 10px; position: relative; }
+  .links a::after {
+    content: ''; position: absolute; left: 10px; right: 10px; bottom: 2px; height: var(--px);
+    background: var(--red); transform: scaleX(0); transform-origin: left; transition: transform 0.2s var(--step);
+  }
+  .links a:hover::after, .links a[aria-current='page']::after { transform: scaleX(1); }
+  .icon-link { display: inline-flex; }
+  .coffee-nav { white-space: nowrap; }
+  @media (max-width: 900px) {
+    .bar { flex-wrap: wrap; gap: 4px 12px; padding: 8px 0; }
+    .links { order: 3; width: 100%; margin: 0; overflow-x: auto; scrollbar-width: none; justify-content: space-between; }
+    .links a { white-space: nowrap; }
+    .coffee-nav { margin-left: auto; }
+  }
+
+  /* Buttons: pixel frames that lift on hover and press down on click. */
+  .btn {
+    display: inline-flex; align-items: center; gap: 12px;
+    font: inherit; font-size: var(--t-m); line-height: 1; color: var(--ink); text-decoration: none;
+    padding: calc(var(--px) * 3) calc(var(--px) * 5);
+    cursor: pointer; background: none;
+    filter: drop-shadow(0 calc(var(--px) * 2) 0 var(--ink));
+    transition: transform 0.12s steps(2), filter 0.12s steps(2);
+  }
+  .btn:hover { transform: translateY(calc(var(--px) * -1)); filter: drop-shadow(0 calc(var(--px) * 3) 0 var(--ink)); }
+  .btn:active { transform: translateY(calc(var(--px) * 2)); filter: drop-shadow(0 0 0 var(--ink)); }
+  .btn:focus-visible { outline: var(--px) dashed var(--red); outline-offset: calc(var(--px) * 2); }
+  .btn.small { font-size: var(--t-s); padding: calc(var(--px) * 2) calc(var(--px) * 3); gap: 8px; }
+  .btn.primary { color: #fff; text-shadow: var(--px) var(--px) 0 #8a1410; }
+  .btn.big { font-size: var(--t-m); padding: calc(var(--px) * 5) calc(var(--px) * 7); }
+
+  /* Cards: white, ink-outlined, a hard pixel shadow. */
+  .card { filter: var(--hard-shadow); padding: calc(var(--px) * 6); }
+  .chip { display: inline-flex; align-items: center; gap: 8px; font-size: var(--t-s); line-height: 1; padding: calc(var(--px) * 2) calc(var(--px) * 3); white-space: nowrap; }
+
+  /* Sections */
+  section.block { padding: 72px 0; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 12px; font-size: var(--t-s); color: var(--red); letter-spacing: 0.0625em; margin-bottom: 14px; text-shadow: var(--bold); }
+  .eyebrow::before { content: ''; width: calc(var(--px) * 4); height: calc(var(--px) * 4); background: var(--red); }
+  .heading { font-size: var(--t-xl); letter-spacing: 0.0625em; text-shadow: var(--bold), var(--px) var(--px) 0 rgba(29, 27, 38, 0.12), calc(var(--px) + 0.0625em) var(--px) 0 rgba(29, 27, 38, 0.12); }
+  .lead { color: var(--ink-2); max-width: 44ch; margin-top: 18px; line-height: 1.55; }
+  .section-head { margin-bottom: 40px; }
+  .section-head.center { text-align: center; }
+  .section-head.center .lead { margin-inline: auto; }
+
+  /* Windows open like the game's: squashed flat, then up in steps. */
+  /* Hidden by opacity only: a transform would shrink the box the observer sees, and a tall block
+     (the games table) then only opened once its middle reached the screen. */
+  .js [data-reveal] { opacity: 0; }
+  .js [data-reveal].in { animation: open 0.42s var(--step) forwards; animation-delay: calc(var(--i, 0) * 70ms); }
+  .js [data-reveal='fade'].in { animation-name: fadeUp; animation-duration: 0.5s; }
+  @keyframes fadeUp {
+    0% { opacity: 0; transform: translateY(calc(var(--px) * 8)); }
+    100% { opacity: 1; transform: none; }
+  }
+  @keyframes bob { 50% { transform: translateY(var(--px)); } }
+  @keyframes open {
+    0% { opacity: 1; transform: translateY(calc(var(--px) * 4)) scaleY(0.15); }
+    60% { opacity: 1; transform: translateY(calc(var(--px) * -1)) scaleY(1.04); }
+    100% { opacity: 1; transform: none; }
+  }
+
+  /* Footer */
+  .footer { margin-top: 48px; padding: 48px 0 64px; border-top: var(--px) solid var(--ink); background: rgba(255, 255, 255, 0.6); }
+  .foot { display: grid; gap: 24px; }
+  .foot-brand { display: flex; align-items: center; gap: 16px; }
+  .foot-name { font-size: var(--t-l); text-shadow: var(--bold); letter-spacing: 0.0625em; }
+  .foot-links { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+  .foot-links a { text-decoration: none; }
+  .foot-links a:hover { color: var(--red); }
+  .legal { max-width: 110ch; line-height: 1.6; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .js [data-reveal] { opacity: 1; transform: none; }
+    html { scroll-behavior: auto; }
+  }
+</style>

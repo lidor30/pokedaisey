@@ -58,6 +58,7 @@ import com.pokedaisy.app.companion.data.activeGame
 import com.pokedaisy.app.companion.data.PokedexSource
 import com.pokedaisy.app.companion.data.PokedexState
 import com.pokedaisy.app.companion.data.PokedexTables
+import com.pokedaisy.app.companion.data.dexCategoryLine
 import com.pokedaisy.app.companion.data.formatDexHeight
 import com.pokedaisy.app.companion.data.formatDexWeight
 import com.pokedaisy.app.companion.data.speciesName
@@ -146,6 +147,7 @@ private fun rememberSpeciesMap(t: PokedexTables): IntArray? =
  */
 @Composable
 fun PokedexScreen(dex: PokedexState, ui: DexUiState, modifier: Modifier = Modifier) {
+    // Dense pages sized to Pixel Operator: a game font keeps its metrics here.
     val m = rememberGbaTextMetrics()
     val small = rememberGbaTextMetrics(1f)
     val national = ui.showsNational(dex)
@@ -280,6 +282,7 @@ private fun DexMark(caught: Boolean, seen: Boolean, modifier: Modifier) {
  */
 @Composable
 fun PokedexEntryScreen(dex: PokedexState, ui: DexUiState, current: Int, modifier: Modifier = Modifier) {
+    // Dense pages sized to Pixel Operator: a game font keeps its metrics here.
     val m = rememberGbaTextMetrics()
     val small = rememberGbaTextMetrics(1f)
     val order = rememberDexOrder(dex, ui.showsNational(dex))
@@ -350,13 +353,13 @@ private fun EntryPage(
                     PixelImage(print, 16, Modifier.size(u * 16))
                     Spacer(Modifier.width(u * 5))
                 }
-                GbaText(e?.let { "${it.category} ${t.categorySuffix}" } ?: "", OptionColors.label, OptionColors.labelShadow, small)
+                GbaText(e?.let { dexCategoryLine(t, it.category) } ?: "", OptionColors.label, OptionColors.labelShadow, small)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) { e?.types?.forEach { TypeBadge(it) } }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Stat(tr("HT"), e?.let { formatDexHeight(it.heightDm) } ?: "", small)
+                Stat(tr("HT"), e?.let { formatDexHeight(t, it) } ?: "", small)
                 Spacer(Modifier.width(u * 10))
-                Stat(tr("WT"), e?.let { formatDexWeight(it.weightHg) } ?: "", small)
+                Stat(tr("WT"), e?.let { formatDexWeight(t, it) } ?: "", small)
             }
         }
         Separator(m, Modifier.fillMaxHeight(), vertical = true)
@@ -369,10 +372,11 @@ private fun EntryPage(
             if (e != null) {
                 BaseStats(e.baseStats, small)
                 Separator(m, Modifier.fillMaxWidth())
-                InfoLine(tr("ABILITY"), e.abilities.joinToString(" / "), small)
+                // Gen 1 has none of these: no abilities, eggs or genders (genderRatio -1).
+                if (e.abilities.isNotEmpty()) InfoLine(tr("ABILITY"), e.abilities.joinToString(" / "), small)
                 e.hiddenAbility?.let { InfoLine(tr("HIDDEN|ability"), it, small) }
-                InfoLine(tr("EGG GROUP"), e.eggGroups.joinToString(" / ") { dexCase(it) }, small)
-                InfoLine(tr("GENDER"), genderLabel(e.genderRatio), small)
+                if (e.eggGroups.isNotEmpty()) InfoLine(tr("EGG GROUP"), e.eggGroups.joinToString(" / ") { dexCase(it) }, small)
+                if (e.genderRatio >= 0) InfoLine(tr("GENDER"), genderLabel(e.genderRatio), small)
                 InfoLine(tr("CATCH RATE"), "${e.catchRate}", small)
             }
         }
@@ -388,21 +392,25 @@ private fun dexCase(s: String): String = when (activeGame) {
 }
 
 private val STAT_LABELS = listOf(tk("HP"), tk("ATTACK"), tk("DEFENSE"), tk("SP. ATK"), tk("SP. DEF"), tk("SPEED"))
+/** Gen 1's five, in its own order: one SPECIAL for both. */
+private val STAT_LABELS_GEN1 = listOf(tk("HP"), tk("ATTACK"), tk("DEFENSE"), tk("SPEED"), tk("SPECIAL"))
 
 /** Base stats as labelled bars (255 = full), then their total. */
 @Composable
 private fun BaseStats(stats: List<Int>, small: GbaTextMetrics) {
     val u = small.u
+    // Room for "DEFENSE" in a fixed-width game font (Gen 1's 8px letters).
+    val labelU = if (com.pokedaisy.app.companion.ui.theme.LocalGameFont.current != null) 64 else 58
     Column(verticalArrangement = Arrangement.spacedBy(u)) {
         stats.forEachIndexed { i, v ->
             Row(verticalAlignment = Alignment.CenterVertically) {
-                GbaText(tr(STAT_LABELS[i]), OptionColors.label, OptionColors.labelShadow, small, Modifier.width(u * 58))
+                GbaText(tr((if (stats.size == 5) STAT_LABELS_GEN1 else STAT_LABELS)[i]), OptionColors.label, OptionColors.labelShadow, small, Modifier.width(u * labelU))
                 GbaText("$v", OptionColors.value, OptionColors.valueShadow, small, Modifier.width(u * 22))
                 StatBar(v, Modifier.weight(1f).height(u * 6), u)
             }
         }
         Row {
-            GbaText(tr("TOTAL"), OptionColors.label, OptionColors.labelShadow, small, Modifier.width(u * 58))
+            GbaText(tr("TOTAL"), OptionColors.label, OptionColors.labelShadow, small, Modifier.width(u * labelU))
             GbaText("${stats.sum()}", OptionColors.value, OptionColors.valueShadow, small)
         }
     }
@@ -431,7 +439,9 @@ private fun StatBar(value: Int, modifier: Modifier, u: Dp) {
 @Composable
 private fun InfoLine(label: String, value: String, small: GbaTextMetrics) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        GbaText(label, OptionColors.label, OptionColors.labelShadow, small, Modifier.width(small.u * 80))
+        // A fixed-width game font (Gen 1's 8px letters) needs a wider label column.
+        val wide = com.pokedaisy.app.companion.ui.theme.LocalGameFont.current != null
+        GbaText(label, OptionColors.label, OptionColors.labelShadow, small, Modifier.width(small.u * if (wide) 92 else 80))
         GbaText(value, OptionColors.value, OptionColors.valueShadow, small, Modifier.weight(1f))
     }
 }

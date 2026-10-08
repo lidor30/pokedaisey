@@ -1,0 +1,86 @@
+---
+// The social / README cover, 1280x640. Not a page people visit: `npm run cover` renders it to
+// public/og.png with headless Chrome.
+import Pixel from '../components/Pixel.astro';
+import { frameCss } from '../lib/pixel.js';
+import HeroDevice from '../components/HeroDevice.astro';
+import data from '../data/compat.json';
+
+const games = new Set(data.matrix.rows.map((r) => r.game)).size;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <title>PokeDaisy cover</title>
+    <style is:global set:html={frameCss()}></style>
+  </head>
+  <body>
+    <div class="cover">
+      <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+      <div class="dots"></div>
+      <span class="petal p1"><Pixel name="logo" scale={1.334} /></span>
+      <span class="petal p2"><Pixel name="logo" scale={0.667} /></span>
+      <span class="petal p3"><Pixel name="logo" scale={0.667} /></span>
+
+      <div class="copy">
+        <div class="head">
+          <Pixel name="logo" scale={1.25} />
+          <h1><span class="red">POKE</span>DAISY</h1>
+        </div>
+        <div class="dialog f-dialog">
+          <p>Play your Pokémon games on the top screen. See everything about your game on the bottom one.</p>
+          <span class="more"><Pixel name="more" scale={1} /></span>
+        </div>
+        <div class="chips">
+          <span class="chip f-pillGreen">FREE &amp; OPEN SOURCE</span>
+          <span class="chip f-pillRed">{games} GAMES &amp; ROM HACKS</span>
+          <span class="chip f-pillBlue">DUAL-SCREEN ANDROID</span>
+          <span class="chip f-pillYellow">GB · GBC · GBA</span>
+        </div>
+      </div>
+
+      <div class="dev"><HeroDevice still /></div>
+      <span class="tag t1 chip f-chip"><Pixel name="tv" scale={0.667} /> THE GAME</span>
+      <span class="tag t2 chip f-chip"><Pixel name="logo" scale={0.5} /> YOUR COMPANION</span>
+    </div>
+  </body>
+</html>
+
+<style is:global>
+  @font-face { font-family: 'Pixel Operator'; src: url('/fonts/PixelOperator.ttf') format('truetype'); }
+  :root { --px: 4px; --ink: #1d1b26; }
+  * { box-sizing: border-box; animation: none !important; }
+  html, body { margin: 0; width: 1280px; height: 640px; overflow: hidden; }
+  body { font-family: 'Pixel Operator', monospace; color: var(--ink); -webkit-font-smoothing: none; }
+  .cover { position: relative; width: 1280px; height: 640px; overflow: hidden; background: #f7f6fb; }
+  .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.7; }
+  .b1 { width: 620px; height: 620px; left: -200px; top: -260px; background: #ffd2cc; }
+  .b2 { width: 520px; height: 520px; right: -160px; top: -120px; background: #fff0b0; }
+  .b3 { width: 700px; height: 600px; left: 360px; bottom: -420px; background: #d6e2ff; }
+  .dots {
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect width='2' height='2' fill='%231d1b26' fill-opacity='0.09'/%3E%3C/svg%3E");
+  }
+  .petal { position: absolute; opacity: 0.16; }
+  .p1 { left: 600px; top: 540px; transform: rotate(20deg); }
+  .p2 { left: 36px; top: 560px; }
+  .p3 { left: 1200px; top: 40px; }
+  .red { color: #e83028; }
+
+  .copy { position: absolute; left: 64px; top: 72px; width: 560px; display: grid; gap: 28px; }
+  .head { display: flex; align-items: center; gap: 20px; }
+  h1 { margin: 0; font-weight: normal; font-size: 80px; line-height: 1; letter-spacing: 5px; text-shadow: 5px 0 0 currentColor, 8px 8px 0 rgba(29, 27, 38, 0.13), 13px 8px 0 rgba(29, 27, 38, 0.13); }
+  .dialog { position: relative; font-size: 32px; line-height: 1.4; color: #404048; text-shadow: 4px 4px 0 #d8d8d0; padding: 12px 20px 22px; filter: drop-shadow(8px 8px 0 rgba(29, 27, 38, 0.14)); }
+  .dialog p { margin: 0; }
+  .more { position: absolute; right: 16px; bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 12px; }
+  .chip { display: inline-flex; align-items: center; gap: 10px; font-size: 16px; line-height: 1; padding: 8px 12px; white-space: nowrap; }
+
+  .dev .textbox { display: none; }
+  .dev { position: absolute; right: 84px; top: 24px; width: 418px; --px: 3px; }
+  .tag { position: absolute; filter: drop-shadow(8px 8px 0 rgba(29, 27, 38, 0.14)); }
+  .t1 { left: 660px; top: 140px; }
+  .t2 { left: 590px; top: 548px; }
+</style>

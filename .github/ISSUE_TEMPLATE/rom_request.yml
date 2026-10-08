@@ -1,0 +1,41 @@
+name: ROM support request
+description: Ask for the companion to support a game or ROM hack it doesn't read yet.
+title: 'ROM support: '
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Support is added per exact version, found by the ROM's SHA-1. The [ROM check](https://pokedaisy.web.app/compatibility/)
+        fills in the fields below for you. **Never attach or link the ROM itself** - only the hack's official page.
+  - type: input
+    id: game
+    attributes:
+      label: Game and version
+      placeholder: Pokémon Unbound v2.1.1.1
+    validations:
+      required: true
+  - type: input
+    id: official_page
+    attributes:
+      label: Official page
+      description: Where the hack is published (its PokéCommunity thread, website, Discord...). Patch downloads only, never a ROM.
+  - type: input
+    id: game_code
+    attributes:
+      label: Game code
+      placeholder: BPRE (rev 0)
+  - type: input
+    id: size
+    attributes:
+      label: Size (bytes)
+  - type: input
+    id: sha1
+    attributes:
+      label: SHA-1
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else

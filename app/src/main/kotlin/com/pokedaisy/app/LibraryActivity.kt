@@ -42,6 +42,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GridView
@@ -76,6 +77,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.pokedaisy.app.companion.i18n.tr
+import com.pokedaisy.app.companion.ui.LOGO_PALETTE
+import com.pokedaisy.app.companion.ui.LOGO_ROWS
+import com.pokedaisy.app.companion.ui.PixelArt
 import com.pokedaisy.app.companion.ui.AppBackdrop
 import com.pokedaisy.app.companion.ui.BackdropText
 import com.pokedaisy.app.companion.ui.GbaText
@@ -138,10 +142,10 @@ class LibraryActivity : ComponentActivity() {
 
     /** First-time setup over the library while non-null (internal for the ui-preview harness). */
     internal var setup by mutableStateOf<SetupState?>(null)
-    private val pickRomsFolder = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+    private val pickRomsFolder = registerForActivityResult(StorageAccess.PickFolder()) { uri ->
         pickedFolder(uri)?.let(::linkRomsFolder)
     }
-    private val pickSavesFolder = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+    private val pickSavesFolder = registerForActivityResult(StorageAccess.PickFolder()) { uri ->
         pickedFolder(uri)?.let(::useSavesFolder)
     }
 
@@ -209,6 +213,7 @@ class LibraryActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        com.pokedaisy.app.companion.ui.OptionColors.inGame = false
         com.pokedaisy.app.companion.i18n.L10n.apply(prefs.appLanguage, null)
         if (prefs.setupRequested) {
             prefs.setupRequested = false
@@ -217,7 +222,7 @@ class LibraryActivity : ComponentActivity() {
         }
         setup?.let { s ->
             // Back from Android's All files access page: carry on with the folder pick it was for.
-            s.hasAccess = StorageAccess.hasAllFilesAccess()
+            s.hasAccess = StorageAccess.hasAllFilesAccess(this)
             val waiting = s.awaitingAccess
             s.awaitingAccess = null
             if (s.hasAccess) when (waiting) {
@@ -246,9 +251,11 @@ class LibraryActivity : ComponentActivity() {
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
-            AppBackdrop()
+            AppBackdrop(logos = true)
             Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                OptionTitleWindow("POKéDAISY", m) {
+                OptionTitleWindow("POKéDAISY", m, leading = {
+                    PixelArt(LOGO_ROWS, LOGO_PALETTE, Modifier.size(m.lineHeight))
+                }) {
                     HeaderIcon(if (gridView) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView, tr("Toggle view"), m) {
                         gridView = !gridView
                         prefs.libraryViewMode = if (gridView) 1 else 0
@@ -569,6 +576,10 @@ class LibraryActivity : ComponentActivity() {
                 }
                 MenuItem(tr("LOAD SAVE"), Icons.Filled.FileOpen) { saveTarget = rom; pickSaveFile.launch(arrayOf("*/*")) }
                 MenuItem(tr("RESTORE BACKUP"), Icons.Filled.History) { showBackups(rom) }
+                // The game's cheats, on Settings' CHEATS page.
+                MenuItem(tr("CHEATS"), Icons.Filled.Code) {
+                    startActivity(Intent(this@LibraryActivity, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_CHEATS_ROM, rom.absolutePath))
+                }
                 MenuItem(tr("HIDE"), Icons.Filled.VisibilityOff) { hideRom(rom) }
                 // A linked folder's ROM is the player's own file: it can be hidden, never deleted.
                 if (!RomFolder.isLinked(prefs, rom)) {
@@ -1007,7 +1018,7 @@ class LibraryActivity : ComponentActivity() {
 
     private fun startSetup() {
         setup = SetupState().apply {
-            hasAccess = StorageAccess.hasAllFilesAccess()
+            hasAccess = StorageAccess.hasAllFilesAccess(this@LibraryActivity)
             romsFolder = prefs.romsFolder
             if (romsFolder != null) found = RomFolder.found(this@LibraryActivity, prefs).map(::romLabel)
             savesDir = prefs.savesDirOverride
@@ -1072,7 +1083,7 @@ class LibraryActivity : ComponentActivity() {
     /** Folders are opened by raw path, so All files access comes first: Android's page
      * opens, and onResume carries on with the pick once the player comes back. */
     private fun chooseFolder(s: SetupState, step: SetupState.Step) {
-        if (!StorageAccess.hasAllFilesAccess()) {
+        if (!StorageAccess.hasAllFilesAccess(this)) {
             s.awaitingAccess = step
             StorageAccess.requestAllFilesAccess(this)
             return

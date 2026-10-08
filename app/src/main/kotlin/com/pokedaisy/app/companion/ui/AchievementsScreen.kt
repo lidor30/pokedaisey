@@ -205,6 +205,7 @@ fun AchievementsScreen(
             else -> AchievementList(
                 state.achievements, game, lockedOnly, { lockedOnly = !lockedOnly }, m, small, Modifier.weight(1f),
                 onLeaderboards = if (state.leaderboards.isNotEmpty()) ({ showBoards = true }) else null,
+                paused = state.cheatsPaused,
             )
         }
     }
@@ -221,6 +222,8 @@ private fun AchievementList(
     modifier: Modifier,
     /** Switches to the leaderboards; null = the game has none. */
     onLeaderboards: (() -> Unit)?,
+    /** A cheat is on, so nothing unlocks (RetroAchievements.setCheatsActive). */
+    paused: Boolean = false,
 ) {
     val shown = if (lockedOnly) list.filter { !it.unlocked } else list
     Column(modifier.fillMaxWidth()) {
@@ -229,6 +232,7 @@ private fun AchievementList(
             modifier = Modifier.fillMaxWidth(),
         ) {
             BackdropText(game.title.orEmpty(), m, Modifier.weight(1f).padding(start = m.u * 4))
+            if (paused) OptionBadge(tk("PAUSED: CHEATS ON"), m)
             OptionButton(if (lockedOnly) tk("SHOW ALL") else tk("LOCKED ONLY"), small, onClick = onToggle)
             onLeaderboards?.let { OptionButton(tk("LEADERBOARDS"), small, onClick = it) }
         }

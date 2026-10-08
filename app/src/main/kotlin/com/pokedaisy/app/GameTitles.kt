@@ -1,6 +1,9 @@
 package com.pokedaisy.app
 
 import android.content.Context
+import com.pokedaisy.app.companion.data.EMERALD_LOCALIZED_CODES
+import com.pokedaisy.app.companion.data.RETAIL_PORT_CODE_TITLES
+import com.pokedaisy.app.companion.data.RETAIL_PORT_TITLES
 import java.io.File
 
 /**
@@ -18,13 +21,21 @@ import java.io.File
  */
 object GameTitles {
 
-    val BY_SHA1: Map<String, String> = mapOf(
+    val BY_SHA1: Map<String, String> by lazy { HAND + RETAIL_PORT_TITLES }
+
+    private val HAND: Map<String, String> = mapOf(
         // Retail (USA, Europe), every revision: pret's pokefirered / pokeemerald / pokeruby.
         "41cb23d8dccc8ebd7c649cd8fbb58eeace6e2fdc" to "Pokémon FireRed",
         "dd5945db9b930750cb39d00c84da8571feebf417" to "Pokémon FireRed",
         "574fa542ffebb14be69902d1d36f1ec0a4afd71e" to "Pokémon LeafGreen",
         "7862c67bdecbe21d1d69ce082ce34327e1c6ed5e" to "Pokémon LeafGreen",
         "f3ae088181bf583e55daf962a92bb46f4f1d07b7" to "Pokémon Emerald",
+        // The other Emeralds, by their own titles (No-Intro's dumps; no decomp builds them).
+        "fe1558a3dcb0360ab558969e09b690888b846dd9" to "Pokémon Edición Esmeralda",
+        "61c2eb2b380b1a75f0c94b767a2d4c26cd7ce4e3" to "Pokémon Smaragd-Edition",
+        "ca666651374d89ca439007bed54d839eb7bd14d0" to "Pokémon Version Émeraude",
+        "1692db322400c3141c5de2db38469913ceb1f4d4" to "Pokémon Versione Smeraldo",
+        "d7cf8f156ba9c455d164e1ea780a6bf1945465c2" to "ポケットモンスター エメラルド",
         "f28b6ffc97847e94a6c21a63cacf633ee5c8df1e" to "Pokémon Ruby",
         "610b96a9c9a7d03d2bafb655e7560ccff1a6d894" to "Pokémon Ruby",
         "5b64eacf892920518db4ec664e62a086dd5f5bc8" to "Pokémon Ruby",
@@ -37,6 +48,7 @@ object GameTitles {
         "964f951a0fdaf209e4ea1344883ef0d557bb3a80" to "Pokémon Radical Red",
         "8745ddbdbfadf6abaf66de4e9055923b62eb4668" to "Pokémon Odyssey",
         "00e70c0384a5f1698588034201fd5b849d3542e2" to "Pokémon Amethyst",
+        "91291aade04b4b111cd03ae7b6e2ff460e1edd8a" to "Pokémon Amethyst",
         "3cbd5a2e72ce60cfae1e0c28d83e01f855c51537" to "Pokémon Celia's Stupid Romhack",
         "79ee6df0869c1773c8c6a5f764afc1f8d833d8bb" to "Pokémon Heart & Soul",
         "7dcdc7e280bc4631487e13dd37e6e0cea04adea6" to "Pokémon Lazarus",
@@ -46,12 +58,14 @@ object GameTitles {
         "b9f4d332d30fc88c379f9e037f9eae3b2755ead4" to "Pokémon Emerald Seaglass",
         "ea5d369cc8a31cbf1cfacb7c9470ea670f08957b" to "Pokémon SoulGold",
         "805d880ee229fb6dc3ce03d7b03baf48f0d759d0" to "Pokémon SoulGold",
+        "5d6a036260fdbde96f85b5c1b92d0256d3aebafb" to "Pokémon SoulGold",
         // Game Boy (pret/pokeyellow's roms.sha1).
         "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1" to "Pokémon Yellow",
     )
 
     /** Only these games' ROMs (and Game Boy carts) are worth hashing: every entry above is one of them. */
-    private val CODES = setOf("BPRE", "BPGE", "BPEE", "AXVE", "AXPE")
+    private val CODES = setOf("BPRE", "BPGE", "BPEE", "AXVE", "AXPE") + EMERALD_LOCALIZED_CODES +
+        RETAIL_PORT_CODE_TITLES.keys
 
     /** What the library shows for [rom]: the player's RENAME, else [defaultLabel]. Cheap. */
     fun label(context: Context, prefs: Prefs, rom: File): String =

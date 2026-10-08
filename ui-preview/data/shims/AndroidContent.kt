@@ -15,6 +15,7 @@ open class Context {
     fun getExternalFilesDir(t: String?): File? = filesDir
     fun getSharedPreferences(n: String, mode: Int): SharedPreferences = SharedPreferences.shared
     open fun getSystemService(n: String): Any? = null
+    fun checkSelfPermission(p: String) = 0
 
     companion object {
         const val MODE_PRIVATE = 0

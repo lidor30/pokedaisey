@@ -117,14 +117,16 @@ fun itemName(id: Int): String = activeItemNames[id]?.let(::gameCase) ?: "Item#$i
  * é stays small). Tables extracted from a hack's own ROM already carry that
  * game's casing, so everything else is left alone.
  */
-fun gameCase(name: String): String = when (activeGame) {
-    GameKind.FIRERED, GameKind.EMERALD -> buildString(name.length) {
+fun gameCase(name: String): String = when {
+    // A localized game's names come from its ROM, already in its casing.
+    localText != null -> name
+    activeGame == GameKind.FIRERED || activeGame == GameKind.EMERALD -> buildString(name.length) {
         for (c in name) append(if (c == 'é') c else c.uppercaseChar())
     }
     else -> name
 }
 
-fun itemDescription(id: Int): String = when (activeGame) {
+fun itemDescription(id: Int): String = localText?.let { it.itemDescriptions[id] ?: "" } ?: when (activeGame) {
     // Each game's own text, extracted from its ROM.
     GameKind.HEART_AND_SOUL -> itemDescriptionsHns[id] ?: ""
     GameKind.LAZARUS -> itemDescriptionsLazarus[id] ?: ""
@@ -134,7 +136,8 @@ fun itemDescription(id: Int): String = when (activeGame) {
     // Renumbered items with no description table: vanilla text would be wrong.
     GameKind.EMERALD_SEAGLASS -> itemDescriptionsSeaglass[id] ?: ""
     GameKind.CELIA, GameKind.TMT2 -> ""
-    GameKind.YELLOW -> ""   // Gen 1 items have no descriptions
+    // Gen 1 items have no descriptions of their own: ours, and what each TM / HM teaches.
+    GameKind.YELLOW -> itemDescriptionsYellow[id] ?: tmDescriptionsYellow[id] ?: ""
     else -> itemDescriptions[id] ?: ""
 }
 

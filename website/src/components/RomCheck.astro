@@ -1,0 +1,175 @@
+---
+// The ROM check: reads a dropped ROM in the browser (never uploaded) and judges it with
+// src/lib/compat.js - the app's CompanionSupport rules over compat.json.
+import Pixel from './Pixel.astro';
+---
+<div class="romcheck">
+  <label class="drop f-card" data-drop>
+    <input type="file" accept=".gba,.gb,.gbc,.zip,.7z" hidden data-file />
+    <span class="drop-art"><Pixel name="logo" scale={2} /></span>
+    <span class="drop-title" data-drop-text>DROP A ROM HERE</span>
+    <span class="drop-sub small muted">or tap to pick one: .gba, .gb, .gbc or a .zip of one</span>
+    <span class="drop-lock small"><Pixel name="states" scale={0.667} /> Checked right here in your browser. Never uploaded.</span>
+  </label>
+
+  <div class="result f-list" data-result hidden aria-live="polite">
+    <div class="verdict" data-verdict></div>
+    <dl class="rows" data-rows></dl>
+    <p class="message" data-message></p>
+    <div data-actions></div>
+  </div>
+</div>
+
+<style is:global>
+  .romcheck { display: grid; gap: 28px; }
+  .drop {
+    display: grid; justify-items: center; gap: 8px; text-align: center; cursor: pointer;
+    padding: calc(var(--px) * 12) calc(var(--px) * 6);
+    filter: var(--hard-shadow);
+    transition: transform 0.15s steps(2);
+    position: relative;
+  }
+  .drop::after {
+    content: ''; position: absolute; inset: calc(var(--px) * 3);
+    outline: var(--px) dashed #c9c6d6; outline-offset: 0; pointer-events: none;
+  }
+  .drop:hover, .drop.over { transform: translateY(calc(var(--px) * -2)); }
+  .drop.over::after { outline-color: var(--red); }
+  .drop-art { animation: wobble 2.4s steps(1) infinite; transform-origin: 50% 90%; }
+  .drop.busy .drop-art { animation-duration: 0.7s; }
+  @keyframes wobble {
+    0%, 55%, 100% { transform: rotate(0); }
+    62% { transform: rotate(-15deg); }
+    70% { transform: rotate(15deg); }
+    78% { transform: rotate(-8deg); }
+    86% { transform: rotate(0); }
+  }
+  .drop-title { font-size: var(--t-l); margin-top: 8px; text-shadow: var(--bold); letter-spacing: 0.0625em; }
+  .drop-lock { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; color: var(--green); }
+
+  .result { padding: calc(var(--px) * 2) calc(var(--px) * 3); color: #575656; text-shadow: var(--px) var(--px) 0 #c8c7bf; }
+  .result.in { animation: open 0.42s var(--step) forwards; }
+  .verdict { display: flex; align-items: center; gap: 16px; font-size: var(--t-l); margin-bottom: 8px; }
+  .verdict .stamp { padding: 0 12px; text-shadow: none; }
+  .rows { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 24px; margin: 8px 0 16px; font-size: var(--t-m); }
+  .rows dt { color: #575656; }
+  .rows dd { margin: 0; color: #cb0707; text-shadow: var(--px) var(--px) 0 #e0a564; overflow-wrap: anywhere; }
+  .rows dd.plain { color: #8c8c94; text-shadow: none; }
+  .message { color: #3c3b45; text-shadow: none; margin-bottom: 8px; }
+  @media (max-width: 760px) { .rows { grid-template-columns: 1fr; gap: 0; } .rows dd { margin-bottom: 6px; } }
+</style>
+
+<script>
+  import data from '../data/compat.json';
+  import { checkFile } from '../lib/compat.js';
+
+  const REPO = 'https://github.com/lidor30/pokedaisy';
+  const MESSAGES: Record<string, (v: any, r: any) => string> = {
+    supported: (v) => v.version
+      ? `The companion knows this exact version of ${v.title}. Party, battles, map and more on the second screen.`
+      : `The companion reads ${v.title}. Party, battles, map and more on the second screen.`,
+    likely: (v) => `It's a ${v.base} ROM, but not a dump we know: a FireRed / Emerald QoL build is fully supported, while a small ROM hack is read as ${v.base} and may show wrong or missing info.`,
+    'unknown-hack': (v) => `A ${v.base}-based ROM hack we don't know yet. It still plays, but the companion screen only says "not supported". Ask for it below!`,
+    'in-progress': (v) => `${v.title} ${v.version} plays in PokeDaisy, but its companion is still being built. It's coming!`,
+    'retail-hack': (v) => `A ROM hack built on ${v.base}. Only the original game is supported so far.`,
+    revision: (v, r) => `${v.base} revision ${r.rev} isn't supported yet.`,
+    'other-game': (_, r) => `Not a game the companion reads (game code ${r.code}). PokeDaisy still plays it, without the companion.`,
+    gb: () => 'A Game Boy game the companion doesn\'t read yet. Pokémon Yellow is the only one so far.',
+    '7z': () => 'Unpack the .7z first, then drop the ROM (or a .zip of it).',
+    'empty-zip': () => 'There\'s no .gba, .gb or .gbc file in that zip.',
+    'not-a-rom': () => 'This doesn\'t look like a GBA or Game Boy ROM.',
+  };
+  const STAMPS: Record<string, [string, string]> = {
+    supported: ['SUPPORTED', 'f-pillGreen'],
+    likely: ['PROBABLY WORKS', 'f-pillYellow'],
+    unsupported: ['NOT YET', 'f-pillRed'],
+  };
+
+  for (const root of document.querySelectorAll<HTMLElement>('.romcheck')) {
+    const drop = root.querySelector<HTMLElement>('[data-drop]')!;
+    const input = root.querySelector<HTMLInputElement>('[data-file]')!;
+    const dropText = root.querySelector<HTMLElement>('[data-drop-text]')!;
+    const result = root.querySelector<HTMLElement>('[data-result]')!;
+    const verdictEl = root.querySelector<HTMLElement>('[data-verdict]')!;
+    const rows = root.querySelector<HTMLElement>('[data-rows]')!;
+    const message = root.querySelector<HTMLElement>('[data-message]')!;
+    const actions = root.querySelector<HTMLElement>('[data-actions]')!;
+
+    const row = (label: string, value: string, plain = false) => {
+      const dt = document.createElement('dt');
+      dt.textContent = label;
+      const dd = document.createElement('dd');
+      dd.textContent = value;
+      if (plain) dd.className = 'plain';
+      rows.append(dt, dd);
+    };
+
+    const requestLink = (r: any) => {
+      // Pre-fills .github/ISSUE_TEMPLATE/rom_request.yml's fields (by id) - never the file.
+      const params = new URLSearchParams({
+        template: 'rom_request.yml',
+        title: `ROM support: ${r.name.replace(/\.[^.]+$/, '')}`,
+        game_code: r.code ? `${r.code} (rev ${r.rev})` : 'Game Boy',
+        size: String(r.size),
+        sha1: r.sha1,
+      });
+      const a = document.createElement('a');
+      a.className = 'btn f-btn h-btnHot small';
+      a.href = `${REPO}/issues/new?${params}`;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = 'ASK FOR SUPPORT';
+      return a;
+    };
+
+    const check = async (file: File) => {
+      dropText.textContent = 'CHECKING…';
+      drop.classList.add('busy');
+      result.hidden = true;
+      result.classList.remove('in');
+      rows.replaceChildren();
+      actions.replaceChildren();
+      verdictEl.replaceChildren();
+      try {
+        const r: any = await checkFile(data, file.name, new Uint8Array(await file.arrayBuffer()));
+        const v = r.verdict;
+        const [stampText, stampFrame] = STAMPS[v.status];
+        const stamp = document.createElement('span');
+        stamp.className = `stamp chip ${stampFrame}`;
+        stamp.textContent = stampText;
+        const name = document.createElement('span');
+        name.textContent = v.title ? (v.version ? `${v.title} ${v.version}` : v.title) : v.base ?? r.name;
+        verdictEl.append(stamp, name);
+        if (v.base && v.base !== v.title) row('BASED ON', v.base);
+        row('FILE', r.name, true);
+        if (r.code) row('GAME CODE', `${r.code}  REV ${r.rev}`);
+        if (r.size) row('SIZE', `${(r.size / 1048576).toFixed(r.size % 1048576 ? 1 : 0)} MB`);
+        if (r.sha1) row('SHA-1', r.sha1, true);
+        message.textContent = MESSAGES[v.status === 'unsupported' ? v.reason : v.status](v, r);
+        if (r.sha1 && (v.status === 'likely' || ['unknown-hack', 'retail-hack', 'revision', 'other-game', 'gb'].includes(v.reason))) {
+          actions.append(requestLink(r));
+        }
+      } catch (e) {
+        const stamp = document.createElement('span');
+        stamp.className = 'stamp chip f-pillRed';
+        stamp.textContent = 'ERROR';
+        verdictEl.append(stamp);
+        message.textContent = `Couldn't read that file: ${(e as Error).message}`;
+      }
+      drop.classList.remove('busy');
+      dropText.textContent = 'DROP ANOTHER ROM';
+      result.hidden = false;
+      result.classList.add('in');
+    };
+
+    input.addEventListener('change', () => input.files?.[0] && check(input.files[0]));
+    drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', (e) => {
+      e.preventDefault();
+      drop.classList.remove('over');
+      const file = e.dataTransfer?.files?.[0];
+      if (file) check(file);
+    });
+  }
+</script>

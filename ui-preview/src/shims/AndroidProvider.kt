@@ -6,6 +6,7 @@ object DocumentsContract {
     fun getTreeDocumentId(u: Uri): String = ""
     fun getDocumentId(u: Uri): String = ""
     fun isDocumentUri(c: android.content.Context, u: Uri) = false
+    fun buildDocumentUri(authority: String, id: String): Uri = Uri.parse("content://$authority/document/$id")
 }
 
 object OpenableColumns { const val DISPLAY_NAME = "_display_name" }

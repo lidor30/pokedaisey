@@ -1,0 +1,168 @@
+---
+// The PARTY tab as the app draws it for a game without slot art of its own (PartyScreen.kt's
+// FireRedPartyPalette slot), then a Pokémon's summary (MonDetailScreen.kt's SummaryFrame),
+// playing itself: the cursor walks the party, opens the first, steps DOWN to the next, goes back. Invented
+// creatures and moves only (never a real name), a type's emblem for each icon, a daisy orb for the ball.
+import AppScreen from './AppScreen.astro';
+import Pixel from './Pixel.astro';
+import { TYPE } from '../lib/types.js';
+
+interface Props { compact?: boolean }
+const { compact = false } = Astro.props;
+
+const party = [
+  { name: 'EMBERPUP', icon: 'flame', g: 'maleParty', lv: 12, hp: [30, 35] },
+  { name: 'GALEFINCH', icon: 'feather', g: 'femaleParty', lv: 9, hp: [5, 26], status: 'PSN' },
+  { name: 'VOLTMOUSE', icon: 'battle', g: 'femaleParty', lv: 10, hp: [24, 28] },
+  { name: 'PEBBLON', icon: 'rock', g: 'maleParty', lv: 11, hp: [0, 30], status: 'FNT' },
+  { name: 'SPROUTLING', icon: 'leaf', g: 'maleParty', lv: 10, hp: [12, 31] },
+  { name: 'EGG', icon: 'egg', egg: true },
+];
+const hpClass = (hp: number[]) => {
+  const f = hp[0] / hp[1];
+  return f === 0 ? 'empty' : f <= 0.2 ? 'red' : f <= 0.5 ? 'yellow' : 'green';
+};
+const summaries = [
+  {
+    key: 'first', name: 'EMBERPUP', g: 'male', icon: 'flame', lv: 12, types: ['FIRE'], hp: ['86%', '30/35', ''], exp: ['34%', 'NEXT 161'],
+    weak: [['WATER', '2x'], ['GROUND', '2x'], ['ROCK', '2x']], resists: [['FIRE', '1/2x'], ['GRASS', '1/2x'], ['ICE', '1/2x'], ['BUG', '1/2x']],
+    moves: [['PAW SWIPE', 'NORMAL', '40', '35'], ['WARY GLARE', 'NORMAL', '-', '40'], ['CINDER SPIT', 'FIRE', '40', '25'], ['IRON NIP', 'STEEL', '50', '35']],
+  },
+  {
+    key: 'second', name: 'GALEFINCH', g: 'female', icon: 'feather', lv: 9, types: ['NORMAL', 'FLYING'], status: 'PSN', hp: ['19%', '5/26', 'low'], exp: ['72%', 'NEXT 48'],
+    weak: [['ELECTRIC', '2x'], ['ICE', '2x'], ['ROCK', '2x']], resists: [['GRASS', '1/2x'], ['BUG', '1/2x']], immune: [['GROUND', '0x'], ['GHOST', '0x']],
+    moves: [['WING BUMP', 'NORMAL', '35', '35'], ['DUST FLICK', 'GROUND', '-', '15'], ['BREEZE CUT', 'FLYING', '40', '35'], ['SWIFT DART', 'NORMAL', '40', '30']],
+  },
+];
+---
+<div class:list={['party-demo', compact && 'compact']} data-party-demo>
+  <AppScreen bare={compact} tabs={compact ? ['PARTY', 'MAP', 'BAG', 'GUIDE'] : undefined} tinted={compact} label="The companion's PARTY tab: six party slots with HP, then one's summary with its moves and weaknesses">
+    <div class="pane on" data-pane="grid">
+      {party.map((m, i) => (
+        <div class:list={['slot', i === 0 && 'sel', m.status === 'FNT' && 'fnt']} data-slot={i}
+          style={`left:${i % 2 ? 288 : 16}px;top:${24 + Math.floor(i / 2) * 138}px`}>
+          <span class="slot-ball"><Pixel name="partyOrb" scale={1} /></span>
+          <span class="slot-icon"><Pixel name={m.icon} scale={1.5} /></span>
+          <span class="slot-name t24">{m.name}</span>
+          {!m.egg && (
+            <>
+              <span class="slot-lv t24">{m.status ? <span class="spill" style={`--c:${m.status === 'PSN' ? '#a259d9' : '#606060'}`}>{m.status}</span> : `Lv${m.lv}`}</span>
+              <span class="slot-g"><Pixel name={m.g} scale={1} /></span>
+              <span class="slot-hp">
+                <span class="hp-tag t16">HP</span>
+                <span class={`hp-bar ${hpClass(m.hp!)}`} style={`--v:${(m.hp![0] / m.hp![1]) * 100}%`}><i></i></span>
+              </span>
+              <span class="slot-num t24">{m.hp![0]}/{m.hp![1]}</span>
+            </>
+          )}
+        </div>
+      ))}
+    </div>
+
+    {summaries.map((s, si) => (
+      <div class="pane" data-pane={s.key}>
+        <div class="win f-appWin sum">
+          <div class="sum-l">
+            <span class="t32 nm">{s.name}<Pixel name={s.g} scale={1} />{s.status && <span class="pill" style="--c:#a259d9">{s.status}</span>}</span>
+            <span class="row"><span class="icon-box f-iconBox"><Pixel name={s.icon} scale={1.334} /></span><span class="t32">Lv <b class="red t48">{s.lv}</b></span></span>
+            <span class="row">{s.types.map((t) => <span class="pill big" style={`--c:${TYPE[t]}`}>{t}</span>)}</span>
+            <span class="hp"><span class="red">HP</span><span class:list={['hpbar', s.hp[2]]} style={`--v:${s.hp[0]}`}><i></i></span><span>{s.hp[1]}</span></span>
+            <span class="hp"><span class="red">EXP</span><span class="hpbar exp" style={`--v:${s.exp[0]}`}><i></i></span><span>{s.exp[1]}</span></span>
+            <span class="sep-h"></span>
+            <span class="t24">WEAK TO</span>
+            <span class="pills">{s.weak.map(([t, x]) => <span class="pill big" style={`--c:${TYPE[t]}`}>{t} {x}</span>)}</span>
+            <span class="t24">{s.immune ? 'IMMUNE TO' : 'RESISTS'}</span>
+            <span class="pills">{(s.immune ?? s.resists).map(([t, x]) => <span class="pill big" style={`--c:${TYPE[t]}`}>{t} {x}</span>)}</span>
+          </div>
+          <span class="sep-v"></span>
+          <div class="sum-r">
+            {s.moves.map(([name, type, pwr, pp], i) => (
+              <>
+                {i > 0 && <span class="sep-h"></span>}
+                <div class="smv" style={`--t:${TYPE[type]}`}>
+                  <span class="t32">{name}</span>
+                  <span class="mv-b"><span class="pill big" style={`--c:${TYPE[type]}`}>{type}</span><span class="t24">PWR <b class="red">{pwr}</b> PP <b class="red">{pp}</b></span></span>
+                </div>
+              </>
+            ))}
+          </div>
+        </div>
+        <div class="pb pb-mon f-pbMon" style="left:14px;top:378px;width:68px;height:56px"><Pixel name="arrowUp" scale={1.334} /></div>
+        <div class="pb pb-mon f-pbMon" style="left:94px;top:378px;width:68px;height:56px" data-b={`down${si}`}><Pixel name="arrowDown" scale={1.334} /></div>
+        <div class="strip">
+          {['flame', 'feather', 'battle', 'rock', 'leaf', 'egg'].slice(0, 3).map((icon, i) => (
+            <span class:list={['strip-icon', i === si && 'f-iconBoxOn on']}><Pixel name={icon} scale={1.334} /></span>
+          ))}
+        </div>
+        <div class="pb pb-run f-pbRun" style="left:474px;top:378px;width:72px;height:56px" data-b={`back${si}`}><Pixel name="back" scale={1.334} /></div>
+      </div>
+    ))}
+  </AppScreen>
+</div>
+
+<style is:global>
+  /* FireRedPartyPalette: normal / selected / fainted slots, an orb over the corner. */
+  .app .slot {
+    --o: #4a4a63; --l: #84c6de; --f: #3994de; --s: #297bb5;
+    position: absolute; width: 256px; height: 118px; color: #fff; text-shadow: 2px 2px 0 #737373;
+    background: var(--f);
+    box-shadow: inset 0 0 0 4px var(--o), inset 0 0 0 6px var(--l);
+    clip-path: polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px);
+    transition: none;
+  }
+  .app .slot::after { content: ''; position: absolute; left: 6px; right: 6px; bottom: 6px; height: 40px; background: color-mix(in srgb, var(--f), var(--l) 45%); box-shadow: 0 -2px 0 var(--l); }
+  .app .slot > * { position: absolute; z-index: 1; }
+  .app .slot.sel { --o: #ff7331; --l: #adefff; --f: #7bd6ef; --s: #4aadce; }
+  .app .slot.fnt { --l: #d6a521; --f: #c66b10; --s: #a54a00; }
+  .app .slot-ball { left: -2px; top: -4px; }
+  .app .slot-icon { left: 4px; top: 18px; }
+  .app .slot.sel .slot-icon { animation: monBob 0.36s steps(1) infinite; }
+  @keyframes monBob { 50% { transform: translateY(-4px); } }
+  .app .slot-name { left: 62px; top: 16px; white-space: nowrap; }
+  .app .slot-lv { left: 78px; top: 44px; }
+  .app .slot-g { right: 18px; top: 46px; }
+  .app .slot-hp { left: 62px; right: 12px; bottom: 30px; display: flex; align-items: center; }
+  .app .hp-tag { color: #ffd652; text-shadow: 0 2px 0 #ffb542; background: #525252; padding: 1px 4px 3px; line-height: 1; }
+  .app .hp-bar { position: relative; flex: 1; height: 10px; background: #737373; box-shadow: inset 0 0 0 2px #525252, inset 0 0 0 4px #fff; }
+  .app .hp-bar i { position: absolute; left: 4px; right: 4px; top: 4px; bottom: 2px; clip-path: inset(0 calc(100% - var(--v)) 0 0); }
+  .app .hp-bar.green i { background: #73ffad; box-shadow: inset 0 2px 0 #5ad684; }
+  .app .hp-bar.yellow i { background: #ffe739; box-shadow: inset 0 2px 0 #cead08; }
+  .app .hp-bar.red i { background: #ff7331; box-shadow: inset 0 2px 0 #c63900; }
+  .app .slot-num { right: 16px; bottom: 6px; }
+  .app .spill { display: inline-block; padding: 0 6px; font-size: 16px; line-height: 20px; background: var(--c); text-shadow: none; clip-path: polygon(2px 0, calc(100% - 2px) 0, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 0 calc(100% - 2px), 0 2px); }
+
+  /* Summary */
+  .app .sum { display: grid; grid-template-columns: 1fr 2px 1fr; gap: 12px; }
+  .app .sum-l { display: grid; gap: 4px; align-content: start; overflow: hidden; }
+  .app .sum-l .sep-h { margin: 2px 0; }
+  .app .sum-r { display: grid; align-content: start; gap: 2px; overflow: hidden; }
+  .app .smv { display: grid; gap: 4px; padding: 2px 0 2px 10px; box-shadow: inset 4px 0 0 var(--t); }
+  .app .sum-r .sep-h { margin: 3px 0; }
+  .app .strip { position: absolute; left: 230px; top: 376px; display: flex; gap: 10px; align-items: center; }
+  .app .strip-icon { display: grid; place-items: center; width: 60px; height: 60px; }
+</style>
+
+<script>
+  import { demo } from '../lib/demo.js';
+
+  for (const root of document.querySelectorAll<HTMLElement>('[data-party-demo]')) {
+    const slots = [...root.querySelectorAll<HTMLElement>('[data-slot]')];
+    const cursor = (i: number) => slots.forEach((s, j) => s.classList.toggle('sel', i === j));
+    demo(root, async (d) => {
+      d.show('grid');
+      cursor(0);
+      await d.wait(1100);
+      for (const i of [1, 2, 4, 2, 0]) {
+        cursor(i);
+        await d.wait(650);
+      }
+      await d.tap('[data-slot="0"]');
+      d.show('first');
+      await d.wait(2600);
+      await d.tap('[data-b="down0"]');
+      d.show('second');
+      await d.wait(2600);
+      await d.tap('[data-b="back1"]');
+    });
+  }
+</script>

@@ -43,10 +43,11 @@ import com.pokedaisy.app.companion.ui.rememberArtGeneration
 import com.pokedaisy.app.companion.ui.soundClickable
 
 /**
- * A named "chrome" palette — one of 8 selectable reskins (FireRed default +
- * 7 more, named after mainline Pokémon versions). Only the identity/chrome
- * colors vary per theme; semantic colors (HP/status/type, cream panel, dark
- * text) stay constant across all of them so contrast and meaning never break.
+ * A named "chrome" palette — one of 9 selectable reskins (PokéDaisy default, then
+ * FireRed and 7 more named after mainline Pokémon versions). Only the
+ * identity/chrome colors vary per theme; semantic colors (HP/status/type, cream
+ * panel, dark text) stay constant across all of them so contrast and meaning
+ * never break. Picked by [id] (stored in Prefs.appTheme), not list position.
  */
 data class ThemeSpec(
     val id: Int,
@@ -63,9 +64,34 @@ data class ThemeSpec(
     val slotInner: Color,
 )
 
+/** [ThemeSpec.id] of the PokéDaisy theme, the default: the website's look (see [isDaisyTheme]). */
+const val DAISY_THEME_ID = 8
+
+/** [ThemeSpec.id] of the FireRed theme (the default before PokéDaisy): FireRed's party-menu stripes. */
+const val FIRERED_THEME_ID = 0
+
+/**
+ * The PokéDaisy theme draws the top screen (Library, Settings, setup) like the
+ * website: light, soft colour, ink-outlined white windows (OptionColors), the
+ * drifting backdrop with the logo (AppBackdrop). Its chrome colours here are
+ * FireRed's, so what still reads them (the in-game companion's few themed bits)
+ * looks as before.
+ */
+val isDaisyTheme: Boolean get() = QolColors.currentThemeId == DAISY_THEME_ID
+
+/** The theme stored as [id], or the default for an unknown one. */
+fun themeById(id: Int): ThemeSpec = APP_THEMES.firstOrNull { it.id == id } ?: APP_THEMES.first()
+
 val APP_THEMES = listOf(
     ThemeSpec(
-        0, "FireRed",
+        DAISY_THEME_ID, "PokéDaisy",
+        bgTop = Color(0xFF3AA890), bgBottom = Color(0xFF2C7868),
+        windowFrame = Color(0xFF3860A8), windowInner = Color(0xFF98C0F8), windowGold = Color(0xFFF8D060),
+        accent = Color(0xFF3860A8),
+        slotFill = Color(0xFF48B8A8), slotFillDark = Color(0xFF308878), slotFrame = Color(0xFF206858), slotInner = Color(0xFF90E0D0),
+    ),
+    ThemeSpec(
+        FIRERED_THEME_ID, "FireRed",
         bgTop = Color(0xFF3AA890), bgBottom = Color(0xFF2C7868),
         windowFrame = Color(0xFF3860A8), windowInner = Color(0xFF98C0F8), windowGold = Color(0xFFF8D060),
         accent = Color(0xFF3860A8),
@@ -250,6 +276,32 @@ fun pixelFontFamily(): FontFamily {
  */
 val LocalGameFont = androidx.compose.runtime.staticCompositionLocalOf<FontFamily?> { null }
 
+/**
+ * How much larger than Pixel Operator text [LocalGameFont] is set, so its letters come out
+ * as tall: Gen 1's capitals are 7 pixels to Pixel Operator's 9 (rememberGbaTextMetrics still
+ * rounds to whole screen pixels per font pixel). 1 with no game font.
+ */
+val LocalGameTextScale = androidx.compose.runtime.staticCompositionLocalOf { 1f }
+
+/**
+ * How wide [LocalGameFont]'s pixels are drawn, relative to their height: Gen 1's letters fill
+ * 8px cells, far wider than Pixel Operator's, so they're condensed (GbaText rounds it per size,
+ * so a font pixel stays a whole number of screen pixels wide). 1 with no game font.
+ */
+val LocalGameFontWidth = androidx.compose.runtime.staticCompositionLocalOf { 1f }
+
+/** [LocalGameFontWidth] for [game]'s own font. */
+fun gameFontWidth(game: GameKind?): Float = when (game) {
+    GameKind.YELLOW -> 0.75f
+    else -> 1f
+}
+
+/** [LocalGameTextScale] for [game]'s own font. */
+fun gameTextScale(game: GameKind?): Float = when (game) {
+    GameKind.YELLOW -> 9f / 7f
+    else -> 1f
+}
+
 /** [game]'s own font from the rom-art cache, once a launch of it has written it; else null. */
 @Composable
 fun rememberGameFont(game: GameKind?): FontFamily? {
@@ -280,8 +332,8 @@ fun QolTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
     remember(context) {
         // runCatching: previews / screenshot tests may have no real prefs.
-        val id = runCatching { com.pokedaisy.app.Prefs(context).appTheme }.getOrDefault(0)
-        QolColors.applyTheme(APP_THEMES.getOrElse(id) { APP_THEMES[0] })
+        val id = runCatching { com.pokedaisy.app.Prefs(context).appTheme }.getOrDefault(DAISY_THEME_ID)
+        QolColors.applyTheme(themeById(id))
     }
 
     val pixel = pixelFontFamily()
@@ -376,9 +428,11 @@ fun rememberGameBackground(game: GameKind): GameBackground? {
 private val backgroundCache = HashMap<Pair<GameKind, Int>, GameBackground>()
 
 private fun buildGameBackground(context: android.content.Context, game: GameKind): GameBackground? {
-    // Gen 1's screens are plain white.
+    // Gen 1's screens are plain white: one pixel, stretched over the tab in a single draw.
+    // (Never tiled - GameBackdrop draws a tiled backdrop tile by tile, and a 1px tile at
+    // the Thor's 5x was ~53,000 draws a frame: 77 ms per frame on the RenderThread.)
     if (game == GameKind.YELLOW) {
-        return GameBackground(android.graphics.Bitmap.createBitmap(intArrayOf(-1), 1, 1, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap(), true)
+        return GameBackground(android.graphics.Bitmap.createBitmap(intArrayOf(-1), 1, 1, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap(), false)
     }
     backdropColors(game)?.let { to ->
         return GameBackground(recolorBackdrop(GameArt.get(context, "partybg/firered.png"), to).asImageBitmap(), false)

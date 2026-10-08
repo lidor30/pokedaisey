@@ -12,6 +12,8 @@ import java.io.File
  * the QoL builds, small hacks) are read as FireRed/Emerald; bigger ones only
  * when their SHA1 is a hack detect() knows. An archive is judged by the ROM
  * inside it ([RomArchive]). Blocking (hashes up to 32 MB) - never on the UI thread.
+ * The website's ROM check (`website/src/lib/compat.js`) is the same rules in JavaScript, over
+ * the tables `SiteDataExportTest` exports: change this, change that.
  */
 object CompanionSupport {
     fun isSupported(rom: File): Boolean {

@@ -11,6 +11,9 @@ interface StateSlots {
         val present: Boolean,
         val savedAtMillis: Long,
         val thumbPath: String?,
+        /** The thumbnail file's write time: it lands just after the state, so a list read
+         * between the two must still change (and redraw the card) once it does. */
+        val thumbModifiedMillis: Long = 0,
     )
 
     /** All slots, 0..9, in order. */

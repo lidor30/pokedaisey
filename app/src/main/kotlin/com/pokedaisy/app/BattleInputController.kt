@@ -41,6 +41,19 @@ class BattleInputController(
      */
     data class SwitchAddrs(val partyMenu: Long, val party: Long, val monStride: Int = 100, val grid: Boolean = false)
 
+    /**
+     * A Gen 1 game (Yellow): its battle menu is FIGHT / PkMn over ITEM / RUN, two one-column
+     * menus, and its moves are one list - not Gen 3's 2x2 grids. So presses go from the cursor
+     * the last poll read ([gen1Cursor], see readGen1BattleInput) straight to the target: no
+     * LEFT / UP normalising, which would wrap in a list.
+     */
+    @Volatile
+    var gen1 = false
+
+    /** The open Gen 1 menu's cursor (action cell column + 2 x row, or move index); -1 unknown. */
+    @Volatile
+    private var gen1Cursor = -1
+
     /** Set once the running game is known to support [switchTo]; null = it doesn't. */
     @Volatile
     var switchAddrs: SwitchAddrs? = null
@@ -278,8 +291,9 @@ class BattleInputController(
     /** Feed the latest (battleActiveBattler, battleInputState) from the fast
      * telemetry poll (not the ~1 Hz full refresh). Resumes a move selection
      * that's waiting for the FIGHT screen to actually open. */
-    fun onState(activeBattler: Int, state: Int) {
+    fun onState(activeBattler: Int, state: Int, cursor: Int = -1) {
         synchronized(lock) {
+            gen1Cursor = cursor
             if (state != lastKnownState) {
                 log("state $lastKnownState -> $state (battler=$activeBattler, queue=${queue.size}, framesLeft=$framesLeft, pending=$pendingMoveIndex, awaitingTarget=$awaitingTargetConfirm)")
             }
@@ -346,7 +360,7 @@ class BattleInputController(
     fun selectAction(actionIndex: Int) {
         synchronized(lock) {
             pendingMoveIndex = null
-            queueCellLocked(col(actionIndex), row(actionIndex))
+            if (gen1) queueGen1ActionLocked(actionIndex) else queueCellLocked(col(actionIndex), row(actionIndex))
             if (actionIndex == ACTION_RUN) {
                 // "Got away safely!" waits for a button: close it with B (a press
                 // while it's still printing just finishes the text).
@@ -372,7 +386,7 @@ class BattleInputController(
             log("selectMove($moveIndex) lastKnownState=$lastKnownState col=${col(moveIndex)} row=${row(moveIndex)}")
             if (lastKnownState == BATTLE_INPUT_ACTION_SELECT) {
                 pendingMoveIndex = moveIndex
-                queueCellLocked(col(0), row(0)) // open FIGHT (action index 0)
+                if (gen1) queueGen1ActionLocked(0) else queueCellLocked(col(0), row(0)) // open FIGHT (action index 0)
             } else {
                 pendingMoveIndex = null
                 queueMoveCellLocked(moveIndex)
@@ -439,8 +453,28 @@ class BattleInputController(
      * action) can land on a third "who does this hit" screen instead of
      * completing outright. */
     private fun queueMoveCellLocked(moveIndex: Int) {
+        if (gen1) {
+            // One list (items 1-4): UP / DOWN from the read cursor, then A. No target screen.
+            val from = gen1Cursor.takeIf { it in 0..3 } ?: 0
+            repeat(kotlin.math.abs(moveIndex - from)) { pressAndSettleLocked(if (moveIndex > from) MgbaCore.Key.DOWN else MgbaCore.Key.UP) }
+            pressLocked(MgbaCore.Key.A)
+            return
+        }
         queueCellLocked(col(moveIndex), row(moveIndex))
         awaitingTargetConfirm = true
+    }
+
+    /**
+     * Gen 1's battle menu: [actionIndex] in Gen 3's numbering (0 FIGHT, 1 BAG, 2 POKEMON,
+     * 3 RUN) onto its cells - FIGHT and PkMn on top, ITEM and RUN below. RIGHT / LEFT
+     * switches column on the same row, UP / DOWN the row; then A.
+     */
+    private fun queueGen1ActionLocked(actionIndex: Int) {
+        val target = when (actionIndex) { 0 -> 0; 1 -> 2; 2 -> 1; else -> 3 }
+        val from = gen1Cursor.takeIf { it in 0..3 } ?: 0
+        if ((from and 1) != (target and 1)) pressAndSettleLocked(if (target and 1 == 1) MgbaCore.Key.RIGHT else MgbaCore.Key.LEFT)
+        if ((from shr 1) != (target shr 1)) pressAndSettleLocked(if (target shr 1 == 1) MgbaCore.Key.DOWN else MgbaCore.Key.UP)
+        pressLocked(MgbaCore.Key.A)
     }
 
     /** One real frame pressed, one real frame released — JOY_NEW only fires

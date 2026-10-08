@@ -74,6 +74,9 @@ class EmulatorEngine(
 
     /** False for a Game Boy / Color ROM: the GBA-only watchers (region map, menus, m4a songs) stay off. */
     @Volatile var gba = true
+
+    /** A Game Boy game's music tables: its STEADY FF-music key comes from Gen1Music instead of the m4a engine. */
+    @Volatile var gen1Music: com.pokedaisy.app.companion.data.Gen1MusicTables? = null
     var onStateResult: ((action: Hotkeys.Action, slot: Int, ok: Boolean) -> Unit)? = null
     var onSlotChanged: ((slot: Int) -> Unit)? = null
     var onSpeedChanged: ((label: String) -> Unit)? = null
@@ -132,7 +135,12 @@ class EmulatorEngine(
 
     /** Feed the latest (battleActiveBattler, battleInputState) from the fast
      * poll above. */
-    fun setBattleMenuState(activeBattler: Int, state: Int) = battleInput.onState(activeBattler, state)
+    fun setBattleMenuState(activeBattler: Int, state: Int, cursor: Int = -1) = battleInput.onState(activeBattler, state, cursor)
+
+    /** A Gen 1 game's battle menus (steered from their read cursor - see [BattleInputController.gen1]). */
+    var battleGen1Menus: Boolean
+        get() = battleInput.gen1
+        set(v) { battleInput.gen1 = v }
 
     fun setFastForwardHeld(on: Boolean) {
         if (ffHeld == on) return
@@ -253,6 +261,17 @@ class EmulatorEngine(
         running = false
     }
 
+    /** The game's cheats as mGBA .cheats text (CheatFiles.coreText: the enabled ones,
+     * "" with the master switch off), loaded before the first frame and again on the
+     * next frame boundary whenever it changes. */
+    @Volatile private var cheatText = ""
+    @Volatile private var cheatsDirty = false
+
+    fun setCheats(text: String) {
+        cheatText = text
+        cheatsDirty = true
+    }
+
     fun requestSaveState(slot: Int) { pendingSave = slot.coerceIn(SaveStates.SLOT_MIN, SaveStates.SLOT_MAX) }
     fun requestLoadState(slot: Int) { pendingLoad = slot.coerceIn(SaveStates.SLOT_MIN, SaveStates.SLOT_MAX) }
     fun requestUndoSave() { pendingUndoSave = true }
@@ -302,6 +321,9 @@ class EmulatorEngine(
         // resumed progress is handed over to be put back once it has.
         runCatching { RetroAchievements.onCoreStarted(resumedFrom = resumed) }
             .onFailure { Log.e("pokedaisy", "achievements start failed", it) }
+        // After the resume (a state never carries cheats) and before the first frame.
+        // The save was backed up above, before any cheat could touch it.
+        applyCheats()
 
         val sampleRate = MgbaCore.pkSampleRate()
         // Out of audio resources (or a device mid-reroute) mustn't take the process down:
@@ -369,7 +391,8 @@ class EmulatorEngine(
                 val mode = ffMusicMode
                 // The song the game is playing right now (FfMusicKey): read
                 // every frame, so a clip starts and stops exactly with it.
-                val ffMusicKey = if (gba) FfMusicKey.current(InProcessReader) else null
+                val ffMusicKey = if (gba) FfMusicKey.current(InProcessReader)
+                    else gen1Music?.let { com.pokedaisy.app.companion.data.Gen1Music.current(InProcessReader, it) }
                 if (ffMusicKey != null && ffMusicKey != songKey) {
                     songKey = ffMusicKey
                     songStartedAt = android.os.SystemClock.elapsedRealtime()
@@ -472,7 +495,18 @@ class EmulatorEngine(
         }
     }
 
+    /** Loads [cheatText] into the core (emu thread). Achievements pause while any is in. */
+    private fun applyCheats() {
+        cheatsDirty = false
+        val text = if (gba) cheatText else ""
+        val n = MgbaCore.pkCheatsApply(text)
+        if (n < 0) Log.w("pokedaisy", "cheats didn't load")
+        else if (text.isNotEmpty()) Log.i("pokedaisy", "cheats loaded: $n")
+        runCatching { RetroAchievements.setCheatsActive(n > 0) }
+    }
+
     private fun servicePending() {
+        if (cheatsDirty) applyCheats()
         pendingSuspend?.let { target ->
             pendingSuspend = null
             val ok = saveState(target)
