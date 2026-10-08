@@ -615,6 +615,8 @@ class PokeDaisyActivity : Activity() {
             // loop): the GL thread lets go of it first. unbind takes the renderer's lock,
             // so it's safe from this thread and returns only once no upload is reading it.
             onCoreStopping = { view.unbindCoreBlocking() }
+            // The screen shows finished frames only (a copy), never the one being drawn.
+            onFrame = { view.publishFrame() }
             onStateResult = { action, slot, ok ->
                 val msg = when (action) {
                     Hotkeys.Action.SAVE_STATE -> if (ok) tr("Saved slot {0}", slot) else tr("Slot {0}: save failed", slot)

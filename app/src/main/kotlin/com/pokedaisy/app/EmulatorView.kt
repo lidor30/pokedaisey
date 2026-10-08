@@ -13,7 +13,10 @@ import javax.microedition.khronos.opengles.GL10
 /**
  * Draws the mGBA RGBA framebuffer as an aspect-fit (or, with [stretch], view-filling)
  * nearest-filtered quad, optionally through [gbaColors] and a screen effect.
- * Continuous render mode; the emu thread writes the shared buffer concurrently.
+ * Continuous render mode. The GL thread never reads the core's own buffer, which the emu
+ * thread draws into line by line: each finished frame is copied out ([publishFrame]) and
+ * that copy is what's uploaded. Uploading the live buffer showed a frame half drawn - the
+ * top of the new one over the bottom of the old - a tear across the screen while scrolling.
  */
 class EmulatorView(context: Context) : GLSurfaceView(context) {
 
@@ -102,6 +105,9 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
         post { reportGamePixel() }
     }
 
+    /** Emu thread, right after a frame has run: hands the finished frame to the GL thread. */
+    fun publishFrame() = renderer.publish()
+
     /**
      * Drops the renderer's reference to the current framebuffer and blocks
      * (briefly, bounded) until the GL thread has actually applied that —
@@ -129,7 +135,12 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
      * game in every shader; only the pass onto the view flips it to GL's bottom-up.
      */
     private class FrameRenderer : Renderer {
+        /** The core's own frame buffer, read only by [publish] (the emu thread). */
         private var buffer: ByteBuffer? = null
+        /** The last finished frame, copied out of [buffer]; what the GL thread uploads. */
+        private var ready: ByteBuffer? = null
+        /** [ready] holds a frame the texture doesn't have yet. */
+        private var fresh = false
         private var texW = 0
         private var texH = 0
         private var surfaceW = 0
@@ -171,15 +182,32 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
         private var quadW = 0f
         private var quadH = 0f
 
-        /** Guards [buffer] and its size: held by [bind] / [unbind] and by a frame's upload. */
+        /** Guards [buffer] and its size: held by [bind] / [unbind] and by a frame's draw. */
         private val lock = Any()
+        /** Guards [ready] / [fresh] only, so a copy never waits on a whole draw (taken after [lock]). */
+        private val frameLock = Any()
 
         fun bind(buf: ByteBuffer, w: Int, h: Int) = synchronized(lock) {
-            buffer = buf.also { it.order(ByteOrder.nativeOrder()) }
+            synchronized(frameLock) {
+                buffer = buf.also { it.order(ByteOrder.nativeOrder()) }
+                // A new one each time: a restarted core mustn't show the last game's frame first.
+                ready = ByteBuffer.allocateDirect(buf.capacity()).order(ByteOrder.nativeOrder())
+                fresh = false
+            }
             texW = w
             texH = h
             texAllocated = false
             dirtyGeometry = true
+        }
+
+        /** Emu thread, between frames (so [buffer] is whole): copies it into [ready]. */
+        fun publish() = synchronized(frameLock) {
+            val src = buffer ?: return
+            val dst = ready ?: return
+            src.position(0)
+            dst.position(0)
+            dst.put(src)
+            fresh = true
         }
 
         fun setStretch(on: Boolean) = synchronized(lock) {
@@ -195,7 +223,10 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
 
         /** Drops the buffer reference; [onDrawFrame] just clears until the next [bind]. */
         fun unbind() = synchronized(lock) {
-            buffer = null
+            synchronized(frameLock) {
+                buffer = null
+                fresh = false
+            }
         }
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) = synchronized(lock) {
@@ -228,7 +259,7 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
             GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
             GLES20.glViewport(0, 0, surfaceW, surfaceH)
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-            val buf = buffer ?: return
+            if (buffer == null) return
             val plain = plain ?: return
             if (texW == 0 || surfaceW == 0) return
 
@@ -239,20 +270,28 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
 
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texId)
-            buf.position(0)
-            if (texAllocated && holdFrame()) {
-                // Keep the texture as is: the last frame shown stays up.
-            } else if (!texAllocated) {
-                GLES20.glTexImage2D(
-                    GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, texW, texH, 0,
-                    GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf,
-                )
-                texAllocated = true
-            } else {
-                GLES20.glTexSubImage2D(
-                    GLES20.GL_TEXTURE_2D, 0, 0, 0, texW, texH,
-                    GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf,
-                )
+            // glTex(Sub)Image2D has taken the pixels by the time it returns, so frameLock
+            // is held only for the copy into GL, not the passes below.
+            synchronized(frameLock) {
+                val buf = ready ?: return  // set with buffer by bind
+                if (!texAllocated) {
+                    // The last frame published (a new GL context after SWAP SCREENS has none yet).
+                    buf.position(0)
+                    GLES20.glTexImage2D(
+                        GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, texW, texH, 0,
+                        GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf,
+                    )
+                    texAllocated = true
+                    fresh = false
+                } else if (fresh && !holdFrame()) {
+                    // A held frame keeps the texture as is: the last frame shown stays up.
+                    buf.position(0)
+                    GLES20.glTexSubImage2D(
+                        GLES20.GL_TEXTURE_2D, 0, 0, 0, texW, texH,
+                        GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf,
+                    )
+                    fresh = false
+                }
             }
 
             var input = texId

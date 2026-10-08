@@ -72,6 +72,9 @@ class EmulatorEngine(
      */
     var onCoreStopping: (() -> Unit)? = null
 
+    /** Fired on the emu thread after every frame, while the frame buffer holds that whole frame. */
+    var onFrame: (() -> Unit)? = null
+
     /** False for a Game Boy / Color ROM: the GBA-only watchers (region map, menus, m4a songs) stay off. */
     @Volatile var gba = true
 
@@ -361,6 +364,7 @@ class EmulatorEngine(
                 battleInput.tick()
                 MgbaCore.pkSetKeys(input.mask)
                 MgbaCore.pkRunFrame()
+                onFrame?.invoke()
                 // Achievements never take the game down with them (a pending JNI
                 // exception from a callback would otherwise end this loop).
                 try {

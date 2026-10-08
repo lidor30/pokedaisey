@@ -2,8 +2,8 @@
 //
 // Phase 0 scope: bring up a GBA core, run frames, expose the RGBA framebuffer
 // and interleaved s16 stereo audio, take key input, and do raw save/load state.
-// Everything here is called from a single Kotlin "emu thread" except
-// pkVideoBuffer()'s returned ByteBuffer, which the GL thread samples read-only.
+// Everything here is called from a single Kotlin "emu thread", which also copies
+// pkVideoBuffer()'s frames out for the GL thread (EmulatorView.publishFrame).
 
 #include <jni.h>
 #include <android/log.h>

@@ -5,10 +5,10 @@ import java.nio.ByteBuffer
 /**
  * Thin Kotlin facade over the native mGBA bridge (`libpokedaisy.so`).
  *
- * All methods must be called from the single emulator thread, with one
- * exception: [videoBuffer]'s returned [ByteBuffer] may be read from the GL
- * thread while the emu thread writes it (tearing is possible and, for Phase 0,
- * acceptable).
+ * All methods must be called from the single emulator thread, and so must
+ * reads of [pkVideoBuffer]'s [ByteBuffer]: the core draws into it during
+ * [pkRunFrame], so the screen gets a copy made between frames
+ * ([EmulatorView.publishFrame]).
  */
 object MgbaCore {
     init {

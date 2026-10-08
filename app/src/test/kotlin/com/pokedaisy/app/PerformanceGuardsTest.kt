@@ -49,6 +49,21 @@ class PerformanceGuardsTest {
     }
 
     @Test
+    fun `the screen only shows finished frames`() {
+        // The core draws into its buffer line by line during pkRunFrame: a GL upload from it
+        // then was half one frame, half the next (a tear across the screen while scrolling).
+        val view = read("EmulatorView.kt")
+        val draw = view.substring(view.indexOf("private fun draw()")).substringBefore("\n        }\n")
+        assertTrue("draw() must upload the published copy (ready), not the core's buffer", "val buf = ready" in draw)
+        val engine = read("EmulatorEngine.kt")
+        assertTrue(
+            "EmulatorEngine must publish right after each pkRunFrame",
+            "MgbaCore.pkRunFrame()\n                onFrame?.invoke()" in engine,
+        )
+        assertTrue("the activity must wire onFrame to the view's publish", "onFrame = { view.publishFrame() }" in read("PokeDaisyActivity.kt"))
+    }
+
+    @Test
     fun `nothing on the emu loop's per-frame path can end the game by throwing`() {
         val engine = read("EmulatorEngine.kt")
         val frame = engine.substring(engine.indexOf("MgbaCore.pkRunFrame()")).take(600)
