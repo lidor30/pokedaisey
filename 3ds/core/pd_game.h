@@ -67,7 +67,22 @@ struct pd_config {
     uint32_t flagsOff, varsOff, flagBytes; // in SaveBlock1
     int probeTrainer;     // checks the tables match the ROM ...
     const char* probeName; // ... by this trainer's name
+
+    // TRAINER CARD (the app's TrainerCardSave): which card (PD_CARD_*, 0 =
+    // none), SaveBlock1.gameStats, the badge / POKéDEX flags, what makes the
+    // National Dex count (with nationalMagic above), FireRed's sticker vars and
+    // Emerald's extra stars (Battle Frontier symbols, the museum's paintings)
+    // and battle points. 0 = not in this game.
+    int cardStyle;
+    uint32_t gameStatsOff;
+    int badgeFlag, pokedexFlag;
+    int nationalVar, nationalVarValue, nationalFlag;
+    int stickerVar;
+    int frontierSymbolFlag;
+    uint32_t museumWinnersOff, frontierBpOff; // in SaveBlock1 / SaveBlock2
 };
+
+enum pd_card_style { PD_CARD_NONE, PD_CARD_KANTO, PD_CARD_HOENN };
 
 // The bag's pockets, in a fixed order of our own (the app's QOL_POCKET_* ids).
 enum pd_pocket {

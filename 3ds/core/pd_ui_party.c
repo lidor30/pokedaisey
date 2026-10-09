@@ -1,7 +1,9 @@
-// PARTY: the six slots in FireRed's party colours, and a summary on tap.
+// PARTY: the six slots in FireRed's party colours, each with the game's own
+// icon (from the ROM, pd_icon), and a summary on tap.
 #include <stdio.h>
 #include <string.h>
 
+#include "pd_icon.h"
 #include "pd_tables.h"
 #include "pd_ui_internal.h"
 
@@ -31,8 +33,8 @@ static void gender_mark(struct pd_canvas* c, int x, int y, enum pd_gender g) {
     if (g == PD_GENDER_FEMALE) pd_text(c, x, y, "♀", FEMALE, FEMALE_SHADOW);
 }
 
-static void party_slot(struct pd_ui* ui, struct pd_canvas* c, int x, int y, int w, int h,
-                       const struct pd_mon* m, int slot) {
+static void party_slot(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, int x, int y, int w,
+                       int h, const struct pd_mon* m, int slot) {
     char buf[40];
     if (!m) {
         // An empty slot: just its outline over the backdrop.
@@ -49,28 +51,40 @@ static void party_slot(struct pd_ui* ui, struct pd_canvas* c, int x, int y, int 
     pd_round_rect(c, x + 2, y + 2, w - 4, h - 4, 3, col->fill);
     pd_fill(c, x + 3, y + h - 6, w - 6, 3, col->shade);
 
+    // The icon at the top left, like the game's party menu; the text beside it.
+    int tx = x + 8;
+    if (pd_draw_mon_icon(c, g, m->species, x + 2, y + 1, false)) tx = x + 2 + PD_ICON + 3;
     const char* name = mon_display_name(m, buf, sizeof(buf));
-    int nameW = pd_text_fit(c, x + 8, y + 3, w - 66, name, SLOT_TEXT, SLOT_TEXT_SHADOW);
     if (!egg) {
-        gender_mark(c, x + 11 + nameW, y + 3, m->gender);
         char lv[12];
         snprintf(lv, sizeof(lv), "Lv%d", m->level);
+        int lvW = pd_text_width(lv);
         pd_text_right(c, x + w - 8, y + 3, lv, SLOT_TEXT, SLOT_TEXT_SHADOW);
-        ui_status_badge(c, x + 8, y + 24, m->status);
+        int nameW = pd_text_fit(c, tx, y + 3, x + w - 8 - lvW - 6 - 10 - tx, name, SLOT_TEXT, SLOT_TEXT_SHADOW);
+        gender_mark(c, tx + nameW + 3, y + 3, m->gender);
+        ui_status_badge(c, tx, y + 24, m->status);
         char hp[16];
         snprintf(hp, sizeof(hp), "%d/%d", m->hp, m->maxHp);
         pd_text_right(c, x + w - 8, y + 21, hp, SLOT_TEXT, SLOT_TEXT_SHADOW);
         ui_hp_bar(c, x + 8, y + h - 18, w - 34, m->hp, m->maxHp);
+    } else {
+        pd_text_fit(c, tx, y + 3, x + w - 8 - tx, name, SLOT_TEXT, SLOT_TEXT_SHADOW);
     }
     ui_add_hit(ui, x, y, w, h, HIT_SLOT + slot);
 }
 
-static void summary(struct pd_ui* ui, struct pd_canvas* c, const struct pd_mon* m) {
+static void summary(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_mon* m) {
     char buf[40], buf2[40];
     int x = MARGIN, y = CONTENT_Y, w = c->w - 2 * MARGIN, h = c->h - CONTENT_Y - MARGIN;
     int f = pd_title_box(c, x, y, w, h, PD_TITLE_FILL);
     int ix = x + f + 6, iw = w - 2 * (f + 6);
     int ty = y + f + 2;
+    // The icon left of the first two lines (name, HP).
+    if (pd_draw_mon_icon(c, g, m->species, ix - 2, ty + 2, m->species != PD_SPECIES_EGG && m->hp == 0)) {
+        ix += PD_ICON + 2;
+        iw -= PD_ICON + 2;
+    }
+    int ix0 = x + f + 6, iw0 = w - 2 * (f + 6);
 
     bool egg = m->species == PD_SPECIES_EGG;
     const char* name = mon_display_name(m, buf, sizeof(buf));
@@ -91,6 +105,8 @@ static void summary(struct pd_ui* ui, struct pd_canvas* c, const struct pd_mon* 
         pd_text(c, ix + 120, ty, hp, PD_LABEL, PD_LABEL_SHADOW);
         ui_status_badge(c, ix + iw - 30, ty + 2, m->status);
         ty += 20;
+        ix = ix0;
+        iw = iw0;
         pd_fill(c, ix, ty, iw, 1, PD_DIVIDER);
         ty += 4;
         for (int i = 0; i < PD_NUM_MOVES; i++) {
@@ -108,9 +124,9 @@ static void summary(struct pd_ui* ui, struct pd_canvas* c, const struct pd_mon* 
     ui_button(ui, c, x + w - f - 70, y + h - f - 26, 66, 22, "BACK", HIT_BACK);
 }
 
-void ui_party_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_snapshot* s) {
+void ui_party_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_snapshot* s) {
     if (ui->summarySlot >= 0) {
-        summary(ui, c, &s->party[ui->summarySlot]);
+        summary(ui, c, g, &s->party[ui->summarySlot]);
         return;
     }
     int gap = 4;
@@ -119,6 +135,6 @@ void ui_party_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_snapsho
     for (int i = 0; i < PD_PARTY_SIZE; i++) {
         int x = MARGIN + (i % 2) * (w + gap);
         int y = CONTENT_Y + (i / 2) * (h + gap);
-        party_slot(ui, c, x, y, w, h, i < s->partyCount ? &s->party[i] : NULL, i);
+        party_slot(ui, c, g, x, y, w, h, i < s->partyCount ? &s->party[i] : NULL, i);
     }
 }

@@ -18,7 +18,7 @@
 static const enum pd_tab BAR[BAR_TABS] = { PD_TAB_PARTY, PD_TAB_BAG, PD_TAB_MAP, PD_TAB_GUIDE, PD_TAB_DEX };
 static const char* const TAB_LABELS[PD_TAB_COUNT] = {
     [PD_TAB_PARTY] = "PARTY", [PD_TAB_BAG] = "BAG", [PD_TAB_MAP] = "MAP", [PD_TAB_GUIDE] = "GUIDE",
-    [PD_TAB_DEX] = "DEX", [PD_TAB_BATTLE] = "BATTLE", [PD_TAB_SETTINGS] = "",
+    [PD_TAB_DEX] = "DEX", [PD_TAB_BATTLE] = "BATTLE", [PD_TAB_SETTINGS] = "", [PD_TAB_CARD] = "CARD",
 };
 
 // The tab a bar slot shows now.
@@ -115,7 +115,8 @@ static void tab_bar(struct pd_ui* ui, struct pd_canvas* c, const struct pd_host_
     pd_triangle(c, x + 7, 2 + CHIP_H / 2 - 4, 5, PD_RIGHT, col);
     pd_triangle(c, x + 13, 2 + CHIP_H / 2 - 4, 5, PD_RIGHT, col);
     x += FF_W + MARGIN;
-    bool open = ui->tab == PD_TAB_SETTINGS;
+    // The TRAINER CARD is under SETTINGS: the gear stays lit.
+    bool open = ui->tab == PD_TAB_SETTINGS || ui->tab == PD_TAB_CARD;
     chip(ui, c, x, GEAR_W, open, HIT_TAB + PD_TAB_SETTINGS);
     pd_bitmap(c, x + (GEAR_W - 11) / 2, 2 + (CHIP_H - 11) / 2, GEAR, 11, open ? PD_VALUE : PD_TITLE_TEXT);
 }
@@ -130,7 +131,7 @@ void pd_ui_draw(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g,
     } else if (!g->cfg) {
         ui_notice(c, "NOT SUPPORTED", g->unsupported ? g->unsupported : "", "SETTINGS has what was detected.");
     } else if (ui->tab == PD_TAB_PARTY) {
-        ui_party_tab(ui, c, s);
+        ui_party_tab(ui, c, g, s);
     } else if (ui->tab == PD_TAB_BAG) {
         ui_bag_tab(ui, c, g, s);
     } else if (ui->tab == PD_TAB_MAP) {
@@ -139,6 +140,8 @@ void pd_ui_draw(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g,
         ui_guide_tab(ui, c, g, s);
     } else if (ui->tab == PD_TAB_DEX) {
         ui_dex_tab(ui, c, g, s);
+    } else if (ui->tab == PD_TAB_CARD) {
+        ui_card_tab(ui, c, g, s);
     } else {
         ui_battle_tab(ui, c, g, s);
     }
@@ -164,11 +167,12 @@ static int* scroll_target(struct pd_ui* ui) {
 
 bool pd_ui_tick(struct pd_ui* ui, unsigned ms) {
     // The MAP cursor swaps sizes every 20 GBA frames, like the game's.
+    bool redraw = ui_card_tick(ui, ms);
     ui->blinkMs += ms;
-    if (ui->blinkMs < 333) return false;
+    if (ui->blinkMs < 333) return redraw;
     ui->blinkMs %= 333;
     ui->mapBlink = !ui->mapBlink;
-    return ui->tab == PD_TAB_MAP && ui->overlay == PD_OVERLAY_NONE;
+    return redraw || (ui->tab == PD_TAB_MAP && ui->overlay == PD_OVERLAY_NONE);
 }
 
 static void close_overlay(struct pd_ui* ui, enum pd_action action) {
@@ -177,7 +181,9 @@ static void close_overlay(struct pd_ui* ui, enum pd_action action) {
 }
 
 static void act(struct pd_ui* ui, int id) {
-    if (ui_map_act(ui, id) || ui_dex_act(ui, id) || ui_guide_act(ui, id) || ui_battle_act(ui, id)) return;
+    if (ui_map_act(ui, id) || ui_dex_act(ui, id) || ui_guide_act(ui, id) || ui_battle_act(ui, id) || ui_card_act(ui, id)) {
+        return;
+    }
     if (ui->overlay != PD_OVERLAY_NONE) {
         if (id >= HIT_OPTION && id < HIT_OPTION + 8) {
             int i = id - HIT_OPTION;
@@ -279,7 +285,7 @@ void pd_ui_next_tab(struct pd_ui* ui, int dir) {
         if (order[i] == ui->tab) at = i;
     }
     order[BAR_TABS] = PD_TAB_SETTINGS;
-    if (ui->tab == PD_TAB_SETTINGS) at = BAR_TABS;
+    if (ui->tab == PD_TAB_SETTINGS || ui->tab == PD_TAB_CARD) at = BAR_TABS;
     ui->tab = order[(at + BAR_TABS + 1 + dir) % (BAR_TABS + 1)];
     ui->summarySlot = -1;
 }
@@ -305,6 +311,10 @@ bool pd_ui_back(struct pd_ui* ui) {
     }
     if (ui->tab == PD_TAB_MAP && (ui->mapSel >= 0 || ui->mapDungeon >= 0 || ui->mapPage >= 0)) {
         ui->mapSel = ui->mapDungeon = ui->mapPage = -1;
+        return true;
+    }
+    if (ui->tab == PD_TAB_CARD) {
+        ui->tab = PD_TAB_SETTINGS;
         return true;
     }
     if (ui->tab == PD_TAB_BATTLE && ui->battlePane) {

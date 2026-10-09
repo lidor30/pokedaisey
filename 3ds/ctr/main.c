@@ -26,6 +26,7 @@
 #include "../core/pd_canvas.h"
 #include "../core/pd_game.h"
 #include "../core/pd_map.h"
+#include "../core/pd_romart.h"
 #include "../core/pd_menu.h"
 #include "../core/pd_settings.h"
 #include "../core/pd_snapshot.h"
@@ -382,14 +383,16 @@ static bool run_game(const char* file) {
     struct game_mem mem = { 0 };
     mem.ewram = core->getMemoryBlock(core, 0x02, &mem.ewramSize);
     mem.iwram = core->getMemoryBlock(core, 0x03, &mem.iwramSize);
-    // The ROM as mGBA loaded it, for MAP / POKéDEX / GUIDE, which read its
-    // tables and art. The region map is rebuilt now (a pass over the whole
-    // ROM, about a second here) rather than on the first MAP open, mid-game.
+    // The ROM as mGBA loaded it, for the tabs that read its tables and art.
+    // Its art (the region map, the TRAINER CARD) is found now - one pass over
+    // the whole ROM, under a second here - rather than on the first open,
+    // mid-game.
     size_t romSize = 0;
     game.rom = core->getMemoryBlock(core, 0x08, &romSize);
     game.romSize = game.rom ? romSize : 0;
     mem.rom = game.rom;
     mem.romSize = game.romSize;
+    pd_romart_scan(&game);
     pd_map_art(&game);
 
     struct pd_ui ui;

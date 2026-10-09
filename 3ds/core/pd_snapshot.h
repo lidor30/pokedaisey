@@ -51,6 +51,7 @@ struct pd_battle_mon {
 #define PD_DEX_BYTES 52
 #define PD_FLAG_BYTES 0x12C // Emerald's; FireRed's 0x120 fit
 #define PD_VAR_COUNT 0x100
+#define PD_GAME_STATS 52 // up to GAME_STAT_BERRY_CRUSH_POINTS
 
 struct pd_item {
     uint16_t id, quantity;
@@ -98,6 +99,17 @@ struct pd_snapshot {
     bool flagsOk;
     uint8_t flags[PD_FLAG_BYTES];
     uint16_t vars[PD_VAR_COUNT];
+
+    // The TRAINER CARD's (games with a cfg->cardStyle): SaveBlock2's name (the
+    // game's encoding, 0xFF-ended), ID and play time; the game stats decrypted;
+    // Emerald's museum paintings (each winner's species) and battle points.
+    bool cardOk;
+    uint8_t playerName[8];
+    uint16_t trainerId, playHours;
+    uint8_t playMinutes;
+    uint32_t gameStats[PD_GAME_STATS];
+    uint16_t museumWinners[5];
+    uint16_t battlePoints;
 };
 
 bool pd_flag(const struct pd_snapshot* s, int flag);

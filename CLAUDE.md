@@ -77,7 +77,9 @@ never committed. Only retail English FireRed / LeafGreen / Emerald so far (ROM t
 rev 1 and Emerald only: rev 0 / LeafGreen get MAP but no POKéDEX, and GUIDE without wild / BOSS); never run
 on a real 3DS yet. Its tabs: PARTY, BAG, MAP, GUIDE, POKéDEX (BATTLE takes the last chip in a battle: INFO /
 SUGGESTIONS + the FOE TEAM, ported from BattleInfoScreen / SuggestionsScreen / CompanionScreen's foe state), and
-SETTINGS (screen mode, FF, one save state slot - states never carry the save data). No retail trainer-battle
+SETTINGS (screen mode, FF, one save state slot - states never carry the save data), with the TRAINER CARD
+under it (`pd_card`: its renders match `TrainerCardTest`'s pinned CRCs - `make preview` prints them; keep it
+so). ROM art (`pd_romart`) is one scan per ROM for every blob (map + card), done while the game loads. No retail trainer-battle
 fixture exists, so `make preview` builds one from `emerald_de_battle` (party structs copied into gEnemyParty)
 and keeps it in `3ds/build/fixtures/emerald_trainer` for `make azahar-battle-test`. mGBA's 3DS build
 loads every ROM into one fixed buffer, so per-ROM caches key on `pd_rom_id()`, never the ROM pointer. The GPU path

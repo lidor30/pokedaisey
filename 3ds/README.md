@@ -29,8 +29,9 @@ unknown. Target the **New 3DS / New 3DS XL / New 2DS XL** first; the original
   (newest 10 per game) - the repo's "save files are sacred" rule.
 - Settings kept in `sdmc:/pokedaisy/settings.ini`.
 - The companion, in the app's FireRed OPTION-screen look:
-  - **PARTY**: the six slots (name with its ♂ / ♀, level, HP bar, status) in the
-    app's FireRed party palette; tap one for its summary (moves, type, PP).
+  - **PARTY**: the six slots (the game's own icon from your ROM, name with its
+    ♂ / ♀, level, HP bar, status) in the app's FireRed party palette; tap one
+    for its summary (moves, type, PP).
   - **BATTLE**: opens by itself in a battle and goes back after it. **INFO**:
     the foe and you (with the game's own party icons, read from your ROM),
     your moves with the app's verdicts (SUPER 2x / NEUTRAL 1x / RESISTED 1/2x /
@@ -60,6 +61,12 @@ unknown. Target the **New 3DS / New 3DS XL / New 2DS XL** first; the original
     picture, category, types, height / weight, text, base stats and ability.
   - **SETTINGS** (the gear): place, money, file and speed, then SCREEN and
     FAST-FORWARD (pick-lists), SAVE STATE / LOAD STATE / LEAVE GAME (confirmed).
+  - **TRAINER CARD** (the button in SETTINGS' title, like the app's TOOLS): the
+    game's own card, drawn from your ROM's art pixel for pixel - name, ID,
+    money, POKéDEX, play time with its blinking colon, badges, stars, the
+    trainer pic; a tap flips it to the back (Hall of Fame debut, link battles,
+    trades, FireRed's stickers ...) the way the game does. FireRed rev 1,
+    LeafGreen and Emerald, as in the app.
 - Games: retail English **FireRed / LeafGreen (rev 0 and 1)** and **Emerald**.
   MAP, POKéDEX and GUIDE's wild / BOSS parts read ROM tables mapped for
   FireRed rev 1 and Emerald only so far: on FireRed rev 0 and LeafGreen MAP
@@ -135,8 +142,11 @@ make tables        # regenerate core/*_gen.c and ctr/icon.png from the app
   BATTLE, BAG (an item, a drag, the next pocket), SETTINGS, a pick-list, a
   confirm, MAP (a tapped tile, the blink, PLACES), POKéDEX (scrolled, an
   entry, the next, the other dex), GUIDE (the notice, every page, a hint and
-  its answer), BATTLE's INFO and SUGGESTIONS - drawing each as the 3DS's two
-  screens. There's no retail trainer-battle fixture, so the preview makes one
+  its answer), BATTLE's INFO and SUGGESTIONS, the TRAINER CARD (blinked, mid-flip,
+  the back) - drawing each as the 3DS's two screens. It also renders each card
+  whole and prints the CRC32 `TrainerCardTest` pins: FireRed's `d62339db` /
+  `045996a2` and Emerald's `f3e14960` / `74484c21`, the cards that matched the
+  games' own screens pixel for pixel, come out the same here. There's no retail trainer-battle fixture, so the preview makes one
   from the wild battle (`emerald_de_battle`): three of the player's Pokémon
   copied into gEnemyParty beside the wild one, the trainer flag set; then the
   first faints and the trainer's next pick is set, and the last slot is
@@ -171,8 +181,8 @@ make tables        # regenerate core/*_gen.c and ctr/icon.png from the app
 
 | Path | What |
 |---|---|
-| `core/` | Portable C, no platform code: game detection (`pd_game`, the app's `NativeConfig` addresses), the snapshot reader (`pd_snapshot`: party, battle, bag, money, place - ports `Gen3Mon.kt` / `readNativeTelemetry` / `readNativeBag`), the canvas (`pd_canvas`: pixel-stepped corners, layered OPTION frames, GBA-shadowed and wrapped text, drawn cursors), the companion (`pd_ui.c` frame + `pd_ui_party` / `_battle` (INFO, SUGGESTIONS, FOE TEAM) / `_bag` / `_map` / `_guide` / `_dex` / `_settings` / `_widgets`), the ROM readers (`pd_map`: `RomArt`'s region map and heads, `RegionMapModel`'s pick, `PlayerMapTile`; `pd_dex`: the dex tables and front pics; `pd_guide`: `GuideRom.kt`'s bosses, teams and wild tables), the party icons (`pd_icon`: `DecompIconSource`'s tables), the game list (`pd_menu`) and the settings file (`pd_settings`) |
-| `core/*_gen.c` | Generated: names / moves / type chart / map sections / item text / gender ratios from the app's Kotlin tables (`tools/gen_tables.py`), the map art's fingerprints and cursor grids (`tools/gen_map_tables.py`), the guides and area data (`tools/gen_guide.py`), Pixel Operator as a 1-bit font plus drawn ♂ ♀ (`tools/gen_font.py`) |
+| `core/` | Portable C, no platform code: game detection (`pd_game`, the app's `NativeConfig` addresses), the snapshot reader (`pd_snapshot`: party, battle, bag, money, place - ports `Gen3Mon.kt` / `readNativeTelemetry` / `readNativeBag`), the canvas (`pd_canvas`: pixel-stepped corners, layered OPTION frames, GBA-shadowed and wrapped text, drawn cursors), the companion (`pd_ui.c` frame + `pd_ui_party` / `_battle` (INFO, SUGGESTIONS, FOE TEAM) / `_bag` / `_map` / `_guide` / `_dex` / `_settings` / `_widgets`), the ROM readers (`pd_romart`: `RomArt`'s scan - every blob of the game in one pass; `pd_map`: the region map and heads, `RegionMapModel`'s pick, `PlayerMapTile`; `pd_dex`: the dex tables and front pics; `pd_guide`: `GuideRom.kt`'s bosses, teams and wild tables), the party icons (`pd_icon`: `DecompIconSource`'s tables), the TRAINER CARD (`pd_card`: `readTrainerCard` + `TrainerCardArt`; `pd_ui_card`), the game list (`pd_menu`) and the settings file (`pd_settings`) |
+| `core/*_gen.c` | Generated: names / moves / type chart / map sections / item text / gender ratios from the app's Kotlin tables (`tools/gen_tables.py`), the ROM art's fingerprints (map and card) and the cursor grids (`tools/gen_map_tables.py`), the guides and area data (`tools/gen_guide.py`), Pixel Operator as a 1-bit font plus drawn ♂ ♀ (`tools/gen_font.py`) |
 | `ctr/` | The 3DS host: `main.c` (game loop, ndsp audio, HID, files, states) and `gpu.c` (citro2d: the game and canvases written into textures in the GPU's tiled order, drawn as quads), and the CMake build against the mGBA submodule |
 | `desktop/` | The preview tool and its small PNG writer |
 | `test/` | The fixture ROM, the decomp build and the Azahar script |
@@ -201,7 +211,7 @@ not used; nor is render-to-texture.
   texture orientation, sound and save writes on hardware.
 - Port more of the app: the rest of `NativeConfig` (hacks, other languages,
   Ruby / Sapphire, ROM tables for FireRed rev 0 / LeafGreen - the app has
-  LeafGreen's), the icons on PARTY (`pd_icon` already reads them), the
-  battle's touch controls (`BattleInputController`), the TRAINER CARD.
+  LeafGreen's), the battle's touch controls (`BattleInputController`), the
+  party icons' two-frame animation.
 - More state slots with thumbnails, and resuming where the player left off (with
   the app's `pkStateMatchesSave` check first).

@@ -38,11 +38,24 @@
     .battleStructPtr = 0x02023FE8,     \
     .monToSwitchIntoOff = 0x5C
 
+// TRAINER_CARD_FIRERED: retail FireRed rev 1 and LeafGreen (the app has no
+// card for FireRed rev 0).
+#define FIRERED_CARD                \
+    .cardStyle = PD_CARD_KANTO,      \
+    .gameStatsOff = 0x1200,          \
+    .badgeFlag = 0x820,              \
+    .pokedexFlag = 0x829,            \
+    .nationalVar = 0x404E,           \
+    .nationalVarValue = 0x6258,      \
+    .nationalFlag = 0x840,           \
+    .stickerVar = 0x4049
+
 // FireRed rev 1 (sha1 dd5945db..., what pret's firered_rev1 builds): its ROM
 // tables too - POKEDEX_FIRERED_REV1 and GUIDE_TABLES_FIRERED_REV1.
 static const struct pd_config FIRERED_REV1 = {
     FIRERED_RAM,
     FIRERED_REV1_FOES,
+    FIRERED_CARD,
     .monIconTable = 0x083D3810,
     .monIconPaletteIndices = 0x083D3EF0,
     .monIconPaletteTable = 0x083D40A8,
@@ -76,6 +89,7 @@ static const struct pd_config FIRERED_REV0_RAM_ONLY = {
 
 static const struct pd_config LEAFGREEN_REV0_RAM_ONLY = {
     FIRERED_RAM,
+    FIRERED_CARD,
     .monIconTable = 0x083D35DC,
     .monIconPaletteIndices = 0x083D3CBC,
     .monIconPaletteTable = 0x083D3E74,
@@ -84,6 +98,7 @@ static const struct pd_config LEAFGREEN_REV0_RAM_ONLY = {
 static const struct pd_config LEAFGREEN_REV1_RAM_ONLY = {
     FIRERED_RAM,
     FIRERED_REV1_FOES,
+    FIRERED_CARD,
     .monIconTable = 0x083D364C,
     .monIconPaletteIndices = 0x083D3D2C,
     .monIconPaletteTable = 0x083D3EE4,
@@ -136,6 +151,17 @@ static const struct pd_config EMERALD = {
     .flagBytes = 0x12C,
     .probeTrainer = 265,
     .probeName = "ROXANNE",
+    // TRAINER_CARD_EMERALD.
+    .cardStyle = PD_CARD_HOENN,
+    .gameStatsOff = 0x159C,
+    .badgeFlag = 0x867,
+    .pokedexFlag = 0x861,
+    .nationalVar = 0x4046,
+    .nationalVarValue = 0x302,
+    .nationalFlag = 0x896,
+    .frontierSymbolFlag = 0x8C4,
+    .museumWinnersOff = 0x2E90 + 8 * 32,
+    .frontierBpOff = 0xEBA,
 };
 
 const uint8_t* pd_rom_at(const struct pd_game* g, uint32_t addr, size_t len) {

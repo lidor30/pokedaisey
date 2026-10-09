@@ -28,6 +28,7 @@ enum pd_tab {
     PD_TAB_DEX,
     PD_TAB_BATTLE,
     PD_TAB_SETTINGS,
+    PD_TAB_CARD, // the TRAINER CARD: no chip, it opens from SETTINGS
     PD_TAB_COUNT,
 };
 
@@ -116,6 +117,11 @@ struct pd_ui {
     // GUIDE: the page, its scroll, the open entry and how far it's revealed.
     int guidePage, guideScroll, guideOpen, guideLevel;
     bool guideNoticeShown;
+    // TRAINER CARD: the side shown, a flip running (ms into it, 0 = none) and
+    // the play time's blinking colon.
+    bool cardBack, cardColon;
+    int cardFlipMs;
+    unsigned cardColonMs;
 
     enum pd_overlay overlay;
     struct pd_settings* settings;
@@ -141,7 +147,8 @@ bool pd_ui_back(struct pd_ui* ui);
 // The last thing the player asked the host for (once), or PD_ACTION_NONE.
 enum pd_action pd_ui_take_action(struct pd_ui* ui);
 // Time passing (milliseconds since the last call): true when something on
-// screen animates and needs a redraw (the MAP cursor's blink).
+// screen animates and needs a redraw (the MAP cursor's blink, the TRAINER
+// CARD's colon and flip).
 bool pd_ui_tick(struct pd_ui* ui, unsigned ms);
 
 const char* pd_screen_mode_name(int mode);

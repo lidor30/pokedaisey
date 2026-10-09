@@ -3,110 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-// --- finding blobs (RomArt.find) ---
-
-static uint64_t u64le(const uint8_t* p) {
-    uint64_t v = 0;
-    for (int i = 7; i >= 0; i--) v = v << 8 | p[i];
-    return v;
-}
-
-static uint64_t fmix(uint64_t k) {
-    k ^= k >> 33;
-    k *= 0xFF51AFD7ED558CCDull;
-    k ^= k >> 33;
-    k *= 0xC4CEB9FE1A85EC53ull;
-    k ^= k >> 33;
-    return k;
-}
-
-static uint64_t head_hash(const uint8_t* p) {
-    return fmix(u64le(p) ^ fmix(u64le(p + 8)));
-}
-
-static uint16_t prefilter(uint64_t a) {
-    return (uint16_t) ((a * 0x9E3779B97F4A7C15ull) >> 48);
-}
-
-uint32_t pd_crc32(const uint8_t* data, size_t len) {
-    static uint32_t table[256];
-    if (!table[1]) {
-        for (uint32_t n = 0; n < 256; n++) {
-            uint32_t c = n;
-            for (int k = 0; k < 8; k++) c = (c & 1) ? 0xEDB88320u ^ (c >> 1) : c >> 1;
-            table[n] = c;
-        }
-    }
-    uint32_t c = 0xFFFFFFFFu;
-    for (size_t i = 0; i < len; i++) c = table[(c ^ data[i]) & 0xFF] ^ (c >> 8);
-    return c ^ 0xFFFFFFFFu;
-}
-
-size_t pd_lz77(const uint8_t* src, size_t srcLen, uint8_t* dst, size_t dstLen) {
-    if (srcLen < 4 || src[0] != 0x10) return 0;
-    size_t size = src[1] | (size_t) src[2] << 8 | (size_t) src[3] << 16;
-    if (size != dstLen) return 0;
-    size_t in = 4, out = 0;
-    while (out < size) {
-        if (in >= srcLen) return 0;
-        uint8_t flags = src[in++];
-        for (int bit = 7; bit >= 0 && out < size; bit--) {
-            if (flags >> bit & 1) {
-                if (in + 1 >= srcLen) return 0;
-                unsigned d = (unsigned) src[in] << 8 | src[in + 1];
-                in += 2;
-                size_t disp = (d & 0xFFF) + 1, len = (d >> 12) + 3;
-                if (disp > out) return 0;
-                for (size_t k = 0; k < len && out < size; k++, out++) dst[out] = dst[out - disp];
-            } else {
-                if (in >= srcLen) return 0;
-                dst[out++] = src[in++];
-            }
-        }
-    }
-    return size;
-}
-
-// Decodes the blob that would start at off; true if its CRC matches.
-static bool decode(const uint8_t* rom, size_t romSize, size_t off, const struct pd_blob_sig* sig, uint8_t* out) {
-    if (sig->lz) {
-        return pd_lz77(rom + off, romSize - off, out, sig->size) == sig->size && pd_crc32(out, sig->size) == sig->crc;
-    }
-    if (off + sig->size > romSize) return false;
-    memcpy(out, rom + off, sig->size);
-    return pd_crc32(out, sig->size) == sig->crc;
-}
-
-// Scans the ROM once for every wanted blob; each found one is decoded into
-// out[blob] (malloc'd, sig.size bytes), the rest left NULL.
-static void find_blobs(const uint8_t* rom, size_t size, const int* wanted, int n, uint8_t** out) {
-    static uint64_t bits[1024];
-    memset(bits, 0, sizeof(bits));
-    for (int i = 0; i < n; i++) {
-        uint16_t p = pd_blob_sigs[wanted[i]].pre;
-        bits[p >> 6] |= 1ull << (p & 63);
-        out[wanted[i]] = NULL;
-    }
-    int left = n;
-    for (size_t i = 0; i + 16 <= size && left > 0; i++) {
-        uint16_t p = prefilter(u64le(rom + i));
-        if (!(bits[p >> 6] >> (p & 63) & 1)) continue;
-        uint64_t h = head_hash(rom + i);
-        for (int k = 0; k < n; k++) {
-            int b = wanted[k];
-            const struct pd_blob_sig* sig = &pd_blob_sigs[b];
-            if (out[b] || sig->head != h || i < sig->headOff) continue;
-            uint8_t* buf = malloc(sig->size);
-            if (buf && decode(rom, size, i - sig->headOff, sig, buf)) {
-                out[b] = buf;
-                left--;
-            } else {
-                free(buf);
-            }
-        }
-    }
-}
-
 // --- drawing (RomArt's screen / emeraldRegionMap / sprite) ---
 
 static uint32_t bgr555(uint16_t c) {
@@ -182,14 +78,10 @@ const struct pd_map_art* pd_map_art(const struct pd_game* g) {
     cachedRom = pd_rom_id(g);
     if (!cached) return NULL;
 
-    uint8_t* blob[PD_BLOB_COUNT] = { 0 };
+    const uint8_t* blob[PD_BLOB_COUNT];
+    for (int i = 0; i < PD_BLOB_COUNT; i++) blob[i] = pd_romart_blob(g, (enum pd_blob) i);
     uint32_t pal[256];
     if (g->kind == PD_GAME_FIRERED) {
-        static const int WANT[] = {
-            PD_FR_REGION_GFX, PD_FR_REGION_PAL, PD_FR_KANTO_MAP, PD_FR_SEVII123_MAP, PD_FR_SEVII45_MAP,
-            PD_FR_SEVII67_MAP, PD_FR_PLAYER_RED_GFX, PD_FR_PLAYER_LEAF_GFX, PD_FR_PLAYER_PAL,
-        };
-        find_blobs(g->rom, g->romSize, WANT, (int) (sizeof(WANT) / sizeof(WANT[0])), blob);
         if (blob[PD_FR_REGION_GFX] && blob[PD_FR_REGION_PAL] && blob[PD_FR_KANTO_MAP]) {
             int colours = (int) pd_blob_sigs[PD_FR_REGION_PAL].size / 2;
             palette(blob[PD_FR_REGION_PAL], colours, pal);
@@ -207,18 +99,13 @@ const struct pd_map_art* pd_map_art(const struct pd_game* g) {
             // Red's palette serves Leaf too (the game does the same).
             palette(blob[PD_FR_PLAYER_PAL], 16, pal);
             for (int s = 0; s < 2; s++) {
-                uint8_t* gfx = blob[s ? PD_FR_PLAYER_LEAF_GFX : PD_FR_PLAYER_RED_GFX];
+                const uint8_t* gfx = blob[s ? PD_FR_PLAYER_LEAF_GFX : PD_FR_PLAYER_RED_GFX];
                 if (!gfx) continue;
                 sprite16(gfx, pal, cached->head[s]);
                 cached->hasHead[s] = true;
             }
         }
     } else {
-        static const int WANT[] = {
-            PD_EM_REGION_GFX, PD_EM_REGION_PAL, PD_EM_REGION_MAP, PD_EM_PLAYER_BRENDAN_GFX,
-            PD_EM_PLAYER_BRENDAN_PAL, PD_EM_PLAYER_MAY_GFX, PD_EM_PLAYER_MAY_PAL,
-        };
-        find_blobs(g->rom, g->romSize, WANT, (int) (sizeof(WANT) / sizeof(WANT[0])), blob);
         if (blob[PD_EM_REGION_GFX] && blob[PD_EM_REGION_PAL] && blob[PD_EM_REGION_MAP]) {
             int colours = (int) pd_blob_sigs[PD_EM_REGION_PAL].size / 2;
             palette(blob[PD_EM_REGION_PAL], colours, pal);
@@ -237,7 +124,6 @@ const struct pd_map_art* pd_map_art(const struct pd_game* g) {
             cached->hasHead[s] = true;
         }
     }
-    for (int i = 0; i < PD_BLOB_COUNT; i++) free(blob[i]);
     return cached->ok ? cached : NULL;
 }
 

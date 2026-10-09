@@ -12,6 +12,8 @@
 #include <string.h>
 
 #include "../core/pd_canvas.h"
+#include "../core/pd_card.h"
+#include "../core/pd_romart.h"
 #include "../core/pd_game.h"
 #include "../core/pd_snapshot.h"
 #include "../core/pd_ui.h"
@@ -41,6 +43,28 @@ static bool save(const char* dir, const char* name, const uint8_t* buf, size_t l
     if (!f) return false;
     size_t n = fwrite(buf, 1, len, f);
     return fclose(f) == 0 && n == len;
+}
+
+// The TRAINER CARD drawn whole (240x160, the game's screen behind it), as a
+// PNG and the CRC32 of its ARGB bytes - TrainerCardTest's, which pins the CRCs
+// of the cards that matched the games' own screens pixel for pixel.
+static void card_png(const char* dir, const char* name, const char* what, const uint32_t* argb) {
+    static uint32_t rgb[PD_CARD_W * PD_CARD_H];
+    for (int i = 0; i < PD_CARD_W * PD_CARD_H; i++) rgb[i] = argb[i] & 0xFFFFFF;
+    char path[1024];
+    snprintf(path, sizeof(path), "%s/%s-%s.png", dir, name, what);
+    if (!pd_png_write(path, PD_CARD_W, PD_CARD_H, rgb)) {
+        fprintf(stderr, "pd_preview: can't write %s\n", path);
+        exit(1);
+    }
+    uint8_t bytes[PD_CARD_W * PD_CARD_H * 4];
+    for (int i = 0; i < PD_CARD_W * PD_CARD_H; i++) {
+        bytes[i * 4] = (uint8_t) (argb[i] >> 24);
+        bytes[i * 4 + 1] = (uint8_t) (argb[i] >> 16);
+        bytes[i * 4 + 2] = (uint8_t) (argb[i] >> 8);
+        bytes[i * 4 + 3] = (uint8_t) argb[i];
+    }
+    printf("%s (crc %08x)\n", path, pd_crc32(bytes, sizeof(bytes)));
 }
 
 // The fixture's RAM, and the ROM when one was given (ctx: the game).
@@ -379,6 +403,40 @@ int main(int argc, char** argv) {
         tap(&p, HIT_BATTLE_SUGGEST, 0);
         shot(out, name, "trainer-unseen-suggest", px);
         printf("foes %d, active %d, next %d\n", snap.foeCount, snap.foeActive, snap.foeNext);
+    }
+
+    // The TRAINER CARD, front and back, as the game draws it (TrainerCardTest's
+    // renders: Emerald's front a minute later, 0:27, like its screenshot).
+    struct pd_card_info card;
+    if (game.rom && pd_card_info(&game, &snap, &card)) {
+        static uint32_t img[PD_CARD_W * PD_CARD_H];
+        printf("card: id %d, money %ld, badges %02x, stars %d, hof %06x, dex %d, %d:%02d\n", card.trainerId,
+               card.money, card.badges, card.stars, card.hofDebut, card.dexCaught, card.hours, card.minutes);
+        struct pd_card_info front = card;
+        if (card.style == PD_CARD_HOENN) front.minutes = 27;
+        if (pd_card_render(&game, &front, false, true, true, img)) card_png(out, name, "card-front-full", img);
+        if (pd_card_render(&game, &card, true, true, true, img)) card_png(out, name, "card-back-full", img);
+
+        // The CARD tab, from SETTINGS: the card, its colon blinked off, a flip
+        // (squashing, then opening on the back) and the back.
+        ui.overlay = PD_OVERLAY_NONE;
+        tap(&p, HIT_TAB + PD_TAB_SETTINGS, 0);
+        shot(out, name, "card-settings", px);
+        tap(&p, HIT_OPEN_CARD, 0);
+        shot(out, name, "card", px);
+        pd_ui_tick(&ui, 1000);
+        draw(&p);
+        shot(out, name, "card-colon", px);
+        tap(&p, HIT_CARD, 0);
+        pd_ui_tick(&ui, 90);
+        draw(&p);
+        shot(out, name, "card-flip-1", px);
+        pd_ui_tick(&ui, 110);
+        draw(&p);
+        shot(out, name, "card-flip-2", px);
+        pd_ui_tick(&ui, 200);
+        draw(&p);
+        shot(out, name, "card-back", px);
     }
 
     // The decoded party, for checking against the app's tests.

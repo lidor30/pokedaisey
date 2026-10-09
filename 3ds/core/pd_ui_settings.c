@@ -29,9 +29,20 @@ void ui_settings_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game
     int f = pd_title_box(c, x, CONTENT_Y, w, TITLE_H, PD_TITLE_FILL);
     int ty = pd_text_y(CONTENT_Y, TITLE_H);
     pd_text(c, x + f + 6, ty, "SETTINGS", PD_TITLE_TEXT, PD_TITLE_SHADOW);
+    int right = x + w - f - 6;
+    // The TRAINER CARD opens from here (the list below is full): a grey chip at
+    // the title window's right, white while pressed, like the tab bar's.
+    if (g->cfg && g->cfg->cardStyle && g->rom) {
+        const char* label = "TRAINER CARD";
+        int bw = pd_text_width(label) + 12, bh = TITLE_H - 6;
+        int bx = x + w - f - 2 - bw, by = CONTENT_Y + 3;
+        pd_title_box(c, bx, by, bw, bh, ui->pressedId == HIT_OPEN_CARD ? PD_TITLE_FILL : PD_LIST_FILL);
+        pd_text(c, bx + 6, pd_text_y(by, bh), label, PD_TITLE_TEXT, PD_TITLE_SHADOW);
+        ui_add_hit(ui, bx, by, bw, bh, HIT_OPEN_CARD);
+        right = bx - 8;
+    }
     if (g->title) {
         int tx = x + f + 6 + pd_text_width("SETTINGS") + 12;
-        int right = x + w - f - 6;
         int tw = pd_text_width(g->title);
         if (tw > right - tx) tw = right - tx;
         pd_text_fit(c, right - tw, ty, tw, g->title, PD_TITLE_TEXT, PD_TITLE_SHADOW);

@@ -45,6 +45,8 @@ enum {
     HIT_BATTLE_SUGGEST = 3000,
     HIT_BATTLE_INFO = 3001,
     HIT_FOE_SLOT = 3010,   // + foe party index
+    HIT_OPEN_CARD = 3100,
+    HIT_CARD = 3101,
 };
 
 enum setting_row {
@@ -69,7 +71,7 @@ void ui_notice(struct pd_canvas* c, const char* title, const char* line1, const 
 void ui_row(struct pd_canvas* c, int x, int y, int w, const char* label, const char* value, bool selected);
 void ui_format_money(long v, char* buf, size_t len);
 
-void ui_party_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_snapshot* s);
+void ui_party_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_snapshot* s);
 void ui_battle_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_snapshot* s);
 void ui_bag_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_snapshot* s);
 void ui_settings_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_snapshot* s,
@@ -87,6 +89,9 @@ bool ui_map_act(struct pd_ui* ui, int id);
 bool ui_dex_act(struct pd_ui* ui, int id);
 bool ui_guide_act(struct pd_ui* ui, int id);
 bool ui_battle_act(struct pd_ui* ui, int id);
+bool ui_card_act(struct pd_ui* ui, int id);
+void ui_card_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_snapshot* s);
+bool ui_card_tick(struct pd_ui* ui, unsigned ms);
 
 // The lists' caught / seen mark: a Poké Ball, or a grey one.
 void ui_ball(struct pd_canvas* c, int x, int y, bool caught);

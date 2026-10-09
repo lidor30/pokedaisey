@@ -282,6 +282,35 @@ void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn
 
 // The save's own fields: position, gender, the POKéDEX's flags, event flags
 // and vars.
+// readTrainerCard's reads (TrainerCard.kt); the rest is worked out by pd_card.
+static void read_card_fields(struct pd_snapshot* s, const struct pd_config* cfg, pd_read_fn read, void* ctx,
+                             uint32_t sb1, uint32_t sb2) {
+    uint8_t head[0x12];
+    uint32_t key;
+    uint8_t stats[PD_GAME_STATS * 4];
+    if (!read(ctx, sb2, head, sizeof(head)) || !read_u32(read, ctx, sb2 + cfg->encryptionKeyOff, &key) ||
+        !read(ctx, sb1 + cfg->gameStatsOff, stats, sizeof(stats))) {
+        return;
+    }
+    memcpy(s->playerName, head, 7);
+    s->playerName[7] = 0xFF;
+    s->trainerId = u16(head + 0x0A);
+    s->playHours = u16(head + 0x0E);
+    s->playMinutes = head[0x10];
+    for (int i = 0; i < PD_GAME_STATS; i++) s->gameStats[i] = u32(stats + i * 4) ^ key;
+    if (cfg->museumWinnersOff) {
+        uint8_t winners[5 * 32];
+        if (!read(ctx, sb1 + cfg->museumWinnersOff, winners, sizeof(winners))) return;
+        for (int i = 0; i < 5; i++) s->museumWinners[i] = u16(winners + i * 32 + 8);
+    }
+    uint8_t bp[2];
+    if (cfg->frontierBpOff) {
+        if (!read(ctx, sb2 + cfg->frontierBpOff, bp, 2)) return;
+        s->battlePoints = u16(bp);
+    }
+    s->cardOk = true;
+}
+
 static void read_save_fields(struct pd_snapshot* s, const struct pd_config* cfg, pd_read_fn read, void* ctx,
                              uint32_t sb1, uint32_t sb2) {
     uint8_t pos[6];
@@ -308,6 +337,8 @@ static void read_save_fields(struct pd_snapshot* s, const struct pd_config* cfg,
             s->dexCaught[i] = owned[i] & s->dexSeen[i];
         }
     }
+
+    if (cfg->cardStyle) read_card_fields(s, cfg, read, ctx, sb1, sb2);
 
     if (cfg->flagBytes && cfg->flagBytes <= PD_FLAG_BYTES && read(ctx, sb1 + cfg->flagsOff, s->flags, cfg->flagBytes)) {
         uint8_t vars[PD_VAR_COUNT * 2];

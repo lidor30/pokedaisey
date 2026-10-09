@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Writes 3ds/core/pd_map_gen.c from the app's region-map tables:
 
-- the fingerprints RomArt finds the region map's art by in a ROM
-  (RomArtSigsGen.kt - only the blobs the 3DS MAP needs),
+- the fingerprints RomArt finds art by in a ROM (RomArtSigsGen.kt - only
+  the blobs the 3DS MAP and TRAINER CARD need),
 - the cursor grids (RegionMapLayoutsGen.kt),
 - every map section's page and rectangle (MapSecData*.kt).
 
@@ -20,7 +20,30 @@ BLOBS = [
     "FR_PLAYER_RED_GFX", "FR_PLAYER_LEAF_GFX", "FR_PLAYER_PAL",
     "EM_REGION_GFX", "EM_REGION_PAL", "EM_REGION_MAP",
     "EM_PLAYER_BRENDAN_GFX", "EM_PLAYER_BRENDAN_PAL", "EM_PLAYER_MAY_GFX", "EM_PLAYER_MAY_PAL",
+    # The TRAINER CARD (TrainerCardArt.kt's KANTO and HOENN blobs).
+    "FR_CARD_GFX", "FR_CARD_FRONT", "FR_CARD_BACK", "FR_CARD_BG",
+    "FR_CARD_PAL0", "FR_CARD_PAL1", "FR_CARD_PAL2", "FR_CARD_PAL3", "FR_CARD_PAL4",
+    "FR_CARD_FEMALE_PAL", "FR_CARD_BADGES_PAL", "FR_CARD_BADGES_GFX",
+    "FR_CARD_STICKERS_GFX", "FR_CARD_STICKER_PAL1", "FR_CARD_STICKER_PAL2", "FR_CARD_STICKER_PAL3",
+    "FR_CARD_STICKER_PAL4",
+    "FR_PIC_RED", "FR_PIC_RED_PAL", "FR_PIC_LEAF", "FR_PIC_LEAF_PAL",
+    "FR_FONT_NORMAL", "FR_FONT_NORMAL_WIDTHS",
+    "EM_CARD_GFX", "EM_CARD_FRONT", "EM_CARD_BACK", "EM_CARD_BG",
+    "EM_CARD_PAL0", "EM_CARD_PAL1", "EM_CARD_PAL2", "EM_CARD_PAL3", "EM_CARD_PAL4",
+    "EM_CARD_FEMALE_PAL", "EM_CARD_BADGES_PAL", "EM_CARD_BADGES_GFX",
+    "EM_PIC_BRENDAN", "EM_PIC_BRENDAN_PAL", "EM_PIC_MAY", "EM_PIC_MAY_PAL",
+    "EM_FONT_NORMAL", "EM_FONT_NORMAL_WIDTHS",
+    "CARD_STAR_PAL",
 ]
+
+
+def family(name):
+    """Which ROMs a blob is looked for in: PD_BLOB_FIRERED / _EMERALD, or both."""
+    if name.startswith("FR_"):
+        return "PD_BLOB_FIRERED"
+    if name.startswith("EM_"):
+        return "PD_BLOB_EMERALD"
+    return "PD_BLOB_FIRERED | PD_BLOB_EMERALD"
 
 
 def read(name):
@@ -79,7 +102,8 @@ def main():
         "const struct pd_blob_sig pd_blob_sigs[PD_BLOB_COUNT] = {",
     ]
     for name, lz, size, crc, head_off, head, pre in blobs():
-        out.append(f"    [PD_{name}] = {{ {str(lz).lower()}, {size}, 0x{crc:08X}u, {head_off}, 0x{head:016X}ull, 0x{pre:04X} }},")
+        out.append(f"    [PD_{name}] = {{ {str(lz).lower()}, {size}, 0x{crc:08X}u, {head_off}, 0x{head:016X}ull, 0x{pre:04X}, "
+                   f"{family(name)} }},")
     out.append("};")
     out.append("")
 
