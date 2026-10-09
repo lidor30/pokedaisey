@@ -12,10 +12,12 @@ class SoulGoldGuideTest {
     private val t = GUIDE_TABLES_SOULGOLD_V1_2
 
     private fun rom(): RomFileReader? {
-        val path = System.getProperty("soulgoldRom")
-            ?: "${System.getProperty("user.home")}/Downloads/Pokemon Soulgold.gba"
-        val altPath = "${System.getProperty("user.home")}/Downloads/Pokemon-SoulGold-v1.2.gba"
-        val file = File(path).takeIf { it.isFile } ?: File(altPath).takeIf { it.isFile }
+        val candidates = listOfNotNull(
+            System.getProperty("soulgoldRom"),
+            RETAIL_ROM_DIR + "Soulgold (v1.2).gba",
+            RETAIL_ROM_DIR + "Pokemon-SoulGold-v1.2.gba",
+        )
+        val file = candidates.map { File(it) }.firstOrNull { it.isFile }
         return file?.let {
             RomFileReader.load(it.absolutePath)?.also { reader ->
                 activeGame = GameKind.SOULGOLD
@@ -102,7 +104,7 @@ class SoulGoldGuideTest {
         // Verify that with the old truncated 0x130 (304 bytes) flag array, badge 1 (byte 306) would be out-of-bounds and read false
         val truncatedSave = SaveProgress(ByteArray(0x130), ByteArray(0x200))
         assertFalse("Truncated flag array causes badge 1 to be missed", truncatedSave.flag(badge1))
-        // But with t.flagBytes (0x2A9 = 681 bytes), it is well within range:
+        // But with t.flagBytes (0x2AA = 682 bytes), it is well within range:
         assertTrue("Full flag array holds badge 1", midSave.flag(badge1))
         assertTrue("Full flag array holds badge 2", midSave.flag(badge2))
     }
