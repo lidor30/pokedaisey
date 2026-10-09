@@ -1,5 +1,8 @@
-# Builds website/ and deploys it to Firebase Hosting (project pokedaisy): live on main and on
-# every published release, a temporary preview channel (linked in a PR comment) for pull requests from this repo.
+# Builds website/ and deploys it to Firebase Hosting (project pokedaisy). The live site only changes with
+# an app release: a published release (not a pre-release) deploys that release's tag, so the game table and
+# ROM check never get ahead of the APK people can download. Pushes to main only build and test; pull
+# requests from this repo get a temporary preview channel (linked in a PR comment). Run it by hand with a
+# release tag to redeploy (or roll back to) that release's site.
 name: Website
 
 on:
@@ -8,10 +11,15 @@ on:
     paths: ['website/**', '.github/workflows/website.yml']
   pull_request:
     paths: ['website/**', '.github/workflows/website.yml']
-  # The home and releases pages list GitHub releases, read at build time.
+  # "released": published as a full release, or a pre-release promoted to one. The home and releases
+  # pages list GitHub releases, read at build time.
   release:
-    types: [published]
+    types: [released]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag whose website goes live (e.g. v1.1.4)
+        required: true
 
 permissions:
   contents: read
@@ -32,6 +40,9 @@ jobs:
         working-directory: website
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          # A release builds its own tag (the default ref); a manual run, the tag it was given.
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || '' }}
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version-file: website/.nvmrc
@@ -42,8 +53,11 @@ jobs:
       - run: npm run build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # Fork PRs get no secrets: they build and test, but don't deploy a preview.
-      - if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+      # Live: releases and manual runs only. Previews: pull requests from this repo (forks get no secrets).
+      # A push to main stops here, built and tested.
+      - if: >-
+          github.event_name == 'release' || github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
         uses: FirebaseExtended/action-hosting-deploy@500ac625ca2dd40cbd15f7659af953801858032a # v0.11.0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
