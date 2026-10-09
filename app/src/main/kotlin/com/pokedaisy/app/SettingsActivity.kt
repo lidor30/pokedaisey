@@ -123,6 +123,9 @@ class SettingsActivity : ComponentActivity() {
     private var capturingCtrl by mutableStateOf<GbaControls.Btn?>(null)
     private var captured by mutableStateOf<List<Int>>(emptyList())
     private val stillHeld = LinkedHashSet<Int>()
+    /** A captured chord that other hotkeys already have exactly ([taken]): MOVE takes it off them. */
+    private class HotkeyClash(val action: Hotkeys.Action, val keys: List<Int>, val taken: List<Hotkeys.Action>)
+    private var hotkeyClash by mutableStateOf<HotkeyClash?>(null)
     private var revision by mutableIntStateOf(0)
     private var aspectPicker by mutableStateOf(false)
     /** HOME's scroll, kept while a sub-page is open so BACK returns to the same rows. */
@@ -186,7 +189,12 @@ class SettingsActivity : ComponentActivity() {
         if (capturing == null && capturingCtrl == null) return super.onKeyUp(keyCode, event)
         stillHeld.remove(keyCode)
         if (stillHeld.isEmpty() && captured.isNotEmpty()) {
-            capturing?.let { Hotkeys.setBinding(filesRoot, it, captured) }
+            capturing?.let { action ->
+                // The same chord on another hotkey: asked first, never two actions on one chord.
+                val taken = Hotkeys.clashes(Hotkeys.load(filesRoot).rawBindings, action, captured.map { Hotkeys.keyName(it) })
+                if (taken.isEmpty()) Hotkeys.setBinding(filesRoot, action, captured)
+                else hotkeyClash = HotkeyClash(action, captured, taken)
+            }
             capturingCtrl?.let { GbaControls.setBinding(filesRoot, it, captured.first()) }
             revision++
             cancelCapture()
@@ -204,6 +212,7 @@ class SettingsActivity : ComponentActivity() {
     private fun Root() {
         BackHandler(enabled = screen != Screen.HOME) { cancelCapture(); goBack() }
         BackHandler(enabled = aspectPicker) { aspectPicker = false }
+        BackHandler(enabled = hotkeyClash != null) { hotkeyClash = null }
         val m = rememberGbaTextMetrics()
         val small = rememberGbaTextMetrics(textScale = 1f)
 
@@ -278,6 +287,25 @@ class SettingsActivity : ComponentActivity() {
                     m = m,
                     onDismiss = { confirmReplaceAll = false },
                     onConfirm = { confirmReplaceAll = false; startCoverSync(replace = true) },
+                )
+            }
+
+            hotkeyClash?.let { c ->
+                OptionConfirm(
+                    title = tk("KEY IN USE"),
+                    message = tr(
+                        "{0} is already {1}. Move it to {2}?",
+                        c.keys.joinToString(" + ") { keyLabel(Hotkeys.keyName(it)) },
+                        c.taken.joinToString(", ") { tr(it.title) }, tr(c.action.title),
+                    ),
+                    confirmLabel = tk("MOVE"),
+                    m = m,
+                    onDismiss = { hotkeyClash = null },
+                    onConfirm = {
+                        hotkeyClash = null
+                        Hotkeys.setBinding(filesRoot, c.action, c.keys, takeFrom = c.taken)
+                        revision++
+                    },
                 )
             }
 
@@ -967,6 +995,20 @@ class SettingsActivity : ComponentActivity() {
                 tr("Tap a hotkey, then press one or more keys/buttons together and release — e.g. hold Select and tap R1 for a chord. BACK cancels."),
                 m, small,
             )
+            // While a hotkey waits for keys: CLEAR leaves it unbound ("-").
+            capturing?.let { action ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(m.u * 8),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = m.u * 4),
+                ) {
+                    OptionButton(tr("CLEAR {0}", tr(action.title)), m, modifier = Modifier.weight(1f), emphasis = true, onClick = {
+                        Hotkeys.clearBinding(filesRoot, action)
+                        revision++
+                        cancelCapture()
+                    })
+                    OptionButton(tk("CANCEL"), m, modifier = Modifier.weight(1f), onClick = ::cancelCapture)
+                }
+            }
             OptionListWindow(m, Modifier.fillMaxWidth().weight(1f, fill = false)) {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     // Off, the binds stay as they are, greyed out, and every key goes to the game.

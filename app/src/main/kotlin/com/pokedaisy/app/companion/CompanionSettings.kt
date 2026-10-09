@@ -57,8 +57,9 @@ interface CompanionSettings {
     fun hotkeyBindings(): Map<Hotkeys.Action, List<String>>
 
     /** Rebinds a hotkey to a single key, by display name — replaces any existing
-     * chord with just this one key. */
-    fun setHotkeyBinding(action: Hotkeys.Action, keyName: String)
+     * chord with just this one key; null unbinds it. The key comes off [takeFrom]
+     * (other hotkeys that had exactly it, moved by the player's MOVE). */
+    fun setHotkeyBinding(action: Hotkeys.Action, keyName: String?, takeFrom: List<Hotkeys.Action> = emptyList())
 
     /** Hard-restarts the running game: stops the core, discards any pending
      * suspend-resume state, and reboots the same ROM re-reading its save file

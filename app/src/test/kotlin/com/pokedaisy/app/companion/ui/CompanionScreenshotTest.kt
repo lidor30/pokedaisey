@@ -1230,7 +1230,7 @@ object SampleCompanion {
         override val hotkeysEnabled = true
         override fun setHotkeysEnabled(on: Boolean) {}
         override fun hotkeyBindings() = Hotkeys.Action.entries.associateWith { listOf("BUTTON_Y") }
-        override fun setHotkeyBinding(action: Hotkeys.Action, keyName: String) {}
+        override fun setHotkeyBinding(action: Hotkeys.Action, keyName: String?, takeFrom: List<Hotkeys.Action>) {}
         override fun restartGame() {}
         override fun closeGame() {}
         override val showHints = true

@@ -407,7 +407,10 @@ both persisted per ROM CRC (`Prefs.ffMenuCallbacks`). Ruby/Sapphire's inBattle b
 a row matches on its label (English and translated), value, `subtitle` and its words in `SETTING_KEYWORDS` (by English
 label, shared by both screens: "rebind", "keybinds", "turbo"... - give a new row its words). The companion's SETTINGS has
 no search (the Presentation can't host a keyboard). `SettingRow.subtitle` / `OptionLine(subtitle)` draw a grey line
-under the label (GAME BUTTONS: key bindings; TWEAKS). First-time setup has a GAME BUTTONS step (`SetupState.Step.BUTTONS`)
+under the label (GAME BUTTONS: key bindings; each TWEAKS switch its own `Tweak.description`, on a wider label column). HOTKEYS
+can be unbound (top screen: CLEAR while a row waits for keys; companion picker: NONE), and a chord another hotkey already has
+exactly (same keys, any order - sharing only some keys is fine) asks KEY IN USE / MOVE first (`Hotkeys.clashes`, `takeFrom`);
+clashes already in a file are left alone. First-time setup has a GAME BUTTONS step (`SetupState.Step.BUTTONS`)
 listing the bindings; CHANGE BUTTONS opens Settings' rebind page alone (`EXTRA_SCREEN` = CONTROLS, BACK returns).
 **SETTINGS layout**: the options come in titled groups (FAST-FORWARD / CONTROLS / COMPANION / SCREEN) in ONE
 scrolling column at the normal text size (a two-column, denser try was too small to tap - the user's call),

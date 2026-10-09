@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.assertCountEquals
@@ -138,8 +139,9 @@ class FakeSettings(showHintsInitially: Boolean = true, initialTabs: List<String>
     private var hotkeysOn = true
     override val hotkeysEnabled get() = hotkeysOn
     override fun setHotkeysEnabled(on: Boolean) { hotkeysOn = on }
-    override fun hotkeyBindings() = Hotkeys.Action.entries.associateWith { listOf("BUTTON_Y") }
-    override fun setHotkeyBinding(action: Hotkeys.Action, keyName: String) {}
+    // SAVE STATE on X, so picking X elsewhere shows the KEY IN USE confirm.
+    override fun hotkeyBindings() = Hotkeys.Action.entries.associateWith { if (it == Hotkeys.Action.SAVE_STATE) listOf("BUTTON_X") else listOf("BUTTON_Y") }
+    override fun setHotkeyBinding(action: Hotkeys.Action, keyName: String?, takeFrom: List<Hotkeys.Action>) {}
     override fun restartGame() {}
     override fun closeGame() {}
     override val canCloseCompanion = true   // the Thor: two screens, so SETTINGS shows CLOSE COMPANION
@@ -768,7 +770,7 @@ fun main(args: Array<String>) {
         }),
         Shot("$g-settings", bw, bh, bd, companion("SETTINGS")),
         Shot("$g-settings-ffspeed", bw, bh, bd, companion("SETTINGS")) { onNodeWithText("FF SPEED").performClick() },
-        // GAME BUTTONS' and TWEAKS' subtitles, further down the list.
+        // GAME BUTTONS' subtitle, further down the list.
         Shot("$g-settings-subtitles", bw, bh, bd, companion("SETTINGS")) { onNodeWithText("TWEAKS").performScrollTo() },
         Shot("$g-settings-ffmusic", bw, bh, bd, companion("SETTINGS")) { onAllNodesWithText("FF MUSIC").onFirst().performClick() },
         Shot("$g-settings-hotkeys", bw, bh, bd, companion("SETTINGS")) {
@@ -781,6 +783,18 @@ fun main(args: Array<String>) {
         Shot("$g-settings-hotkeys-off", bw, bh, bd, companion("SETTINGS")) {
             onNodeWithText("HOTKEYS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
             onNodeWithText("ON").performClick()
+        },
+        // The key picker: NONE (unbind) above CANCEL.
+        Shot("$g-settings-hotkeys-picker", bw, bh, bd, companion("SETTINGS")) {
+            onNodeWithText("HOTKEYS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+            onNodeWithText("LOAD STATE").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+        },
+        // X is SAVE STATE's: binding it to LOAD STATE asks first (the picker's X is the last "X" in the tree).
+        Shot("$g-settings-hotkeys-clash", bw, bh, bd, companion("SETTINGS")) {
+            onNodeWithText("HOTKEYS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+            onNodeWithText("LOAD STATE").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+            onAllNodesWithText("X").onLast().performSemanticsAction(SemanticsActions.OnClick)
+            onAllNodesWithText("KEY IN USE").onFirst().assertExists()
         },
         // CLOSE GAME / RESTART GAME end the scrolling list.
         Shot("$g-settings-bottom", bw, bh, bd, companion("SETTINGS")) { onNodeWithText("CLOSE COMPANION").performScrollTo() },
@@ -1019,11 +1033,17 @@ fun main(args: Array<String>) {
             LibraryActivity()
         }),
         Shot("settings-hotkeys", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("HOTKEYS").performScrollTo().performClick() },
+        // A hotkey waiting for keys: CLEAR (unbind) / CANCEL over the list.
+        Shot("settings-hotkeys-capture", tw, th, td, activity { SettingsActivity() }) {
+            onNodeWithText("HOTKEYS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+            onNodeWithText("SAVE STATE").performSemanticsAction(SemanticsActions.OnClick)
+        },
         // The list's end: LIBRARY / ONLINE (RetroAchievements' BETA tag) / APP.
         Shot("settings-home-bottom", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("RUN SETUP").performScrollTo() },
         Shot("settings-buttons", tw, th * 2, td, activity { SettingsActivity() }) { onNodeWithText("GAME BUTTONS").performScrollTo().performClick() },
         Shot("settings-hotkeys-off", tw, th, td, activity { SettingsActivity() }) {
-            onNodeWithText("HOTKEYS").performClick(); onNodeWithText("ON").performClick()
+            onNodeWithText("HOTKEYS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+            onAllNodesWithText("ON").onFirst().performSemanticsAction(SemanticsActions.OnClick)
         },
         // Search: "rebind" isn't a row's name - its keywords find GAME BUTTONS.
         Shot("settings-search", tw, th, td, activity { SettingsActivity() }) {

@@ -4,7 +4,14 @@ package com.pokedaisy.app.companion.i18n
 internal val trSettings: Map<String, Tr> = mapOf(
     // Page titles
     "Key bindings: which button presses A, B, START..." to Tr(ja = "キーせってい: どのボタンが A B START…", fr = "Touches : quel bouton fait A, B, START...", de = "Tastenbelegung: welche Taste A, B, START drückt...", it = "Tasti: quale pulsante preme A, B, START...", es = "Teclas: qué botón pulsa A, B, START..."),
-    "Small touches: icon bounce, cursor blink, animations" to Tr(ja = "こまかい せってい: アイコン カーソル アニメ", fr = "Détails : icônes, curseur, animations", de = "Kleinigkeiten: Symbole, Cursor, Animationen", it = "Dettagli: icone, cursore, animazioni", es = "Detalles: iconos, cursor, animaciones"),
+    "KEY IN USE" to Tr(ja = "つかわれている キー", fr = "TOUCHE UTILISÉE", de = "TASTE BELEGT", it = "TASTO IN USO", es = "TECLA EN USO"),
+    "MOVE" to Tr(ja = "うつす", fr = "DÉPLACER", de = "VERSCHIEBEN", it = "SPOSTA", es = "MOVER"),
+    "{0} is already {1}. Move it to {2}?" to Tr(ja = "{0} は {1} に つかわれています。 {2} に うつしますか?", fr = "{0} est déjà {1}. Le passer à {2} ?", de = "{0} ist schon {1}. Zu {2} verschieben?", it = "{0} è già {1}. Spostarlo su {2}?", es = "{0} ya es {1}. ¿Moverlo a {2}?"),
+    "CLEAR {0}" to Tr(ja = "{0} を クリア", fr = "EFFACER {0}", de = "{0} LEEREN", it = "CANCELLA {0}", es = "BORRAR {0}"),
+    "Party Pokémon icons bounce, like in the game" to Tr(ja = "てもちの アイコンが ゲームのように うごく", fr = "Les icônes de l'équipe bougent, comme en jeu", de = "Team-Symbole hüpfen wie im Spiel", it = "Le icone della squadra si muovono come nel gioco", es = "Los iconos del equipo se mueven como en el juego"),
+    "The MAP cursor pulses between two sizes" to Tr(ja = "マップの カーソルが おおきく ちいさく なる", fr = "Le curseur de la CARTE change de taille", de = "Der KARTE-Cursor wechselt die Größe", it = "Il cursore della MAPPA cambia dimensione", es = "El cursor del MAPA cambia de tamaño"),
+    "Tabs slide in. Off: they switch at once" to Tr(ja = "タブが スライド。 オフ: すぐ きりかわる", fr = "Les onglets glissent. Non : direct", de = "Tabs gleiten. Aus: sofort", it = "Le schede scorrono. No: subito", es = "Las pestañas se deslizan. No: directo"),
+    "A battle opens BATTLE, then goes back" to Tr(ja = "バトルで バトルを ひらき あとで もどる", fr = "Un combat ouvre COMBAT, puis revient", de = "Ein Kampf öffnet KAMPF, dann zurück", it = "Una lotta apre LOTTA, poi torna", es = "Un combate abre COMBATE y luego vuelve"),
     "SEARCH SETTINGS (e.g. KEY BINDINGS)" to Tr(ja = "せっていを さがす (れい: キーせってい)", fr = "CHERCHER (ex. TOUCHES)", de = "SUCHEN (z. B. TASTEN)", it = "CERCA (es. TASTI)", es = "BUSCAR (p. ej. TECLAS)"),
     "NOTHING MATCHES \"{0}\"" to Tr(ja = "「{0}」は みつかりません", fr = "RIEN POUR « {0} »", de = "NICHTS FÜR \"{0}\"", it = "NIENTE PER \"{0}\"", es = "NADA PARA \"{0}\""),
     "ALSO LOOK IN" to Tr(ja = "ほかに さがす フォルダ", fr = "CHERCHER AUSSI DANS", de = "AUCH SUCHEN IN", it = "CERCA ANCHE IN", es = "BUSCAR TAMBIÉN EN"),

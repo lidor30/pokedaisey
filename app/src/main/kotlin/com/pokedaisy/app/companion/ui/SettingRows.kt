@@ -110,6 +110,8 @@ fun GroupedRows(
     cursor: Int,
     onClick: (Int) -> Unit,
     scroll: ScrollState = rememberScrollState(),
+    /** The label column's share of a row (with its subtitle); TWEAKS' ON / OFF need little room. */
+    labelWeight: Float = 0.58f,
     footer: @Composable () -> Unit = {},
 ) {
     Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
@@ -137,7 +139,7 @@ fun GroupedRows(
                     row.label, row.value, selected = i == cursor, m,
                     height = if (row.subtitle != null) m.rowHeight * 1.2f + m.lineHeight else m.rowHeight * 1.2f,
                     divider = rows.getOrNull(i + 1)?.header == false, labelBadge = row.labelBadge, labelIcon = row.labelIcon,
-                    valueBadge = row.badge, enabled = row.enabled, subtitle = row.subtitle,
+                    valueBadge = row.badge, enabled = row.enabled, subtitle = row.subtitle, labelWeight = labelWeight,
                 ) { onClick(i) }
             }
         }

@@ -109,7 +109,7 @@ fun CompanionSettingsScreen(
     val cursor = if (page == Page.HOME) homeCursor else pageCursor
     fun moveCursor(i: Int) { if (page == Page.HOME) homeCursor = i else pageCursor = i }
     val homeScroll = ui.homeScroll
-    var picking by remember { mutableStateOf<Pair<String, (String) -> Unit>?>(null) }
+    var picking by remember { mutableStateOf<Pair<String, (String?) -> Unit>?>(null) }
     var confirm by remember { mutableStateOf<Confirm?>(null) }
     var selector by remember { mutableStateOf<Selector?>(null) }
 
@@ -160,7 +160,7 @@ fun CompanionSettingsScreen(
                     Page.BUTTONS -> GbaControls.Btn.entries.map { btn ->
                         val title = "GBA ${btn.label}"
                         SettingRow(title, keysLabel(settings.gbaControlBindings()[btn])) {
-                            picking = title to { name -> settings.setGbaControlBinding(btn, name); tick++ }
+                            picking = title to { name -> if (name != null) { settings.setGbaControlBinding(btn, name); tick++ } }
                         }
                     } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     // Off, the binds stay as they are, greyed out, and every key goes to the game.
@@ -171,14 +171,23 @@ fun CompanionSettingsScreen(
                     ) + Hotkeys.Action.entries.map { action ->
                         val title = action.title
                         SettingRow(title, keysLabel(settings.hotkeyBindings()[action]), enabled = settings.hotkeysEnabled) {
-                            picking = title to { name -> settings.setHotkeyBinding(action, name); tick++ }
+                            picking = title to { name ->
+                                // NONE unbinds; a key another hotkey already has exactly moves only on MOVE.
+                                val taken = if (name == null) emptyList() else Hotkeys.clashes(settings.hotkeyBindings(), action, listOf(name))
+                                if (taken.isEmpty()) { settings.setHotkeyBinding(action, name); tick++ }
+                                else confirm = Confirm(
+                                    tk("KEY IN USE"),
+                                    tr("{0} is already {1}. Move it to {2}?", keyLabel(name!!), taken.joinToString(", ") { tr(it.title) }, tr(title)),
+                                    tk("MOVE"),
+                                ) { settings.setHotkeyBinding(action, name, taken); tick++ }
+                            }
                         }
                     } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     Page.SHADERS -> shaderRows(settings) { tick++ } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     Page.CHEATS -> cheatRows(settings) { tick++ } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     // Small preferences, each on by default (CompanionTweaks).
                     Page.TWEAKS -> CompanionTweaks.Tweak.entries.map { t ->
-                        SettingRow(t.label, if (CompanionTweaks[t]) tk("ON") else tk("OFF")) {
+                        SettingRow(t.label, if (CompanionTweaks[t]) tk("ON") else tk("OFF"), subtitle = t.description) {
                             CompanionTweaks[t] = !CompanionTweaks[t]
                             settings.setTweak(t.key, CompanionTweaks[t])
                             tick++
@@ -190,8 +199,10 @@ fun CompanionSettingsScreen(
                 // Rows share out the window's height (big touch targets) down
                 // to a floor, past which the list scrolls instead.
                 // SHADERS too: OptionRows shares the window out, so its 4 rows came out taller than SETTINGS'.
-                if (rows.any { it.header } || page == Page.SHADERS) {
-                    GroupedRows(rows, m, cursor, onClick = { i -> moveCursor(i); rows[i].onClick() }, scroll = if (page == Page.HOME) homeScroll else rememberScrollState()) {
+                // TWEAKS: OptionRows has no subtitle line for each tweak's description.
+                if (rows.any { it.header } || page == Page.SHADERS || page == Page.TWEAKS) {
+                    GroupedRows(rows, m, cursor, onClick = { i -> moveCursor(i); rows[i].onClick() }, scroll = if (page == Page.HOME) homeScroll else rememberScrollState(),
+                        labelWeight = if (page == Page.TWEAKS) 0.8f else 0.58f) {
                         // Actions, not settings: the list's last line, out of the way of the options.
                         if (page == Page.HOME && settings != null) {
                             // A summary-window line sets them apart from the last group.
@@ -261,6 +272,7 @@ fun CompanionSettingsScreen(
             KeyPicker(
                 title, m,
                 note = if (page == Page.HOTKEYS) tr("REPLACES THE WHOLE BINDING. CHORDS: LIBRARY SETTINGS.") else null,
+                canClear = page == Page.HOTKEYS,
                 onPick = { onPick(it); picking = null },
                 onDismiss = { picking = null },
             )
@@ -370,7 +382,7 @@ private fun homeRows(
         // The game's menu click on every companion button.
         SettingRow(tk("CLICK SOUND"), onOff(s.clickSound)) { s.setClickSound(!s.clickSound); changed() },
         // Small on / off preferences: the icons' bounce, the map cursor's blink, tab slides, the battle jump.
-        SettingRow(tk("TWEAKS"), null, subtitle = "Small touches: icon bounce, cursor blink, animations") { navigate(Page.TWEAKS) },
+        SettingRow(tk("TWEAKS"), null) { navigate(Page.TWEAKS) },
         groupTitle(tk("SCREEN")),
         // Game, location, money, clock and battery: OFF, over the game, or over these tabs.
         SettingRow(tk("STATUS BAR"), statusBarLabel(s.statusBar, s.statusBarOnCompanion)) {
@@ -452,7 +464,7 @@ private fun keysLabel(keys: List<String>?) =
     keys.orEmpty().joinToString(" / ") { keyLabel(it) }.ifEmpty { "-" }
 
 @Composable
-private fun KeyPicker(title: String, m: GbaTextMetrics, note: String?, onPick: (String) -> Unit, onDismiss: () -> Unit) {
+private fun KeyPicker(title: String, m: GbaTextMetrics, note: String?, canClear: Boolean, onPick: (String?) -> Unit, onDismiss: () -> Unit) {
     OptionOverlay(onDismiss) {
         Column(Modifier.fillMaxSize()) {
             OptionTitleWindow(tr("BIND {0}", tr(title)), m, onBack = onDismiss)
@@ -474,6 +486,8 @@ private fun KeyPicker(title: String, m: GbaTextMetrics, note: String?, onPick: (
                             OptionLine(keyLabel(name), null, selected = false, m, height = m.rowHeight * 1.3f, divider = true) { onPick(name) }
                         }
                     }
+                    // NONE: the hotkey unbound (a GBA button always keeps one).
+                    if (canClear) OptionLine(tk("NONE"), null, selected = false, m, height = m.rowHeight * 1.3f, divider = true) { onPick(null) }
                     OptionLine(tk("CANCEL"), null, selected = true, m, height = m.rowHeight * 1.3f, onClick = onDismiss)
                 }
             }

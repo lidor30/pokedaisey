@@ -123,11 +123,44 @@ class Hotkeys private constructor(
         }
 
         /** Replace [action]'s binding with the single chord [keyCodes] and persist. */
-        fun setBinding(filesDir: File, action: Action, keyCodes: Collection<Int>) {
+        fun setBinding(filesDir: File, action: Action, keyCodes: Collection<Int>, takeFrom: Collection<Action> = emptyList()) =
+            setBindingNamed(filesDir, action, keyCodes.map { keyName(it) }, takeFrom)
+
+        /**
+         * Replace [action]'s binding with the chord [keyNames] (KEYCODE_ suffixes) and persist; the same
+         * chord comes off each of [takeFrom] (the player said MOVE to [clashes]), their other chords stay.
+         */
+        fun setBindingNamed(filesDir: File, action: Action, keyNames: Collection<String>, takeFrom: Collection<Action> = emptyList()) {
             val props = readProps(filesDir)
-            props.setProperty(action.prop, keyCodes.joinToString("+") { keyName(it) })
+            val chord = chordOf(keyNames.joinToString("+"))
+            for (other in takeFrom) if (other != action) {
+                val kept = props.getProperty(other.prop).orEmpty().split(',').map { it.trim() }
+                    .filter { it.isNotEmpty() && chordOf(it) != chord }
+                props.setProperty(other.prop, kept.joinToString(", "))
+            }
+            props.setProperty(action.prop, keyNames.joinToString("+"))
             writeProps(filesDir, props)
         }
+
+        /** Unbinds [action] (an empty value, so the default doesn't come back). */
+        fun clearBinding(filesDir: File, action: Action) {
+            val props = readProps(filesDir)
+            props.setProperty(action.prop, "")
+            writeProps(filesDir, props)
+        }
+
+        /**
+         * The other actions already bound to exactly the chord [keyNames] - the same keys, in any order.
+         * A chord that only shares some keys (SELECT vs SELECT+R1) isn't a clash: that's how chords work.
+         */
+        fun clashes(raw: Map<Action, List<String>>, action: Action, keyNames: Collection<String>): List<Action> {
+            val chord = chordOf(keyNames.joinToString("+"))
+            if (chord.isEmpty()) return emptyList()
+            return raw.filter { (other, chords) -> other != action && chords.any { chordOf(it) == chord } }.keys.toList()
+        }
+
+        private fun chordOf(s: String): Set<String> =
+            s.split('+').map { it.trim().uppercase() }.filter { it.isNotEmpty() }.toSet()
 
         /** Human name for a keycode (e.g. 96 -> "BUTTON_A"). */
         fun keyName(keyCode: Int): String =

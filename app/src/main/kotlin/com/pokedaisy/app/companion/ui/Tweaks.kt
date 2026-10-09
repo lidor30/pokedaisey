@@ -10,15 +10,16 @@ import com.pokedaisy.app.companion.i18n.tk
  * each change through CompanionSettings.setTweak.
  */
 object CompanionTweaks {
-    enum class Tweak(val label: String, val key: String) {
+    /** [description]: the grey line under the row (English, translated where it's drawn). */
+    enum class Tweak(val label: String, val key: String, val description: String) {
         /** The party icons' two-frame bounce (PARTY, and the battle's POKéMON picker). */
-        PARTY_ICONS_MOVE(tk("PARTY ICONS MOVE"), "party_icons_move"),
+        PARTY_ICONS_MOVE(tk("PARTY ICONS MOVE"), "party_icons_move", "Party Pokémon icons bounce, like in the game"),
         /** The region map cursor's pulse between its two sizes. */
-        MAP_CURSOR_BLINK(tk("MAP CURSOR BLINK"), "map_cursor_blink"),
+        MAP_CURSOR_BLINK(tk("MAP CURSOR BLINK"), "map_cursor_blink", "The MAP cursor pulses between two sizes"),
         /** Tabs slide / fade into each other; off, they cut. */
-        TAB_ANIMATIONS(tk("TAB ANIMATIONS"), "tab_animations"),
+        TAB_ANIMATIONS(tk("TAB ANIMATIONS"), "tab_animations", "Tabs slide in. Off: they switch at once"),
         /** A battle opens the BATTLE tab by itself (and the tab before it comes back after). */
-        JUMP_TO_BATTLE(tk("JUMP TO BATTLE"), "jump_to_battle"),
+        JUMP_TO_BATTLE(tk("JUMP TO BATTLE"), "jump_to_battle", "A battle opens BATTLE, then goes back"),
     }
 
     private val states = Tweak.entries.associateWith { mutableStateOf(true) }

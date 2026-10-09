@@ -329,9 +329,10 @@ class PokeDaisyActivity : Activity() {
             setHotkeysOn(on)
         }
         override fun hotkeyBindings() = Hotkeys.load(getExternalFilesDir(null) ?: filesDir).rawBindings
-        override fun setHotkeyBinding(action: Hotkeys.Action, keyName: String) {
-            val code = keyCodeForName(keyName) ?: return
-            Hotkeys.setBinding(getExternalFilesDir(null) ?: filesDir, action, listOf(code))
+        override fun setHotkeyBinding(action: Hotkeys.Action, keyName: String?, takeFrom: List<Hotkeys.Action>) {
+            val dir = getExternalFilesDir(null) ?: filesDir
+            if (keyName == null) Hotkeys.clearBinding(dir, action)
+            else Hotkeys.setBinding(dir, action, listOf(keyCodeForName(keyName) ?: return), takeFrom)
             hotkeys = Hotkeys.load(getExternalFilesDir(null) ?: filesDir)
         }
         override fun restartGame() {
