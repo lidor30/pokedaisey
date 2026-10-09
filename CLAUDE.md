@@ -61,6 +61,16 @@ literal-pool words pointing at `gScriptCmdTable` (Lazarus: `0x0820B2B0`, see the
 `lazarus_battle` fixture's README; newer expansion's `setwildbattle` takes
 species2/level2/item2 too, and zero padding is harmless since 0x00 is `nop`).
 
+## 3DS port (`3ds/`, branch `port-3ds`)
+
+A homebrew 3DS build, early preview (see `3ds/README.md`): a portable C core (`3ds/core/`) re-implements
+the companion's reads (addresses from `NativeReader.kt`, decoding from `Gen3Mon.kt` - keep in sync) and
+draws it at 320x240 in the OPTION look; `3ds/ctr/` runs it beside libmgba (the same submodule). Its
+tables and font are generated from the app's (`make -C 3ds tables`). Look at UI changes with `make -C 3ds
+preview` (PNGs from the RAM fixtures, no ROM); `make -C 3ds azahar-test` boots the real `.3dsx` in the
+Azahar emulator on a fixture test ROM (GBA homebrew that loads a fixture's RAM, `3ds/test/`). Only
+retail English FireRed / LeafGreen / Emerald so far; never run on a real 3DS yet.
+
 ## UI work
 
 **Look at every UI change before calling it done** — render it and read the PNG, don't

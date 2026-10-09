@@ -1,0 +1,46 @@
+// A small software canvas the companion draws into: 0xRRGGBB pixels, row
+// major. Each host converts it for its screen (the 3DS's rotated BGR
+// framebuffer, an SDL texture, a PNG). Corners step in whole pixels and text
+// is the 1-bit Pixel Operator, so it all stays pixel art (CLAUDE.md: corners
+// are pixel art, never smooth arcs).
+#ifndef PD_CANVAS_H
+#define PD_CANVAS_H
+
+#include <stdbool.h>
+#include <stdint.h>
+
+struct pd_canvas {
+    int w, h;
+    uint32_t* px;
+    // Drawing is clipped to this rectangle (pd_clip / pd_unclip).
+    int cx0, cy0, cx1, cy1;
+};
+
+struct pd_layer {
+    uint32_t color;
+    int width;
+};
+
+void pd_canvas_init(struct pd_canvas* c, int w, int h, uint32_t* px);
+void pd_clip(struct pd_canvas* c, int x, int y, int w, int h);
+void pd_unclip(struct pd_canvas* c);
+
+void pd_fill(struct pd_canvas* c, int x, int y, int w, int h, uint32_t color);
+// A filled rectangle whose corners step like the app's PixelRoundedShape(r).
+void pd_round_rect(struct pd_canvas* c, int x, int y, int w, int h, int r, uint32_t color);
+// Nested rounded rects, outermost first, then the fill - the OPTION screen's
+// window frames (the app's drawLayeredBox). Returns the frame's total width.
+int pd_layered_box(struct pd_canvas* c, int x, int y, int w, int h, int r,
+                   const struct pd_layer* layers, int n, uint32_t fill);
+
+// GBA text: the shadow one pixel right, down and diagonally, then the glyphs.
+// shadow 0xFF000000 (PD_NO_SHADOW) = none. Returns the advance in pixels.
+#define PD_NO_SHADOW 0xFF000000u
+int pd_text(struct pd_canvas* c, int x, int y, const char* utf8, uint32_t color, uint32_t shadow);
+int pd_text_width(const char* utf8);
+// Like pd_text, cut with "..." to fit max_w.
+int pd_text_fit(struct pd_canvas* c, int x, int y, int max_w, const char* utf8, uint32_t color, uint32_t shadow);
+// Right-aligned at right.
+void pd_text_right(struct pd_canvas* c, int right, int y, const char* utf8, uint32_t color, uint32_t shadow);
+
+#endif

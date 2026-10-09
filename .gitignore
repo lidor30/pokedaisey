@@ -32,3 +32,7 @@ build/
 __pycache__/
 .DS_Store
 .claude/settings.local.json
+
+# 3DS build output (3ds/README.md)
+*.3dsx
+*.smdh

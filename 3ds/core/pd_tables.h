@@ -1,0 +1,46 @@
+// Name / move / type tables, generated from the app's Kotlin tables by
+// 3ds/tools/gen_tables.py (pd_tables_gen.c), plus small lookups over them.
+#ifndef PD_TABLES_H
+#define PD_TABLES_H
+
+#include <stddef.h>
+
+struct pd_move_info {
+    const char* name;
+    int type;
+    int power;
+};
+
+struct pd_type_pair {
+    int atk, def, pct;
+};
+
+extern const char* const pd_species_names[];
+extern const int pd_species_names_count;
+extern const struct pd_move_info pd_moves[];
+extern const int pd_moves_count;
+extern const char* const pd_type_names[];
+extern const int pd_type_names_count;
+extern const struct pd_type_pair pd_type_chart[];
+extern const int pd_type_chart_count;
+extern const char* const pd_mapsec_firered[];
+extern const int pd_mapsec_firered_count;
+extern const char* const pd_mapsec_emerald[];
+extern const int pd_mapsec_emerald_count;
+
+#define PD_TYPE_NONE 255
+#define PD_SPECIES_EGG 412
+
+// Names in the game's own casing: FireRed / Emerald print species and moves
+// in capitals with a small é (the app's gameCase()). Writes into buf.
+const char* pd_species_name(int species, char* buf, size_t len);
+const char* pd_move_name(int move, char* buf, size_t len);
+const char* pd_type_name(int type);
+int pd_move_type(int move);
+int pd_move_power(int move);
+
+// One attacking type against a (possibly dual-typed) defender, in percent
+// (100 = 1x) - the app's typeMultiplierPct().
+int pd_type_multiplier_pct(int atk, int def1, int def2);
+
+#endif
