@@ -68,6 +68,13 @@ struct pd_snapshot {
     struct pd_mon party[PD_PARTY_SIZE];
     bool inBattle, isDouble, isTrainer;
     struct pd_battle_mon battlers[4]; // by battler position; species 0 = none
+    // The FOE TEAM (trainer battles): gEnemyParty in order, the one out
+    // (gBattlerPartyIndexes) and the one the trainer is about to send in -
+    // only once the one out has fainted and the pick is alive (the app's
+    // SnapshotView.enemyNext). -1 = none.
+    int foeCount;
+    struct pd_mon foes[PD_PARTY_SIZE];
+    int foeActive, foeNext;
     int mapsec;
     long money; // -1 = unknown
     // By PD_POCKET_*; bagOk = the pockets read (not just empty).

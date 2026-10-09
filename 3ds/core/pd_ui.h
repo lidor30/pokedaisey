@@ -92,6 +92,13 @@ struct pd_ui {
     enum pd_tab tabBeforeBattle; // the tab a battle took over from
     int battleSlot;              // the bar slot BATTLE shows in, -1 = none
     bool battleWasOn;
+    // BATTLE: INFO (0) or SUGGESTIONS (1); the FOE TEAM's slots seen so far
+    // this battle (a bit each), the one tapped (-1 = follow the battle) and
+    // the one shown (set by the draw); what the last read said was out / next.
+    int battlePane;
+    unsigned foeSeen;
+    int foeSelected, foeShown;
+    int lastFoeActive, lastFoeNext;
     int summarySlot; // party slot whose summary is open, -1 = none
     int bagPocket;   // index into the game's own pocket order
     int bagSelected; // item index in that pocket, -1 = none

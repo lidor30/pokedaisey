@@ -4,7 +4,7 @@
 
 // NATIVE_FIRERED_REV0 / _REV1 share every RAM address and save offset below,
 // and LeafGreen's maps put each RAM global at FireRed's address for the same
-// revision (NATIVE_LEAFGREEN_REV0/1). gEnemyParty is from the rev 1 map.
+// revision (NATIVE_LEAFGREEN_REV0/1).
 #define FIRERED_RAM                                                                                     \
     .playerParty = 0x02024284,                                                                          \
     .playerPartyCount = 0x02024029,                                                                     \
@@ -18,7 +18,6 @@
     .mapHeader = 0x02036DFC,                                                                            \
     .encryptionKeyOff = 0xF20,                                                                          \
     .moneyOff = 0x290,                                                                                  \
-    .enemyParty = 0x0202402C,                                                                           \
     /* FireRed's item.c: Items, Key Items, Poke Balls, TM Case, Berry Pouch. */                         \
     .bagPockets = 0x0203988C,                                                                           \
     .bagOrder = { PD_POCKET_ITEMS, PD_POCKET_KEY, PD_POCKET_BALLS, PD_POCKET_TMHM, PD_POCKET_BERRIES }, \
@@ -31,10 +30,22 @@
     .varsOff = 0x1000,                                                                                  \
     .flagBytes = 0x120
 
+// The FOE TEAM, from the rev 1 map (NATIVE_FIRERED_REV1; LeafGreen rev 1's map
+// has the same addresses). monToSwitchIntoId sits at 0x5C in struct BattleStruct.
+#define FIRERED_REV1_FOES        \
+    .enemyParty = 0x0202402C,          \
+    .battlerPartyIndexes = 0x02023BCE, \
+    .battleStructPtr = 0x02023FE8,     \
+    .monToSwitchIntoOff = 0x5C
+
 // FireRed rev 1 (sha1 dd5945db..., what pret's firered_rev1 builds): its ROM
 // tables too - POKEDEX_FIRERED_REV1 and GUIDE_TABLES_FIRERED_REV1.
 static const struct pd_config FIRERED_REV1 = {
     FIRERED_RAM,
+    FIRERED_REV1_FOES,
+    .monIconTable = 0x083D3810,
+    .monIconPaletteIndices = 0x083D3EF0,
+    .monIconPaletteTable = 0x083D40A8,
     .dexEntries = 0x0844E8B0,
     .dexEntryStride = 0x24,
     .speciesInfo = 0x082547F4,
@@ -53,10 +64,29 @@ static const struct pd_config FIRERED_REV1 = {
 };
 
 // FireRed rev 0 and LeafGreen: the tabs that read RAM (and the MAP, whose art
-// is found by fingerprint); their ROM tables for the POKéDEX and the GUIDE's
-// live pages aren't ported yet.
-static const struct pd_config FIRERED_RAM_ONLY = {
+// is found by fingerprint) and the party icons; their ROM tables for the
+// POKéDEX and the GUIDE's live pages aren't ported yet. The FOE TEAM's
+// addresses are known for rev 1 only (the app's NATIVE_FIRERED_REV0 has none).
+static const struct pd_config FIRERED_REV0_RAM_ONLY = {
     FIRERED_RAM,
+    .monIconTable = 0x083D37A0,
+    .monIconPaletteIndices = 0x083D3E80,
+    .monIconPaletteTable = 0x083D4038,
+};
+
+static const struct pd_config LEAFGREEN_REV0_RAM_ONLY = {
+    FIRERED_RAM,
+    .monIconTable = 0x083D35DC,
+    .monIconPaletteIndices = 0x083D3CBC,
+    .monIconPaletteTable = 0x083D3E74,
+};
+
+static const struct pd_config LEAFGREEN_REV1_RAM_ONLY = {
+    FIRERED_RAM,
+    FIRERED_REV1_FOES,
+    .monIconTable = 0x083D364C,
+    .monIconPaletteIndices = 0x083D3D2C,
+    .monIconPaletteTable = 0x083D3EE4,
 };
 
 // NATIVE_EMERALD_RETAIL (English, BPEE; sha1 f3ae0881..., what pret's
@@ -75,6 +105,12 @@ static const struct pd_config EMERALD = {
     .encryptionKeyOff = 0xAC,
     .moneyOff = 0x490,
     .enemyParty = 0x02024744,
+    .battlerPartyIndexes = 0x0202406E,
+    .battleStructPtr = 0x0202449C,
+    .monToSwitchIntoOff = 0x5C,
+    .monIconTable = 0x0857BCA8,
+    .monIconPaletteIndices = 0x0857C388,
+    .monIconPaletteTable = 0x0857C540,
     // Emerald's item.c: Items, Poke Balls, TMs & HMs, Berries, Key Items.
     .bagPockets = 0x02039DD8,
     .bagOrder = { PD_POCKET_ITEMS, PD_POCKET_BALLS, PD_POCKET_TMHM, PD_POCKET_BERRIES, PD_POCKET_KEY },
@@ -131,7 +167,9 @@ void pd_game_detect(struct pd_game* g, const uint8_t* header, size_t romSize) {
     if (!strcmp(g->code, "BPRE") || !strcmp(g->code, "BPGE")) {
         g->kind = PD_GAME_FIRERED;
         g->title = g->code[2] == 'R' ? "Pokémon FireRed" : "Pokémon LeafGreen";
-        g->cfg = g->code[2] == 'R' && g->revision == 1 ? &FIRERED_REV1 : &FIRERED_RAM_ONLY;
+        bool rev1 = g->revision == 1;
+        if (g->code[2] == 'R') g->cfg = rev1 ? &FIRERED_REV1 : &FIRERED_REV0_RAM_ONLY;
+        else g->cfg = rev1 ? &LEAFGREEN_REV1_RAM_ONLY : &LEAFGREEN_REV0_RAM_ONLY;
     } else if (!strcmp(g->code, "BPEE")) {
         g->kind = PD_GAME_EMERALD;
         g->title = "Pokémon Emerald";

@@ -25,6 +25,7 @@ SOURCES = {
     # Item names and descriptions exactly as each game's bag prints them.
     "items": "ItemTextGame.kt",
     "gender": "GenderRatiosFireRed.kt",
+    "species_types": "SpeciesTypes.kt",
 }
 
 
@@ -85,6 +86,13 @@ def main():
         ("pd_item_desc_emerald", strings("items", "itemDescriptionsEmeraldGame")),
     ]
 
+    # Each species' two types (the same twice for one type), by internal id.
+    species_types = {int(k): (int(a), int(b)) for k, a, b in
+                     re.findall(r"(\d+) to SpeciesTypes\((\d+), (\d+)\)", block(read("species_types"), "speciesTypeData"))}
+    # The app's table files BULBASAUR's types under 0 (no species) and has no 1.
+    if 0 in species_types and 1 not in species_types:
+        species_types[1] = species_types.pop(0)
+
     m = re.search(r"val genderRatiosFireRed = intArrayOf\(([^)]*)\)", read("gender"))
     gender = [int(v) for v in m.group(1).split(",")]
 
@@ -127,6 +135,14 @@ def main():
         out.append("    " + ", ".join(str(v) for v in gender[i:i + 20]) + ",")
     out.append("};")
     out.append(f"const int pd_gender_ratios_count = {len(gender)};")
+    out.append("")
+    top = max(species_types)
+    out.append(f"const unsigned char pd_species_type_table[{top + 1}][2] = {{")
+    for i in range(top + 1):
+        a, b = species_types.get(i, (255, 255))
+        out.append(f"    {{ {a}, {b} }},")
+    out.append("};")
+    out.append(f"const int pd_species_type_table_count = {top + 1};")
     out.append("")
 
     with open(OUT, "w", encoding="utf-8") as f:

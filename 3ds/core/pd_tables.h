@@ -38,6 +38,8 @@ extern const int pd_item_desc_emerald_count;
 // gBaseStats[species].genderRatio (FireRed's numbering, which Emerald shares).
 extern const unsigned char pd_gender_ratios[];
 extern const int pd_gender_ratios_count;
+extern const unsigned char pd_species_type_table[][2];
+extern const int pd_species_type_table_count;
 
 #define PD_TYPE_NONE 255
 #define PD_SPECIES_EGG 412
@@ -53,5 +55,8 @@ int pd_move_power(int move);
 // One attacking type against a (possibly dual-typed) defender, in percent
 // (100 = 1x) - the app's typeMultiplierPct().
 int pd_type_multiplier_pct(int atk, int def1, int def2);
+// A species' types (the app's speciesTypeData; the same type twice for one),
+// PD_TYPE_NONE both when unknown.
+void pd_species_type_pair(int species, int* t1, int* t2);
 
 #endif

@@ -31,9 +31,16 @@ unknown. Target the **New 3DS / New 3DS XL / New 2DS XL** first; the original
 - The companion, in the app's FireRed OPTION-screen look:
   - **PARTY**: the six slots (name with its ♂ / ♀, level, HP bar, status) in the
     app's FireRed party palette; tap one for its summary (moves, type, PP).
-  - **BATTLE**: opens by itself in a battle and goes back after it - the foe's
-    and your cards, your moves with the app's verdicts (SUPER 2x / NEUTRAL 1x /
-    RESISTED 1/2x / IMMUNE 0x / STATUS).
+  - **BATTLE**: opens by itself in a battle and goes back after it. **INFO**:
+    the foe and you (with the game's own party icons, read from your ROM),
+    your moves with the app's verdicts (SUPER 2x / NEUTRAL 1x / RESISTED 1/2x /
+    IMMUNE 0x / STATUS). **SUGGESTIONS**: your party's three best picks against
+    the foe, each with its best move and verdict (OUT on the one already in
+    battle) - the app's ranking. In a trainer battle the bar under both carries
+    the **FOE TEAM**: the trainer's party in order, Poké Balls until sent out
+    or announced, fainted ones faded; tap one to see it (NEXT / FAINTED /
+    RESERVE / UNSEEN) and have INFO and SUGGESTIONS work against it, tap it
+    again to follow the battle.
   - **BAG**: one pocket at a time in the game's own order and colours (FireRed's
     or Emerald's bag), item names and counts as the game prints them, a list a
     drag scrolls, the tapped item's description.
@@ -57,7 +64,8 @@ unknown. Target the **New 3DS / New 3DS XL / New 2DS XL** first; the original
   MAP, POKéDEX and GUIDE's wild / BOSS parts read ROM tables mapped for
   FireRed rev 1 and Emerald only so far: on FireRed rev 0 and LeafGreen MAP
   works, POKéDEX says it's not available yet, and GUIDE has its pages and
-  HERE's people / items. ROM hacks, other languages, Ruby / Sapphire, Game Boy
+  HERE's people / items. The FOE TEAM's addresses are known for FireRed /
+  LeafGreen rev 1 and Emerald (as in the app); the icons for all five. ROM hacks, other languages, Ruby / Sapphire, Game Boy
   and the QoL builds' telemetry struct aren't ported yet; they show "not
   supported".
 
@@ -83,6 +91,29 @@ Needs a 3DS with custom firmware (Luma3DS) and the Homebrew Launcher.
 3. For sound, the DSP firmware must be dumped once (`sdmc:/3ds/dspfirm.cdc`, the
    DSP1 homebrew does it) - without it the game runs silent.
 
+## Running it without a 3DS (Azahar)
+
+[Azahar](https://azahar-emu.org) (Citra's successor) runs `.3dsx` homebrew on
+a Mac, Windows or Linux.
+
+1. Install Azahar (macOS: the `.dmg` from its releases page). In its settings,
+   turn on **Enable New 3DS mode** (System) - the port targets the New 3DS.
+2. Build the app: `cd 3ds && make 3ds` (Docker Desktop running) gives
+   `ctr/pokedaisy.3dsx`.
+3. **File > Open Azahar Folder**, then in `sdmc/` make `pokedaisy/roms/` and
+   put your `.gba` files there (a `.sav` beside one with the same name is used).
+   No ROM handy? `make decomps fixture-roms` makes test ROMs: the
+   `build/fixture-*-rom.gba` ones open every tab (the trainer battle is
+   `fixture-emerald_trainer-rom.gba`).
+4. **File > Load File...** and pick `pokedaisy.3dsx`. The mouse is the stylus
+   on the bottom screen.
+
+Azahar's default keys (Emulation > Configure > Controls to change them): A =
+`A`, B = `S`, X = `Z` (next companion tab), Y = `X` (companion back), START =
+`M`, SELECT = `N`, L / R = `Q` / `W`, ZR = `2` (fast-forward), D-pad =
+`T` `F` `G` `H`, circle pad = the arrow keys. Azahar plays sound without the
+DSP firmware. It shows that things work, not how fast they'll run on a console.
+
 ## Building and testing
 
 Everything runs in Docker, so it works the same on a Mac or a cloud session.
@@ -94,6 +125,7 @@ make preview       # the companion from the RAM fixtures -> build/shots/*.png
 make 3ds           # ctr/pokedaisy.3dsx (devkitpro/devkitarm image)
 make fixture-roms  # build/fixture-*.gba test ROMs (below)
 make azahar-test   # the .3dsx in the Azahar 3DS emulator -> build/azahar/*.png
+make azahar-battle-test  # BATTLE in Azahar, a trainer battle -> build/azahar-battle/
 make tables        # regenerate core/*_gen.c and ctr/icon.png from the app
 ```
 
@@ -103,7 +135,13 @@ make tables        # regenerate core/*_gen.c and ctr/icon.png from the app
   BATTLE, BAG (an item, a drag, the next pocket), SETTINGS, a pick-list, a
   confirm, MAP (a tapped tile, the blink, PLACES), POKéDEX (scrolled, an
   entry, the next, the other dex), GUIDE (the notice, every page, a hint and
-  its answer) - drawing each as the 3DS's two screens. No emulator: look at
+  its answer), BATTLE's INFO and SUGGESTIONS - drawing each as the 3DS's two
+  screens. There's no retail trainer-battle fixture, so the preview makes one
+  from the wild battle (`emerald_de_battle`): three of the player's Pokémon
+  copied into gEnemyParty beside the wild one, the trainer flag set; then the
+  first faints and the trainer's next pick is set, and the last slot is
+  tapped (`-trainer*` shots). That RAM is kept as
+  `build/fixtures/emerald_trainer` for `make fixture-roms`. No emulator: look at
   every UI change here. `PD_PREVIEW_HITS=1` also prints each shot's tap
   targets, for writing the Azahar steps.
 - **`make decomps`** (`test/build_decomps.sh`; git, a C compiler, libpng and
@@ -126,13 +164,14 @@ make tables        # regenerate core/*_gen.c and ctr/icon.png from the app
   the `-rom` fixture when it's built) - screenshots in `build/azahar/`,
   and the emulated SD card (states, backups, settings) in `build/azahar/sd/`.
   Azahar shows that it works, not how fast: speed has to be measured on a
-  console.
+  console. **`make azahar-battle-test`** does BATTLE the same way on the
+  trainer battle: INFO with the FOE TEAM, SUGGESTIONS, foes tapped.
 
 ## Layout
 
 | Path | What |
 |---|---|
-| `core/` | Portable C, no platform code: game detection (`pd_game`, the app's `NativeConfig` addresses), the snapshot reader (`pd_snapshot`: party, battle, bag, money, place - ports `Gen3Mon.kt` / `readNativeTelemetry` / `readNativeBag`), the canvas (`pd_canvas`: pixel-stepped corners, layered OPTION frames, GBA-shadowed and wrapped text, drawn cursors), the companion (`pd_ui.c` frame + `pd_ui_party` / `_battle` / `_bag` / `_map` / `_guide` / `_dex` / `_settings` / `_widgets`), the ROM readers (`pd_map`: `RomArt`'s region map and heads, `RegionMapModel`'s pick, `PlayerMapTile`; `pd_dex`: the dex tables and front pics; `pd_guide`: `GuideRom.kt`'s bosses, teams and wild tables), the game list (`pd_menu`) and the settings file (`pd_settings`) |
+| `core/` | Portable C, no platform code: game detection (`pd_game`, the app's `NativeConfig` addresses), the snapshot reader (`pd_snapshot`: party, battle, bag, money, place - ports `Gen3Mon.kt` / `readNativeTelemetry` / `readNativeBag`), the canvas (`pd_canvas`: pixel-stepped corners, layered OPTION frames, GBA-shadowed and wrapped text, drawn cursors), the companion (`pd_ui.c` frame + `pd_ui_party` / `_battle` (INFO, SUGGESTIONS, FOE TEAM) / `_bag` / `_map` / `_guide` / `_dex` / `_settings` / `_widgets`), the ROM readers (`pd_map`: `RomArt`'s region map and heads, `RegionMapModel`'s pick, `PlayerMapTile`; `pd_dex`: the dex tables and front pics; `pd_guide`: `GuideRom.kt`'s bosses, teams and wild tables), the party icons (`pd_icon`: `DecompIconSource`'s tables), the game list (`pd_menu`) and the settings file (`pd_settings`) |
 | `core/*_gen.c` | Generated: names / moves / type chart / map sections / item text / gender ratios from the app's Kotlin tables (`tools/gen_tables.py`), the map art's fingerprints and cursor grids (`tools/gen_map_tables.py`), the guides and area data (`tools/gen_guide.py`), Pixel Operator as a 1-bit font plus drawn ♂ ♀ (`tools/gen_font.py`) |
 | `ctr/` | The 3DS host: `main.c` (game loop, ndsp audio, HID, files, states) and `gpu.c` (citro2d: the game and canvases written into textures in the GPU's tiled order, drawn as quads), and the CMake build against the mGBA submodule |
 | `desktop/` | The preview tool and its small PNG writer |
@@ -160,9 +199,9 @@ not used; nor is render-to-texture.
 
 - Run it on a New 3DS: measure the frame time per screen mode, check the
   texture orientation, sound and save writes on hardware.
-- Port more of the app: the battle's FOE TEAM and SUGGESTIONS, the rest of
-  `NativeConfig` (hacks, other languages, Ruby / Sapphire, ROM tables for
-  FireRed rev 0 / LeafGreen), ROM art (`RomArt`) for the party icons and the
-  TRAINER CARD.
+- Port more of the app: the rest of `NativeConfig` (hacks, other languages,
+  Ruby / Sapphire, ROM tables for FireRed rev 0 / LeafGreen - the app has
+  LeafGreen's), the icons on PARTY (`pd_icon` already reads them), the
+  battle's touch controls (`BattleInputController`), the TRAINER CARD.
 - More state slots with thumbnails, and resuming where the player left off (with
   the app's `pkStateMatchesSave` check first).

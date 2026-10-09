@@ -58,3 +58,10 @@ int pd_type_multiplier_pct(int atk, int def1, int def2) {
     if (def2 != PD_TYPE_NONE && def2 != def1) pct = pct * single_pct(atk, def2) / 100;
     return pct;
 }
+
+void pd_species_type_pair(int species, int* t1, int* t2) {
+    *t1 = *t2 = PD_TYPE_NONE;
+    if (species <= 0 || species >= pd_species_type_table_count) return;
+    *t1 = pd_species_type_table[species][0];
+    *t2 = pd_species_type_table[species][1];
+}

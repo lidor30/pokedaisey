@@ -45,6 +45,8 @@ void pd_ui_init(struct pd_ui* ui, struct pd_settings* settings) {
     ui->mapSel = -1;
     ui->mapDungeon = -1;
     ui->guideOpen = -1;
+    ui->foeSelected = ui->foeShown = -1;
+    ui->lastFoeActive = ui->lastFoeNext = -1;
     ui->settings = settings;
 }
 
@@ -58,11 +60,27 @@ void pd_ui_update(struct pd_ui* ui, const struct pd_snapshot* s) {
         ui->tab = PD_TAB_BATTLE;
         ui->summarySlot = -1;
         ui->overlay = PD_OVERLAY_NONE;
+        ui->battlePane = 0;
+        ui->foeSeen = 0;
+        ui->foeSelected = -1;
+        ui->lastFoeActive = ui->lastFoeNext = -1;
     } else if (!on && ui->battleWasOn) {
         if (ui->tab == PD_TAB_BATTLE) ui->tab = ui->tabBeforeBattle;
         ui->battleSlot = -1;
     }
     ui->battleWasOn = on;
+    // The FOE TEAM: what's been sent out or announced counts as seen; a new
+    // pick by the trainer is shown, whatever was tapped (CompanionScreen).
+    if (on && (s->foeActive != ui->lastFoeActive || s->foeNext != ui->lastFoeNext)) {
+        if (s->foeActive >= 0) ui->foeSeen |= 1u << s->foeActive;
+        if (s->foeNext >= 0) {
+            ui->foeSeen |= 1u << s->foeNext;
+            ui->foeSelected = -1;
+        }
+        ui->lastFoeActive = s->foeActive;
+        ui->lastFoeNext = s->foeNext;
+    }
+    if (ui->foeSelected >= s->foeCount) ui->foeSelected = -1;
     if (ui->summarySlot >= s->partyCount) ui->summarySlot = -1;
 }
 
@@ -122,7 +140,7 @@ void pd_ui_draw(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g,
     } else if (ui->tab == PD_TAB_DEX) {
         ui_dex_tab(ui, c, g, s);
     } else {
-        ui_battle_tab(ui, c, s);
+        ui_battle_tab(ui, c, g, s);
     }
     if (ui->overlay == PD_OVERLAY_PLACES) {
         ui_places_overlay(ui, c, g);
@@ -159,7 +177,7 @@ static void close_overlay(struct pd_ui* ui, enum pd_action action) {
 }
 
 static void act(struct pd_ui* ui, int id) {
-    if (ui_map_act(ui, id) || ui_dex_act(ui, id) || ui_guide_act(ui, id)) return;
+    if (ui_map_act(ui, id) || ui_dex_act(ui, id) || ui_guide_act(ui, id) || ui_battle_act(ui, id)) return;
     if (ui->overlay != PD_OVERLAY_NONE) {
         if (id >= HIT_OPTION && id < HIT_OPTION + 8) {
             int i = id - HIT_OPTION;
@@ -287,6 +305,14 @@ bool pd_ui_back(struct pd_ui* ui) {
     }
     if (ui->tab == PD_TAB_MAP && (ui->mapSel >= 0 || ui->mapDungeon >= 0 || ui->mapPage >= 0)) {
         ui->mapSel = ui->mapDungeon = ui->mapPage = -1;
+        return true;
+    }
+    if (ui->tab == PD_TAB_BATTLE && ui->battlePane) {
+        ui->battlePane = 0;
+        return true;
+    }
+    if (ui->tab == PD_TAB_BATTLE && ui->foeSelected >= 0) {
+        ui->foeSelected = -1;
         return true;
     }
     if (ui->tab == PD_TAB_GUIDE && ui->guideOpen >= 0) {

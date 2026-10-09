@@ -171,6 +171,7 @@ static void decode_battle_mon(const uint8_t* raw, struct pd_battle_mon* b) {
 
 static void read_save_fields(struct pd_snapshot* s, const struct pd_config* cfg, pd_read_fn read, void* ctx,
                              uint32_t sb1, uint32_t sb2);
+static void read_foes(struct pd_snapshot* s, const struct pd_config* cfg, pd_read_fn read, void* ctx, int foeBattler);
 
 static bool read_u32(pd_read_fn read, void* ctx, uint32_t addr, uint32_t* out) {
     uint8_t b[4];
@@ -199,6 +200,7 @@ void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn
     }
 
     // --- battle --- (gMain.inBattle is bit 1 of the byte at +0x439)
+    s->foeActive = s->foeNext = -1;
     uint8_t flags = 0;
     read(ctx, cfg->gMain + 0x439, &flags, 1);
     s->inBattle = (flags & 0x02) != 0;
@@ -212,12 +214,15 @@ void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn
         if (n < 1 || n > 4) n = 4;
         read(ctx, cfg->battlerPositions, pos, 4);
         uint8_t mons[4 * BATTLE_MON_SIZE];
+        int foeBattler = -1;
         if (read(ctx, cfg->battleMons, mons, sizeof(mons))) {
             for (int b = 0; b < n; b++) {
                 int p = pos[b] < 4 ? pos[b] : b;
                 decode_battle_mon(mons + b * BATTLE_MON_SIZE, &s->battlers[p]);
+                if (p == PD_POS_OPPONENT_LEFT) foeBattler = b;
             }
         }
+        if (s->isTrainer && cfg->enemyParty) read_foes(s, cfg, read, ctx, foeBattler);
     }
 
     // --- location ---
@@ -386,4 +391,27 @@ const char* pd_status_label(uint32_t status) {
     if (status & (1 << 7)) return "TOX";
     if (status & (1 << 3)) return "PSN";
     return "";
+}
+
+// The trainer's party and which of it is out / next (readNativeTelemetry's
+// enemyParty / enemyActive / enemyNext, then SnapshotView's rule for next).
+static void read_foes(struct pd_snapshot* s, const struct pd_config* cfg, pd_read_fn read, void* ctx, int foeBattler) {
+    uint8_t raw[PD_PARTY_SIZE * MON_SIZE];
+    if (!read(ctx, cfg->enemyParty, raw, sizeof(raw))) return;
+    for (int i = 0; i < PD_PARTY_SIZE; i++) {
+        if (pd_decode_party_mon(raw + i * MON_SIZE, &s->foes[s->foeCount])) s->foeCount++;
+    }
+    if (!s->foeCount || foeBattler < 0 || !cfg->battlerPartyIndexes) return;
+    uint8_t idx[2];
+    if (read(ctx, cfg->battlerPartyIndexes + (uint32_t) foeBattler * 2, idx, 2)) {
+        int active = idx[0] | idx[1] << 8;
+        if (active < s->foeCount) s->foeActive = active;
+    }
+    uint32_t bs = 0;
+    uint8_t next = 0xFF;
+    if (s->foeActive >= 0 && read_u32(read, ctx, cfg->battleStructPtr, &bs) && in_ram(bs) &&
+        read(ctx, bs + cfg->monToSwitchIntoOff + (uint32_t) foeBattler, &next, 1) && next < s->foeCount &&
+        next != s->foeActive && s->foes[next].hp > 0 && s->foes[s->foeActive].hp == 0) {
+        s->foeNext = next;
+    }
 }

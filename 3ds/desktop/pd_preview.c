@@ -34,6 +34,15 @@ static bool load(const char* dir, const char* name, uint8_t* buf, size_t len) {
     return n == len;
 }
 
+static bool save(const char* dir, const char* name, const uint8_t* buf, size_t len) {
+    char path[1024];
+    snprintf(path, sizeof(path), "%s/%s", dir, name);
+    FILE* f = fopen(path, "wb");
+    if (!f) return false;
+    size_t n = fwrite(buf, 1, len, f);
+    return fclose(f) == 0 && n == len;
+}
+
 // The fixture's RAM, and the ROM when one was given (ctx: the game).
 static bool fixture_read(void* ctx, uint32_t addr, void* out, size_t len) {
     if (pd_rom_read(ctx, addr, out, len)) return true;
@@ -217,6 +226,11 @@ int main(int argc, char** argv) {
     ui.tab = PD_TAB_BATTLE;
     draw(&p);
     shot(out, name, "battle", px);
+    if (has_hit(&p, HIT_BATTLE_SUGGEST)) {
+        tap(&p, HIT_BATTLE_SUGGEST, 0);
+        shot(out, name, "battle-suggest", px);
+        tap(&p, HIT_BATTLE_INFO, 0);
+    }
 
     // BAG: a tapped item shows its description; a drag scrolls the list; the
     // arrow opens the next pocket.
@@ -313,6 +327,58 @@ int main(int argc, char** argv) {
             tap(&p, row, 0);
             shot(out, name, "guide-answer", px);
         }
+    }
+
+    // A trainer battle, made from a wild one: the wild foe is already
+    // gEnemyParty[0]; three of the player's Pokémon (whole encrypted structs)
+    // join it, the battle type gets BATTLE_TYPE_TRAINER, and the foe battler's
+    // party index is 0. Then the first one faints and the trainer picks the
+    // third (gBattleStruct->monToSwitchIntoId), and the last slot is tapped.
+    if (snap.inBattle && game.cfg->enemyParty && snap.partyCount >= 5) {
+        const struct pd_config* cfg = game.cfg;
+        uint8_t* enemy = ewram + (cfg->enemyParty - 0x02000000);
+        const uint8_t* party = ewram + (cfg->playerParty - 0x02000000);
+        static const int FROM[3] = { 1, 2, 4 };
+        for (int i = 0; i < 3; i++) memcpy(enemy + (i + 1) * 100, party + FROM[i] * 100, 100);
+        ewram[cfg->battleTypeFlags - 0x02000000] |= 0x08;
+        int foeBattler = 0;
+        while (foeBattler < 4 && ewram[cfg->battlerPositions - 0x02000000 + foeBattler] != PD_POS_OPPONENT_LEFT) {
+            foeBattler++;
+        }
+        uint8_t* idx = ewram + (cfg->battlerPartyIndexes - 0x02000000) + foeBattler * 2;
+        idx[0] = idx[1] = 0;
+        // PD_PREVIEW_TRAINER_DIR: keep this RAM as a fixture of its own, for
+        // a fixture ROM the 3DS app can be run on (make fixture-roms).
+        const char* keep = getenv("PD_PREVIEW_TRAINER_DIR");
+        if (keep && !(save(keep, "ewram.bin", ewram, sizeof(ewram)) && save(keep, "iwram.bin", iwram, sizeof(iwram)))) {
+            fprintf(stderr, "pd_preview: can't write the trainer battle to %s\n", keep);
+            return 1;
+        }
+        pd_snapshot_read(&snap, &game, fixture_read, &game);
+        pd_ui_update(&ui, &snap);
+        ui.tab = PD_TAB_BATTLE;
+        draw(&p);
+        shot(out, name, "trainer", px);
+        tap(&p, HIT_BATTLE_SUGGEST, 0);
+        shot(out, name, "trainer-suggest", px);
+        tap(&p, HIT_BATTLE_INFO, 0);
+
+        // The first one faints (its party HP and the battler's), the trainer picks the third.
+        enemy[0x56] = enemy[0x57] = 0;
+        uint8_t* foeMon = ewram + (cfg->battleMons - 0x02000000) + foeBattler * 0x58;
+        foeMon[0x28] = foeMon[0x29] = 0;
+        uint32_t bs = 0;
+        memcpy(&bs, ewram + (cfg->battleStructPtr - 0x02000000), 4);
+        if (bs >= 0x02000000 && bs < 0x02040000) ewram[bs - 0x02000000 + cfg->monToSwitchIntoOff + foeBattler] = 2;
+        pd_snapshot_read(&snap, &game, fixture_read, &game);
+        pd_ui_update(&ui, &snap);
+        draw(&p);
+        shot(out, name, "trainer-next", px);
+        tap(&p, HIT_FOE_SLOT + snap.foeCount - 1, 0);
+        shot(out, name, "trainer-unseen", px);
+        tap(&p, HIT_BATTLE_SUGGEST, 0);
+        shot(out, name, "trainer-unseen-suggest", px);
+        printf("foes %d, active %d, next %d\n", snap.foeCount, snap.foeActive, snap.foeNext);
     }
 
     // The decoded party, for checking against the app's tests.
