@@ -29,6 +29,20 @@ struct pd_config {
     uint32_t encryptionKeyOff; // in SaveBlock2
     uint32_t moneyOff;         // in SaveBlock1
     uint32_t enemyParty;       // 0 = unknown
+    // gBagPockets: five {slots pointer, capacity} pairs, 8 bytes apart;
+    // bagOrder[i] is the pocket (PD_POCKET_*) the game keeps at index i.
+    uint32_t bagPockets;
+    uint8_t bagOrder[5];
+};
+
+// The bag's pockets, in a fixed order of our own (the app's QOL_POCKET_* ids).
+enum pd_pocket {
+    PD_POCKET_ITEMS,
+    PD_POCKET_BALLS,
+    PD_POCKET_TMHM,
+    PD_POCKET_BERRIES,
+    PD_POCKET_KEY,
+    PD_POCKET_COUNT,
 };
 
 struct pd_game {

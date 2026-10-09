@@ -157,3 +157,92 @@ int pd_text_fit(struct pd_canvas* c, int x, int y, int max_w, const char* s, uin
 void pd_text_right(struct pd_canvas* c, int right, int y, const char* s, uint32_t color, uint32_t shadow) {
     pd_text(c, right - pd_text_width(s), y, s, color, shadow);
 }
+
+int pd_text_wrap(struct pd_canvas* c, int x, int y, int max_w, int lineH, int maxLines, const char* s,
+                 uint32_t color, uint32_t shadow) {
+    char line[160];
+    int lines = 0;
+    while (lines < maxLines) {
+        while (*s == ' ') s++;
+        if (!*s) break;
+        // The longest run of whole words that fits; a single word too long
+        // for the line is taken whole and cut.
+        const char* end = NULL;
+        const char* p = s;
+        for (;;) {
+            const char* wordEnd = p;
+            while (*wordEnd && *wordEnd != ' ') wordEnd++;
+            size_t n = (size_t) (wordEnd - s);
+            if (n >= sizeof(line)) break;
+            memcpy(line, s, n);
+            line[n] = 0;
+            if (pd_text_width(line) > max_w) break;
+            end = wordEnd;
+            p = wordEnd;
+            while (*p == ' ') p++;
+            if (!*p) break;
+        }
+        bool cut = false;
+        if (!end) {
+            end = s;
+            while (*end && *end != ' ') end++;
+            cut = true;
+        }
+        size_t n = (size_t) (end - s);
+        if (n >= sizeof(line)) n = sizeof(line) - 1;
+        memcpy(line, s, n);
+        line[n] = 0;
+        s = end;
+        while (*s == ' ') s++;
+        if (lines == maxLines - 1 && *s) {
+            // The last line takes the rest, cut with "...".
+            size_t rest = strlen(s);
+            if (n + 1 + rest < sizeof(line)) {
+                line[n] = ' ';
+                memcpy(line + n + 1, s, rest + 1);
+            }
+            cut = true;
+        }
+        if (cut) {
+            pd_text_fit(c, x, y + lines * lineH, max_w, line, color, shadow);
+        } else {
+            pd_text(c, x, y + lines * lineH, line, color, shadow);
+        }
+        lines++;
+    }
+    return lines;
+}
+
+void pd_dim(struct pd_canvas* c, int alpha) {
+    int keep = 255 - alpha;
+    for (int i = 0; i < c->w * c->h; i++) {
+        uint32_t p = c->px[i];
+        uint32_t r = ((p >> 16) & 0xFF) * (uint32_t) keep / 255;
+        uint32_t g = ((p >> 8) & 0xFF) * (uint32_t) keep / 255;
+        uint32_t b = (p & 0xFF) * (uint32_t) keep / 255;
+        c->px[i] = (r << 16) | (g << 8) | b;
+    }
+}
+
+void pd_triangle(struct pd_canvas* c, int x, int y, int size, enum pd_dir dir, uint32_t color) {
+    // Column / row i is 2 * (size - i) - 1 long, centred: a pixel-stepped point.
+    for (int i = 0; i < size; i++) {
+        int len = 2 * (size - i) - 1;
+        int off = i;
+        switch (dir) {
+        case PD_RIGHT: pd_fill(c, x + i, y + off, 1, len, color); break;
+        case PD_LEFT: pd_fill(c, x + size - 1 - i, y + off, 1, len, color); break;
+        case PD_DOWN: pd_fill(c, x + off, y + i, len, 1, color); break;
+        case PD_UP: pd_fill(c, x + off, y + size - 1 - i, len, 1, color); break;
+        }
+    }
+}
+
+void pd_bitmap(struct pd_canvas* c, int x, int y, const uint16_t* rows, int h, uint32_t color) {
+    for (int r = 0; r < h; r++) {
+        uint16_t bits = rows[r];
+        for (int col = 0; bits; col++, bits >>= 1) {
+            if (bits & 1) plot(c, x + col, y + r, color);
+        }
+    }
+}

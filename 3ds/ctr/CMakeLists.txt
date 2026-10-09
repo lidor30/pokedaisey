@@ -47,7 +47,7 @@ add_subdirectory("${MGBA_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/mgba" EXCLUDE_FROM_A
 
 file(GLOB CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../core/*.c")
 
-add_executable(pokedaisy.elf main.c ${CORE_SOURCES})
+add_executable(pokedaisy.elf main.c gpu.c ${CORE_SOURCES})
 target_include_directories(pokedaisy.elf PRIVATE
     "${MGBA_DIR}/include"
     "${MGBA_DIR}/src"
@@ -56,7 +56,8 @@ target_include_directories(pokedaisy.elf PRIVATE
 # headers size color_t by them, so ours must match the library's.
 target_compile_definitions(pokedaisy.elf PRIVATE COLOR_16_BIT COLOR_5_6_5 M_CORE_GBA BUILD_STATIC)
 target_compile_options(pokedaisy.elf PRIVATE -std=gnu11 -O2 -Wall -Wextra)
-target_link_libraries(pokedaisy.elf mgba m)
+# citro2d draws the screens (gpu.c); citro3d and libctru come with libmgba too.
+target_link_libraries(pokedaisy.elf mgba citro2d citro3d ctru m)
 
 find_program(SMDHTOOL smdhtool HINTS "$ENV{DEVKITPRO}/tools/bin" /opt/devkitpro/tools/bin)
 find_program(3DSXTOOL_BIN 3dsxtool HINTS "$ENV{DEVKITPRO}/tools/bin" /opt/devkitpro/tools/bin)

@@ -19,6 +19,9 @@ static const struct pd_config FIRERED = {
     .encryptionKeyOff = 0xF20,
     .moneyOff = 0x290,
     .enemyParty = 0x0202402C,
+    // FireRed's item.c: Items, Key Items, Poke Balls, TM Case, Berry Pouch.
+    .bagPockets = 0x0203988C,
+    .bagOrder = { PD_POCKET_ITEMS, PD_POCKET_KEY, PD_POCKET_BALLS, PD_POCKET_TMHM, PD_POCKET_BERRIES },
 };
 
 // NATIVE_EMERALD_RETAIL (English, BPEE).
@@ -36,6 +39,9 @@ static const struct pd_config EMERALD = {
     .encryptionKeyOff = 0xAC,
     .moneyOff = 0x490,
     .enemyParty = 0x02024744,
+    // Emerald's item.c: Items, Poke Balls, TMs & HMs, Berries, Key Items.
+    .bagPockets = 0x02039DD8,
+    .bagOrder = { PD_POCKET_ITEMS, PD_POCKET_BALLS, PD_POCKET_TMHM, PD_POCKET_BERRIES, PD_POCKET_KEY },
 };
 
 void pd_game_detect(struct pd_game* g, const uint8_t* header, size_t romSize) {

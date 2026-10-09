@@ -14,8 +14,9 @@ shift
 SD="$HOME/.local/share/azahar-emu/sdmc"
 mkdir -p "$SD/pokedaisy/roms" /out/fb
 cp "/repo/3ds/build/$ROM" "$SD/pokedaisy/roms/"
-# Leave a copy of the SD card for checking what the app wrote (saves, backups).
-trap 'cp -r "$SD/pokedaisy" /out/sd 2>/dev/null || true' EXIT
+# Leave a copy of the SD card for checking what the app wrote (saves, backups)
+# and Azahar's own log.
+trap 'cp -r "$SD/pokedaisy" /out/sd 2>/dev/null || true; cp "$HOME"/.local/share/azahar-emu/log/*.txt /out/ 2>/dev/null || true' EXIT
 
 Xvfb :1 -screen 0 1280x960x24 -fbdir /out/fb > /out/xvfb.log 2>&1 &
 sleep 2

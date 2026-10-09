@@ -42,5 +42,20 @@ int pd_text_width(const char* utf8);
 int pd_text_fit(struct pd_canvas* c, int x, int y, int max_w, const char* utf8, uint32_t color, uint32_t shadow);
 // Right-aligned at right.
 void pd_text_right(struct pd_canvas* c, int right, int y, const char* utf8, uint32_t color, uint32_t shadow);
+// Word-wrapped into max_w, lineH apart, at most maxLines (the last cut with
+// "..."). Returns the lines drawn.
+int pd_text_wrap(struct pd_canvas* c, int x, int y, int max_w, int lineH, int maxLines, const char* utf8,
+                 uint32_t color, uint32_t shadow);
+
+// Darkens everything drawn so far towards black: alpha 0-255 (the app's
+// black-out overlays are 0xE6).
+void pd_dim(struct pd_canvas* c, int alpha);
+
+// A filled pixel triangle `size` px from base to tip, pointing dir
+// (PD_LEFT / PD_RIGHT / PD_UP / PD_DOWN) - drawn cursors, since the font has none.
+enum pd_dir { PD_LEFT, PD_RIGHT, PD_UP, PD_DOWN };
+void pd_triangle(struct pd_canvas* c, int x, int y, int size, enum pd_dir dir, uint32_t color);
+// A 1-bit icon: rows[i] bit j (bit 0 = left) is pixel (j, i).
+void pd_bitmap(struct pd_canvas* c, int x, int y, const uint16_t* rows, int h, uint32_t color);
 
 #endif

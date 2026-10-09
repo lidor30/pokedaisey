@@ -1,8 +1,12 @@
 // The companion on the 3DS's 320x240 bottom screen: PARTY (with a summary on
-// tap), BATTLE (cards + your moves' verdicts) and INFO, in the app's FireRed
-// OPTION-screen look (app/.../companion/ui/GbaMenu.kt). Immediate mode: every
-// pd_ui_draw records where its tappable parts went, and pd_ui_touch looks a
-// tap up there - no layout pass to keep in sync.
+// tap), BATTLE (cards + your moves' verdicts), BAG and SETTINGS, in the app's
+// FireRed OPTION-screen look (app/.../companion/ui/GbaMenu.kt). Immediate
+// mode: every pd_ui_draw records where its tappable parts went, and
+// pd_ui_touch looks a tap up there - no layout pass to keep in sync.
+//
+// The host owns the emulator: it shows what pd_ui_draw drew, feeds the stylus
+// and buttons in, and carries out what pd_ui_take_action hands back (fast-
+// forward, save states, leaving the game, saving changed settings).
 #ifndef PD_UI_H
 #define PD_UI_H
 
@@ -18,22 +22,62 @@
 enum pd_tab {
     PD_TAB_PARTY,
     PD_TAB_BATTLE,
-    PD_TAB_INFO,
+    PD_TAB_BAG,
+    PD_TAB_SETTINGS,
     PD_TAB_COUNT,
 };
 
-// Extra INFO rows the host fills in (frame rate, ROM file, save state ...).
-#define PD_UI_HOST_LINES 4
-struct pd_host_info {
-    const char* labels[PD_UI_HOST_LINES];
-    char values[PD_UI_HOST_LINES][40];
-    int count;
+// How the game fills the top screen.
+enum pd_screen_mode {
+    PD_SCREEN_PIXEL,   // 1x, pixel for pixel
+    PD_SCREEN_SHARP,   // 1.5x (fills the height), sharp bilinear
+    PD_SCREEN_STRETCH, // the whole 400x240, sharp bilinear
+    PD_SCREEN_MODES,
 };
 
-#define PD_UI_MAX_HITS 24
+#define PD_FF_MIN 2
+#define PD_FF_MAX 4
+
+// What the player set; the host loads and saves it (pd_settings.h).
+struct pd_settings {
+    int screenMode; // enum pd_screen_mode
+    int ffSpeed;    // PD_FF_MIN..PD_FF_MAX
+};
+
+enum pd_action {
+    PD_ACTION_NONE,
+    PD_ACTION_TOGGLE_FF,
+    PD_ACTION_SAVE_STATE,
+    PD_ACTION_LOAD_STATE,
+    PD_ACTION_LEAVE_GAME,
+    PD_ACTION_SETTINGS_CHANGED,
+};
+
+// What the host tells the companion about itself.
+#define PD_UI_HOST_LINES 2
+struct pd_host_info {
+    const char* labels[PD_UI_HOST_LINES]; // extra SETTINGS info rows (FILE, SPEED ...)
+    char values[PD_UI_HOST_LINES][40];
+    int count;
+    bool ffOn;
+    bool hasState;      // a save state exists for LOAD STATE
+    char stateWhen[24]; // when it was made, shown beside LOAD STATE
+};
+
+#define PD_UI_MAX_HITS 32
 struct pd_hit {
     int x, y, w, h;
     int id;
+    bool scroll; // part of a list that a drag scrolls
+};
+
+enum pd_overlay {
+    PD_OVERLAY_NONE,
+    PD_OVERLAY_PICK_SCREEN,
+    PD_OVERLAY_PICK_FF,
+    PD_OVERLAY_CONFIRM_SAVE,
+    PD_OVERLAY_CONFIRM_LOAD,
+    PD_OVERLAY_CONFIRM_LEAVE,
 };
 
 struct pd_ui {
@@ -41,13 +85,21 @@ struct pd_ui {
     enum pd_tab tabBeforeBattle; // the tab a battle took over from
     bool battleWasOn;
     int summarySlot; // party slot whose summary is open, -1 = none
-    bool touching;
-    int pressedId;   // what the stylus went down on (-1 = nothing)
+    int bagPocket;   // index into the game's own pocket order
+    int bagSelected; // item index in that pocket, -1 = none
+    int bagScroll;   // pixels
+    enum pd_overlay overlay;
+    struct pd_settings* settings;
+    enum pd_action action;
+
+    bool touching, dragging, touchScroll;
+    int touchX0, touchY0, touchLastY;
+    int pressedId; // what the stylus went down on (-1 = nothing)
     struct pd_hit hits[PD_UI_MAX_HITS];
     int hitCount;
 };
 
-void pd_ui_init(struct pd_ui* ui);
+void pd_ui_init(struct pd_ui* ui, struct pd_settings* settings);
 // Follows the game: a battle opens BATTLE, its end goes back.
 void pd_ui_update(struct pd_ui* ui, const struct pd_snapshot* s);
 void pd_ui_draw(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g,
@@ -57,5 +109,9 @@ bool pd_ui_touch(struct pd_ui* ui, int x, int y, bool down);
 // Buttons the GBA doesn't have (the 3DS's X / Y): next / previous tab, BACK.
 void pd_ui_next_tab(struct pd_ui* ui, int dir);
 bool pd_ui_back(struct pd_ui* ui);
+// The last thing the player asked the host for (once), or PD_ACTION_NONE.
+enum pd_action pd_ui_take_action(struct pd_ui* ui);
+
+const char* pd_screen_mode_name(int mode);
 
 #endif

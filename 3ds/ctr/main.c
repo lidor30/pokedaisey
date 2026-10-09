@@ -1,11 +1,9 @@
-// PokeDaisy for the Nintendo 3DS: the game (libmgba) on the top screen at 1x,
-// the companion (../core) on the bottom one. A homebrew .3dsx; see README.md.
+// PokeDaisy for the Nintendo 3DS: the game (libmgba) on the top screen, the
+// companion (../core) on the bottom one. A homebrew .3dsx; see README.md.
 //
-// Screens are plain software framebuffers - the GBA frame is copied into the
-// top screen's RGB565 buffer (mGBA's 3DS build renders RGB565 too), the
-// companion's canvas into the bottom one's BGR8 - no GPU code yet. Audio
-// follows mGBA's own 3DS frontend (src/platform/3ds/main.c): ndsp, stereo
-// PCM16 at 32 kHz, the blip buffers resampled to the 3DS's refresh rate.
+// The screens are drawn by the GPU (gpu.c). Audio follows mGBA's own 3DS
+// frontend (src/platform/3ds/main.c): ndsp, stereo PCM16 at 32 kHz, the blip
+// buffers resampled to the 3DS's refresh rate.
 #include <3ds.h>
 
 #include <dirent.h>
@@ -22,23 +20,27 @@
 #include <mgba/core/blip_buf.h>
 #include <mgba/core/core.h>
 #include <mgba/core/log.h>
+#include <mgba/core/serialize.h>
 #include <mgba/internal/gba/audio.h>
 
 #include "../core/pd_canvas.h"
 #include "../core/pd_game.h"
 #include "../core/pd_menu.h"
+#include "../core/pd_settings.h"
 #include "../core/pd_snapshot.h"
 #include "../core/pd_ui.h"
+#include "gpu.h"
 
-#define ROM_DIR "/pokedaisy/roms"
+#define BASE_DIR "/pokedaisy"
+#define ROM_DIR BASE_DIR "/roms"
 #define BACKUP_DIR ROM_DIR "/pokedaisy-backups"
+#define STATE_DIR BASE_DIR "/states"
+#define SETTINGS_FILE "sdmc:" BASE_DIR "/settings.ini"
 #define MAX_BACKUPS 10
 #define MAX_ROMS 256
 
 #define TOP_W 400
 #define TOP_H 240
-#define GBA_W 240
-#define GBA_H 160
 
 // GBA key bits (GBA_KEY_*), as in the app's pokedaisy_jni.c.
 enum {
@@ -51,10 +53,13 @@ enum {
 // to leave the game (frames).
 #define SNAPSHOT_EVERY 10
 #define LEAVE_HOLD 60
+// What a save state keeps: the RTC, never the save data - loading one must
+// not write an old copy over the save file (CLAUDE.md: save files are sacred).
+#define STATE_FLAGS SAVESTATE_RTC
 
 static uint32_t topPx[TOP_W * TOP_H];
 static uint32_t bottomPx[PD_UI_WIDTH * PD_UI_HEIGHT];
-static color_t video[GBA_W * GBA_H];
+static struct pd_settings settings;
 
 // --- logging: mGBA's default logger prints every unmapped I/O write ---
 
@@ -63,57 +68,13 @@ static void noopLog(struct mLogger* log, int category, enum mLogLevel level, con
 }
 static struct mLogger silentLogger = { .log = noopLog, .filter = NULL };
 
-// --- screens ---
-
-static void blit_bottom(const uint32_t* px) {
-    // The 3DS's framebuffers are rotated: columns of 240 pixels, bottom up.
-    u8* fb = gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, NULL, NULL);
-    for (int x = 0; x < PD_UI_WIDTH; x++) {
-        u8* col = fb + x * 240 * 3;
-        for (int y = 0; y < PD_UI_HEIGHT; y++) {
-            uint32_t p = px[y * PD_UI_WIDTH + x];
-            u8* d = col + (239 - y) * 3;
-            d[0] = (u8) p;         // B
-            d[1] = (u8) (p >> 8);  // G
-            d[2] = (u8) (p >> 16); // R
-        }
-    }
-}
-
-static void blit_top_canvas(const uint32_t* px) {
-    u16* fb = (u16*) gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
-    for (int x = 0; x < TOP_W; x++) {
-        for (int y = 0; y < TOP_H; y++) {
-            uint32_t p = px[y * TOP_W + x];
-            fb[x * 240 + 239 - y] = (u16) (((p >> 19) & 0x1F) << 11 | ((p >> 10) & 0x3F) << 5 | ((p >> 3) & 0x1F));
-        }
-    }
-}
-
-// The GBA frame at 1x, centred; clear says whether to blank the border too
-// (once per buffer after a screen change).
-static void blit_game(bool clear) {
-    u16* fb = (u16*) gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
-    if (clear) memset(fb, 0, TOP_W * TOP_H * sizeof(u16));
-    int ox = (TOP_W - GBA_W) / 2, oy = (TOP_H - GBA_H) / 2;
-    for (int x = 0; x < GBA_W; x++) {
-        u16* col = fb + (ox + x) * 240 + 239 - oy;
-        for (int y = 0; y < GBA_H; y++) col[-y] = video[y * GBA_W + x];
-    }
-}
-
-static void present(void) {
-    gfxFlushBuffers();
-    gfxSwapBuffers();
-    gspWaitForVBlank();
-}
-
 // --- audio (as mGBA's 3DS frontend) ---
 
 #define AUDIO_SAMPLES 384
 #define DSP_BUFFERS 4
 
 static bool hasSound;
+static bool audioMuted; // while fast-forwarding
 static ndspWaveBuf dspBuffer[DSP_BUFFERS];
 static int16_t* audioBuf;
 static int bufferId;
@@ -121,7 +82,11 @@ static struct mAVStream stream;
 
 static void post_audio(struct mAVStream* s, blip_t* left, blip_t* right) {
     (void) s;
-    if (!hasSound) return;
+    if (!hasSound || audioMuted) {
+        blip_clear(left);
+        blip_clear(right);
+        return;
+    }
     int start = bufferId;
     while (dspBuffer[bufferId].status == NDSP_WBUF_QUEUED || dspBuffer[bufferId].status == NDSP_WBUF_PLAYING) {
         bufferId = (bufferId + 1) & (DSP_BUFFERS - 1);
@@ -164,7 +129,6 @@ static void audio_init(void) {
         dspBuffer[i].nsamples = AUDIO_SAMPLES;
     }
     hasSound = true;
-    stream.postAudioBuffer = post_audio;
 }
 
 static void audio_exit(void) {
@@ -178,9 +142,10 @@ static void audio_exit(void) {
 // --- files ---
 
 static void make_dirs(void) {
-    mkdir("sdmc:/pokedaisy", 0777);
+    mkdir("sdmc:" BASE_DIR, 0777);
     mkdir("sdmc:" ROM_DIR, 0777);
     mkdir("sdmc:" BACKUP_DIR, 0777);
+    mkdir("sdmc:" STATE_DIR, 0777);
 }
 
 static bool ends_with_gba(const char* name) {
@@ -242,13 +207,14 @@ static bool is_backup_of(const char* name, const char* base) {
     return true;
 }
 
-// Save files are sacred (CLAUDE.md): every start copies the save into
-// BACKUP_DIR first, keeping the newest MAX_BACKUPS per game.
+// Save files are sacred (CLAUDE.md): every start - and every state load -
+// copies the save into BACKUP_DIR first, keeping the newest MAX_BACKUPS per game.
 static void backup_save(const char* base, const char* savePath) {
     struct stat st;
     if (stat(savePath, &st) || st.st_size == 0) return;
     char stamp[32];
     time_t now = time(NULL);
+    // The 3DS clock is local time; gmtime keeps it as it is.
     strftime(stamp, sizeof(stamp), "%Y%m%d-%H%M%S", gmtime(&now));
     char to[512];
     snprintf(to, sizeof(to), "sdmc:" BACKUP_DIR "/%s-%s.sav", base, stamp);
@@ -315,25 +281,57 @@ static uint32_t gba_keys(u32 held) {
 static void show_message(const char* line1, const char* line2) {
     struct pd_canvas top;
     pd_canvas_init(&top, TOP_W, TOP_H, topPx);
-    for (int i = 0; i < 2; i++) {
-        pd_splash_draw(&top, line1, line2, "Press B.");
-        blit_top_canvas(topPx);
-        present();
-    }
+    pd_splash_draw(&top, line1, line2, "Press B.");
+    gpu_set_top(topPx);
     while (aptMainLoop()) {
         hidScanInput();
         if (hidKeysDown() & (KEY_B | KEY_A)) break;
-        gspWaitForVBlank();
+        gpu_draw(false, 0);
     }
+}
+
+// The state file's time for LOAD STATE, or false if there's none. stat()
+// leaves the time 0 on the SD card; archive_getmtime reads it.
+static bool state_info(const char* path, char* when, size_t len) {
+    struct stat st;
+    if (stat(path, &st) || st.st_size == 0) return false;
+    u64 mtime = 0;
+    if (R_SUCCEEDED(archive_getmtime(path, &mtime)) && mtime) {
+        time_t t = (time_t) mtime;
+        strftime(when, len, "%m-%d %H:%M", gmtime(&t));
+    } else {
+        snprintf(when, len, "SAVED");
+    }
+    return true;
+}
+
+static bool save_state(struct mCore* core, const char* path) {
+    struct VFile* vf = VFileOpen(path, O_CREAT | O_TRUNC | O_RDWR);
+    if (!vf) return false;
+    bool ok = mCoreSaveStateNamed(core, vf, STATE_FLAGS);
+    vf->close(vf);
+    return ok;
+}
+
+static bool load_state(struct mCore* core, const char* path) {
+    struct VFile* vf = VFileOpen(path, O_RDONLY);
+    if (!vf) return false;
+    bool ok = mCoreLoadStateNamed(core, vf, STATE_FLAGS);
+    vf->close(vf);
+    return ok;
 }
 
 // Runs one game until the player leaves (true) or the app is closed (false).
 static bool run_game(const char* file) {
-    char romPath[512], savePath[512], base[256];
+    char romPath[512], savePath[512], statePath[512], base[256];
     snprintf(romPath, sizeof(romPath), ROM_DIR "/%s", file);
     snprintf(base, sizeof(base), "%s", file);
     base[strlen(base) - 4] = 0;
     snprintf(savePath, sizeof(savePath), ROM_DIR "/%s.sav", base);
+    snprintf(statePath, sizeof(statePath), STATE_DIR "/%s.ss1", base);
+    char saveSd[520], stateSd[520];
+    snprintf(saveSd, sizeof(saveSd), "sdmc:%s", savePath);
+    snprintf(stateSd, sizeof(stateSd), "sdmc:%s", statePath);
 
     struct VFile* rom = VFileOpen(romPath, O_RDONLY);
     if (!rom) {
@@ -354,20 +352,19 @@ static bool run_game(const char* file) {
         return true;
     }
     mCoreInitConfig(core, NULL);
-    core->setVideoBuffer(core, video, GBA_W);
+    core->setVideoBuffer(core, (color_t*) gpu_game_buffer(), GPU_GAME_STRIDE);
     core->setAudioBufferSize(core, AUDIO_SAMPLES);
     if (!core->loadROM(core, rom)) {
         core->deinit(core);
         show_message("The game didn't load (too big?):", file);
         return true;
     }
-    char saveSd[520];
-    snprintf(saveSd, sizeof(saveSd), "sdmc:%s", savePath);
     backup_save(base, saveSd);
     struct VFile* save = VFileOpen(savePath, O_CREAT | O_RDWR);
     if (save) core->loadSave(core, save);
+    stream.postAudioBuffer = post_audio;
+    core->setAVStream(core, &stream);
     if (hasSound) {
-        core->setAVStream(core, &stream);
         double ratio = GBAAudioCalculateRatio(1, 268111856.f / 4481136.f, 1);
         blip_set_rates(core->getAudioChannel(core, 0), core->frequency(core), 32768 * ratio);
         blip_set_rates(core->getAudioChannel(core, 1), core->frequency(core), 32768 * ratio);
@@ -379,26 +376,24 @@ static bool run_game(const char* file) {
     mem.iwram = core->getMemoryBlock(core, 0x03, &mem.iwramSize);
 
     struct pd_ui ui;
-    pd_ui_init(&ui);
+    pd_ui_init(&ui, &settings);
     // What the companion shows: read once now (RAM still blank: an empty
     // party), then every SNAPSHOT_EVERY frames.
     struct pd_snapshot snap, shown;
     pd_snapshot_read(&shown, &game, bus_read, &mem);
     shown.frame = 0;
-    struct pd_host_info host = { .count = 3 };
+    struct pd_host_info host = { .count = 2 };
     host.labels[0] = "FILE";
     snprintf(host.values[0], sizeof(host.values[0]), "%s", file);
     host.labels[1] = "SPEED";
     snprintf(host.values[1], sizeof(host.values[1]), "-");
-    host.labels[2] = "LEAVE";
-    snprintf(host.values[2], sizeof(host.values[2]), "HOLD X + Y");
+    host.hasState = state_info(stateSd, host.stateWhen, sizeof(host.stateWhen));
     struct pd_canvas bottom;
     pd_canvas_init(&bottom, PD_UI_WIDTH, PD_UI_HEIGHT, bottomPx);
 
-    int topClear = 2;    // both buffers need the border blanked once
-    int bottomDirty = 2; // and the companion drawn into both
     bool redraw = true;
     bool touching = false;
+    bool ffToggled = false;
     int leaveHeld = 0;
     unsigned frame = 0, fpsFrames = 0;
     u64 fpsStart = osGetTime();
@@ -427,11 +422,46 @@ static bool run_game(const char* file) {
             touching = false;
         }
 
-        core->setKeys(core, gba_keys(held));
-        core->runFrame(core);
-        frame++;
+        bool leave = false;
+        switch (pd_ui_take_action(&ui)) {
+        case PD_ACTION_TOGGLE_FF:
+            ffToggled = !ffToggled;
+            break;
+        case PD_ACTION_SAVE_STATE:
+            save_state(core, statePath);
+            host.hasState = state_info(stateSd, host.stateWhen, sizeof(host.stateWhen));
+            break;
+        case PD_ACTION_LOAD_STATE:
+            backup_save(base, saveSd);
+            load_state(core, statePath);
+            break;
+        case PD_ACTION_LEAVE_GAME:
+            leave = true;
+            break;
+        case PD_ACTION_SETTINGS_CHANGED:
+            pd_settings_save(&settings, SETTINGS_FILE);
+            break;
+        case PD_ACTION_NONE:
+            break;
+        }
+        if (leave) break;
 
-        if (frame % SNAPSHOT_EVERY == 0 && mem.ewram && mem.iwram) {
+        // Fast-forward: toggled from the companion, or held on ZR (New 3DS).
+        bool ff = ffToggled || (held & KEY_ZR);
+        if (ff != host.ffOn) {
+            host.ffOn = ff;
+            audioMuted = ff;
+            redraw = true;
+        }
+        uint32_t keys = gba_keys(held);
+        int frames = ff ? settings.ffSpeed : 1;
+        for (int i = 0; i < frames; i++) {
+            core->setKeys(core, keys);
+            core->runFrame(core);
+            frame++;
+        }
+
+        if (frame / SNAPSHOT_EVERY != (frame - frames) / SNAPSHOT_EVERY && mem.ewram && mem.iwram) {
             pd_snapshot_read(&snap, &game, bus_read, &mem);
             pd_ui_update(&ui, &snap);
             // Only a change the companion shows is worth a redraw (not the frame counter).
@@ -442,7 +472,7 @@ static bool run_game(const char* file) {
             }
         }
 
-        fpsFrames++;
+        fpsFrames += (unsigned) frames;
         u64 now = osGetTime();
         if (now - fpsStart >= 1000) {
             // Against the GBA's own 268111856 / 4481136 = 59.73 frames a second.
@@ -450,23 +480,18 @@ static bool run_game(const char* file) {
             snprintf(host.values[1], sizeof(host.values[1]), "%u%% (%u FPS)", pct, fpsFrames);
             fpsFrames = 0;
             fpsStart = now;
-            if (ui.tab == PD_TAB_INFO) redraw = true;
+            if (ui.tab == PD_TAB_SETTINGS) redraw = true;
         }
 
         if (redraw) {
             pd_ui_draw(&ui, &bottom, &game, &shown, &host);
-            bottomDirty = 2;
+            gpu_set_bottom(bottomPx);
             redraw = false;
         }
-        if (bottomDirty > 0) {
-            blit_bottom(bottomPx);
-            bottomDirty--;
-        }
-        blit_game(topClear > 0);
-        if (topClear > 0) topClear--;
-        present();
+        gpu_draw(true, settings.screenMode);
     }
 
+    audioMuted = false;
     if (hasSound) ndspChnWaveBufClear(0);
     // deinit writes the save back (the 3DS VFile's unmap flushes it).
     core->deinit(core);
@@ -493,9 +518,10 @@ static bool pick_rom(char* out, size_t outLen) {
     pd_canvas_init(&top, TOP_W, TOP_H, topPx);
     pd_canvas_init(&bottom, PD_UI_WIDTH, PD_UI_HEIGHT, bottomPx);
     pd_splash_draw(&top, "The companion for Gen 3 Pokémon.", "A: play   START: quit",
-                   "In game: X tabs, Y back, hold X+Y to leave.");
+                   "In game: X tabs, Y back, ZR fast-forward.");
+    gpu_set_top(topPx);
 
-    int dirty = 2;
+    bool dirty = true;
     bool touching = false, picked = false, running = true;
     while ((running = aptMainLoop())) {
         hidScanInput();
@@ -504,8 +530,8 @@ static bool pick_rom(char* out, size_t outLen) {
             running = false;
             break;
         }
-        if (down & KEY_DOWN) { pd_menu_move(&menu, 1); dirty = 2; }
-        if (down & KEY_UP) { pd_menu_move(&menu, -1); dirty = 2; }
+        if (down & KEY_DOWN) { pd_menu_move(&menu, 1); dirty = true; }
+        if (down & KEY_UP) { pd_menu_move(&menu, -1); dirty = true; }
         if ((down & KEY_A) && n > 0) {
             picked = true;
             break;
@@ -515,22 +541,21 @@ static bool pick_rom(char* out, size_t outLen) {
             hidTouchRead(&t);
             pd_menu_touch(&menu, t.px, t.py, true);
             touching = true;
-            dirty = 2;
+            dirty = true;
         } else if (touching) {
             touching = false;
-            dirty = 2;
+            dirty = true;
             if (pd_menu_touch(&menu, 0, 0, false) >= 0) {
                 picked = true;
                 break;
             }
         }
-        if (dirty > 0) {
+        if (dirty) {
             pd_menu_draw(&menu, &bottom);
-            blit_bottom(bottomPx);
-            blit_top_canvas(topPx);
-            dirty--;
+            gpu_set_bottom(bottomPx);
+            dirty = false;
         }
-        present();
+        gpu_draw(false, 0);
     }
     if (picked) snprintf(out, outLen, "%s", names[menu.selected]);
     for (int i = 0; i < n; i++) free(names[i]);
@@ -538,15 +563,15 @@ static bool pick_rom(char* out, size_t outLen) {
 }
 
 int main(void) {
-    gfxInitDefault();
-    gfxSetScreenFormat(GFX_TOP, GSP_RGB565_OES);
-    gfxSetScreenFormat(GFX_BOTTOM, GSP_BGR8_OES);
-    gfxSetDoubleBuffering(GFX_TOP, true);
-    gfxSetDoubleBuffering(GFX_BOTTOM, true);
+    if (!gpu_init()) {
+        gfxExit();
+        return 1;
+    }
     // The New 3DS's 804 MHz mode (a no-op on the original models).
     osSetSpeedupEnable(true);
     mLogSetDefaultLogger(&silentLogger);
     make_dirs();
+    pd_settings_load(&settings, SETTINGS_FILE);
     audio_init();
 
     char file[256];
@@ -555,6 +580,6 @@ int main(void) {
     }
 
     audio_exit();
-    gfxExit();
+    gpu_exit();
     return 0;
 }

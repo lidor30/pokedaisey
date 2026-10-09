@@ -45,15 +45,25 @@ fixture-roms:
 	docker run --rm -v "$(REPO):/repo" $(DEVKITARM_IMAGE) bash /repo/3ds/test/build_fixture_roms.sh
 
 # The real .3dsx in the Azahar emulator (linuxserver/azahar image, Xvfb inside)
-# on the FireRed fixture ROM: screenshots of the game list, PARTY, a tapped
-# summary, BATTLE and INFO in build/azahar/*.png (needs ImageMagick's convert).
+# on the FireRed fixture ROM, tapped through like a player would: the game
+# list, PARTY (SHARP 1.5x, the default), BAG, SETTINGS, the SCREEN pick-list,
+# STRETCH, PIXEL, fast-forward on, a saved state and loading it - screenshots in
+# build/azahar/*.png (needs ImageMagick's convert). Taps are window
+# coordinates: the bottom screen's (x, y) is (480 + x, 478 + y).
 AZAHAR_IMAGE := linuxserver/azahar:latest
-AZAHAR_SHOTS := 1-menu 2-party 3-summary 4-battle 5-info
+AZAHAR_SHOTS := 01-menu 02-party 03-bag 04-settings 05-pick 06-stretch 07-pixel 08-ff 09-saved 10-loaded
 azahar-test: 3ds fixture-roms
 	rm -rf $(BUILD)/azahar && mkdir -p $(BUILD)/azahar
 	docker run --rm -v "$(REPO):/repo" -v "$(abspath $(BUILD))/azahar:/out" --entrypoint /bin/sh $(AZAHAR_IMAGE) \
 		/repo/3ds/test/azahar_run.sh fixture-firered_vanilla.gba \
-		shot:1-menu a wait:6 shot:2-party click:720,518 wait:1 shot:3-summary z wait:1 shot:4-battle z wait:2 shot:5-info
+		shot:01-menu a wait:6 shot:02-party \
+		click:692,491 wait:1 shot:03-bag \
+		click:783,491 wait:1 shot:04-settings \
+		click:580,626 wait:1 shot:05-pick click:580,596 wait:2 shot:06-stretch \
+		click:580,626 wait:1 click:580,560 wait:2 shot:07-pixel \
+		click:751,491 wait:3 shot:08-ff click:751,491 \
+		click:580,662 wait:1 click:586,628 wait:2 shot:09-saved \
+		click:580,680 wait:1 click:586,628 wait:2 shot:10-loaded
 	for s in $(AZAHAR_SHOTS); do convert xwd:$(BUILD)/azahar/$$s.xwd -crop 640x500+320+230 $(BUILD)/azahar/$$s.png; done
 
 clean:

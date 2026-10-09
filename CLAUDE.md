@@ -69,7 +69,10 @@ draws it at 320x240 in the OPTION look; `3ds/ctr/` runs it beside libmgba (the s
 tables and font are generated from the app's (`make -C 3ds tables`). Look at UI changes with `make -C 3ds
 preview` (PNGs from the RAM fixtures, no ROM); `make -C 3ds azahar-test` boots the real `.3dsx` in the
 Azahar emulator on a fixture test ROM (GBA homebrew that loads a fixture's RAM, `3ds/test/`). Only
-retail English FireRed / LeafGreen / Emerald so far; never run on a real 3DS yet.
+retail English FireRed / LeafGreen / Emerald so far; never run on a real 3DS yet. Its tabs: PARTY, BATTLE,
+BAG, SETTINGS (screen mode, FF, one save state slot - states never carry the save data). The GPU path
+(`3ds/ctr/gpu.c`) writes textures from the CPU in the tiled order: display transfers into textures drew
+upside down / rotated in Azahar, so don't go back to them without checking on hardware.
 
 ## UI work
 

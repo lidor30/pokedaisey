@@ -50,8 +50,8 @@ static const char* gen3_char(uint8_t c) {
     case 0xB0: return "...";
     case 0xB1: case 0xB2: return "\"";
     case 0xB3: case 0xB4: return "'";
-    case 0xB5: return "M"; // ♂ - not in Pixel Operator
-    case 0xB6: return "F"; // ♀
+    case 0xB5: return "♂";
+    case 0xB6: return "♀";
     case 0xB8: return ",";
     case 0xBA: return "/";
     default: return "?";
@@ -70,6 +70,22 @@ static void decode_name(const uint8_t* src, int maxLen, char* out, size_t outLen
     }
     out[n] = 0;
     while (n && out[n - 1] == ' ') out[--n] = 0;
+}
+
+// GetMonGender: the personality's low byte against the species' ratio; and
+// DisplayPartyPokemonGender's rule that a Nidoran still named "NIDORAN♀" /
+// "NIDORAN♂" shows no mark (its name has one) - the app's withNativeGender.
+static enum pd_gender gender_of(const struct pd_mon* m, uint32_t personality) {
+    if (m->species == PD_SPECIES_EGG || m->species >= pd_gender_ratios_count) return PD_GENDER_NONE;
+    if ((m->species == 29 && !strcmp(m->nickname, "NIDORAN♀")) ||
+        (m->species == 32 && !strcmp(m->nickname, "NIDORAN♂"))) {
+        return PD_GENDER_NONE;
+    }
+    int ratio = pd_gender_ratios[m->species];
+    if (ratio == 255) return PD_GENDER_NONE;
+    if (ratio == 0) return PD_GENDER_MALE;
+    if (ratio == 254) return PD_GENDER_FEMALE;
+    return (int) (personality & 0xFF) < ratio ? PD_GENDER_FEMALE : PD_GENDER_MALE;
 }
 
 bool pd_decode_party_mon(const uint8_t* raw, struct pd_mon* m) {
@@ -108,6 +124,7 @@ bool pd_decode_party_mon(const uint8_t* raw, struct pd_mon* m) {
     // SPECIES_EGG, like the party menu.
     if (raw[0x13] & 0x04) m->species = PD_SPECIES_EGG;
     decode_name(raw + 0x08, 10, m->nickname, sizeof(m->nickname));
+    m->gender = gender_of(m, personality);
     return true;
 }
 
@@ -182,12 +199,60 @@ void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn
 
     // --- money: SaveBlock1.money XOR SaveBlock2.encryptionKey ---
     uint32_t sb1 = 0, sb2 = 0, money = 0, key = 0;
-    if (read_u32(read, ctx, cfg->saveBlock1Ptr, &sb1) && in_ram(sb1) &&
-        read_u32(read, ctx, cfg->saveBlock2Ptr, &sb2) && in_ram(sb2) &&
-        read_u32(read, ctx, sb1 + cfg->moneyOff, &money) &&
-        read_u32(read, ctx, sb2 + cfg->encryptionKeyOff, &key)) {
+    bool haveKey = read_u32(read, ctx, cfg->saveBlock2Ptr, &sb2) && in_ram(sb2) &&
+        read_u32(read, ctx, sb2 + cfg->encryptionKeyOff, &key);
+    if (haveKey && read_u32(read, ctx, cfg->saveBlock1Ptr, &sb1) && in_ram(sb1) &&
+        read_u32(read, ctx, sb1 + cfg->moneyOff, &money)) {
         uint32_t v = money ^ key;
         if (v <= MAX_MONEY) s->money = (long) v;
+    }
+
+    // --- bag: quantities XOR the key's low half (readNativeBag) ---
+    uint8_t pockets[PD_POCKET_COUNT * 8];
+    if (haveKey && read(ctx, cfg->bagPockets, pockets, sizeof(pockets))) {
+        s->bagOk = true;
+        for (int p = 0; p < PD_POCKET_COUNT; p++) {
+            uint32_t slots = u32(pockets + p * 8);
+            int capacity = pockets[p * 8 + 4];
+            if (!in_ram(slots) || capacity == 0) continue;
+            if (capacity > PD_POCKET_SLOTS) capacity = PD_POCKET_SLOTS;
+            uint8_t items[PD_POCKET_SLOTS * 4];
+            if (!read(ctx, slots, items, (size_t) capacity * 4)) continue;
+            struct pd_pocket_items* out = &s->bag[cfg->bagOrder[p]];
+            for (int i = 0; i < capacity; i++) {
+                uint16_t id = u16(items + i * 4);
+                if (!id) continue;
+                out->items[out->count].id = id;
+                out->items[out->count].quantity = (uint16_t) (u16(items + i * 4 + 2) ^ (key & 0xFFFF));
+                out->count++;
+            }
+        }
+    }
+}
+
+static const char* item_entry(const char* const* t, int n, int item) {
+    if (item > 0 && item < n && t[item]) return t[item];
+    return "";
+}
+
+const char* pd_item_name(const struct pd_game* g, int item) {
+    if (g->kind == PD_GAME_EMERALD) return item_entry(pd_item_names_emerald, pd_item_names_emerald_count, item);
+    return item_entry(pd_item_names_firered, pd_item_names_firered_count, item);
+}
+
+const char* pd_item_description(const struct pd_game* g, int item) {
+    if (g->kind == PD_GAME_EMERALD) return item_entry(pd_item_desc_emerald, pd_item_desc_emerald_count, item);
+    return item_entry(pd_item_desc_firered, pd_item_desc_firered_count, item);
+}
+
+const char* pd_pocket_name(int pocket) {
+    switch (pocket) {
+    case PD_POCKET_ITEMS: return "ITEMS";
+    case PD_POCKET_BALLS: return "POKé BALLS";
+    case PD_POCKET_TMHM: return "TMs & HMs";
+    case PD_POCKET_BERRIES: return "BERRIES";
+    case PD_POCKET_KEY: return "KEY ITEMS";
+    default: return "";
     }
 }
 
