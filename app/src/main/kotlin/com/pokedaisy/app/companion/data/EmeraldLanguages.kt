@@ -7,26 +7,28 @@ package com.pokedaisy.app.companion.data
  * GameText<Code>Gen.kt): the same ids as English, their own names. The companion
  * shows a game's names in the game's language; types, powers and map rectangles
  * stay English's (the same in every release) - [baseMapSecs] is the English table
- * the names go over.
+ * the names go over. Item descriptions come from the ROM itself (RomItemText).
  */
 class GameText(
     species: () -> Map<Int, String>,
     moves: () -> Map<Int, String>,
     items: () -> Map<Int, String>,
-    itemDescriptions: () -> Map<Int, String>,
     val natures: List<String>,
     mapSecs: () -> Map<Int, String>,
     smallFontWidths: () -> IntArray,
     englishMapSecs: () -> Map<Int, MapSecInfo> = { mapSecDataEmerald },
+    // The moves' types and powers the names go over: the shared table, or a hack's own
+    // (Unbound / Quetzal in another language: the English release's, the same ids).
+    englishMoves: () -> Map<Int, MoveInfo> = { englishMoveData },
 ) {
     /** English's map sections (what hand-written GUIDE entries are tagged with). */
     val baseMapSecs: Map<Int, MapSecInfo> by lazy(englishMapSecs)
+    private val baseMoves: Map<Int, MoveInfo> by lazy(englishMoves)
     val species by lazy(species)
     val items by lazy(items)
-    val itemDescriptions by lazy(itemDescriptions)
     val moveData: Map<Int, MoveInfo> by lazy {
         val names = moves()
-        englishMoveData.mapValues { (id, m) -> names[id]?.let { m.copy(name = it) } ?: m }
+        baseMoves.mapValues { (id, m) -> names[id]?.let { m.copy(name = it) } ?: m }
     }
     val mapSecData: Map<Int, MapSecInfo> by lazy {
         val names = mapSecs()
@@ -41,36 +43,47 @@ class GameText(
 private val englishMoveData get() = moveData
 
 private val EMERALD_ES by lazy {
-    GameText({ speciesNamesEmeraldEs }, { moveNamesEmeraldEs }, { itemNamesEmeraldEs }, { itemDescriptionsEmeraldEs },
+    GameText({ speciesNamesEmeraldEs }, { moveNamesEmeraldEs }, { itemNamesEmeraldEs },
         natureNamesEmeraldEs, { mapSecNamesEmeraldEs }, { smallFontWidthsEmeraldEs })
 }
 private val EMERALD_DE by lazy {
-    GameText({ speciesNamesEmeraldDe }, { moveNamesEmeraldDe }, { itemNamesEmeraldDe }, { itemDescriptionsEmeraldDe },
+    GameText({ speciesNamesEmeraldDe }, { moveNamesEmeraldDe }, { itemNamesEmeraldDe },
         natureNamesEmeraldDe, { mapSecNamesEmeraldDe }, { smallFontWidthsEmeraldDe })
 }
 private val EMERALD_FR by lazy {
-    GameText({ speciesNamesEmeraldFr }, { moveNamesEmeraldFr }, { itemNamesEmeraldFr }, { itemDescriptionsEmeraldFr },
+    GameText({ speciesNamesEmeraldFr }, { moveNamesEmeraldFr }, { itemNamesEmeraldFr },
         natureNamesEmeraldFr, { mapSecNamesEmeraldFr }, { smallFontWidthsEmeraldFr })
 }
 private val EMERALD_IT by lazy {
-    GameText({ speciesNamesEmeraldIt }, { moveNamesEmeraldIt }, { itemNamesEmeraldIt }, { itemDescriptionsEmeraldIt },
+    GameText({ speciesNamesEmeraldIt }, { moveNamesEmeraldIt }, { itemNamesEmeraldIt },
         natureNamesEmeraldIt, { mapSecNamesEmeraldIt }, { smallFontWidthsEmeraldIt })
 }
 
 private val EMERALD_JA by lazy {
-    GameText({ speciesNamesEmeraldJa }, { moveNamesEmeraldJa }, { itemNamesEmeraldJa }, { itemDescriptionsEmeraldJa },
+    GameText({ speciesNamesEmeraldJa }, { moveNamesEmeraldJa }, { itemNamesEmeraldJa },
         natureNamesEmeraldJa, { mapSecNamesEmeraldJa }, { smallFontWidthsEmeraldJa })
+}
+
+// Pokémon Unbound v2.1.1.1's French translation (gen_unbound_fr_tables.py): its names over
+// Unbound's own moves and map sections (the same ids as English). Not a game code: the
+// translation keeps English's header (BPRE), so NATIVE_UNBOUND_FR names it.
+const val UNBOUND_FR_TEXT = "UNBOUND_FR"
+private val UNBOUND_FR by lazy {
+    GameText({ speciesNamesUnboundFr }, { moveNamesUnboundFr }, { itemNamesUnboundFr },
+        natureNamesUnboundFr, { mapSecNamesUnboundFr }, { IntArray(0) },
+        englishMapSecs = { mapSecDataUnbound }, englishMoves = { moveDataUnbound })
 }
 
 private val portTexts = java.util.concurrent.ConcurrentHashMap<String, GameText>()
 
-/** The names of the game with [code] ("BPED", "AXVF"); null for English and every game without its own. */
+/** The names of the game with [code] ("BPED", "AXVF", [UNBOUND_FR_TEXT]); null for English and every game without its own. */
 fun gameText(code: String): GameText? = when (code) {
     "BPES" -> EMERALD_ES
     "BPED" -> EMERALD_DE
     "BPEF" -> EMERALD_FR
     "BPEI" -> EMERALD_IT
     "BPEJ" -> EMERALD_JA
+    UNBOUND_FR_TEXT -> UNBOUND_FR
     else -> RETAIL_PORT_TEXTS[code]?.let { make -> portTexts.getOrPut(code, make) }
 }
 

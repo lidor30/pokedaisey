@@ -32,18 +32,20 @@ class SiteDataExportTest {
         "BPEJ" to "ポケットモンスター エメラルド",
     )
 
-    /** `LAZARUS_V2_0_SHA1` -> v2.0, `EMERALD_ROGUE_V2_2_1_EX_SHA1` -> v2.2.1-EX, `SOULGOLD_V1_2B_SHA1` -> v1.2b. */
+    /** `LAZARUS_V2_0_SHA1` -> v2.0, `EMERALD_ROGUE_V2_2_1_EX_SHA1` -> v2.2.1-EX, `SOULGOLD_V1_2B_SHA1` -> v1.2b,
+     * `QUETZAL_V9_0_ALPHA_ES_SHA1` -> v9.0-ALPHA-ES; a build with no version of its own is `*_UNVERSIONED_SHA1` -> "". */
     private val hackVersions: Map<String, String> by lazy {
-        val name = Regex("""_V(\d+(?:_\d+)*)([A-Z]?)(?:_([A-Z]+))?_SHA1$""")
+        val name = Regex("""_V(\d+(?:_\d+)*)([A-Z]?)((?:_[A-Z]+)*)_SHA1$""")
         TelemetrySampler::class.java.declaredFields
             .filter { java.lang.reflect.Modifier.isStatic(it.modifiers) && it.type == String::class.java }
             .mapNotNull { f ->
-                val m = name.find(f.name) ?: return@mapNotNull null
                 f.isAccessible = true
-                val (digits, letter, tag) = m.destructured
+                if (f.name.endsWith("_UNVERSIONED_SHA1")) return@mapNotNull f.get(null) as String to ""
+                val m = name.find(f.name) ?: return@mapNotNull null
+                val (digits, letter, tags) = m.destructured
                 f.get(null) as String to buildString {
                     append("v").append(digits.replace('_', '.')).append(letter.lowercase())
-                    if (tag.isNotEmpty()) append("-").append(tag)
+                    tags.split('_').filter { it.isNotEmpty() }.forEach { append("-").append(it) }
                 }
             }.toMap()
     }

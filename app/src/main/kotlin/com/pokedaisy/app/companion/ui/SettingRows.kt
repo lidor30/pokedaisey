@@ -20,8 +20,78 @@ import com.pokedaisy.app.companion.i18n.tr
 class SettingRow(
     val label: String, val value: String?, val badge: String? = null, val header: Boolean = false,
     val enabled: Boolean = true, val labelBadge: String? = null,
-    val labelIcon: (@Composable () -> Unit)? = null, val onClick: () -> Unit,
+    val labelIcon: (@Composable () -> Unit)? = null,
+    /** A line under the label saying what the row is for (English, translated where it's drawn). */
+    val subtitle: String? = null,
+    /** Hidden words Settings' search also matches (English, space-separated): the terms players use elsewhere. */
+    val keywords: String = "",
+    val onClick: () -> Unit,
 )
+
+/**
+ * Settings' search: the rows whose label, value, subtitle or keywords hold every word of [query]
+ * (in English or the language on screen, accents and case aside), each under its group's title.
+ */
+fun filterRows(rows: List<SettingRow>, query: String): List<SettingRow> {
+    val words = fold(query).split(' ').filter { it.isNotBlank() }
+    if (words.isEmpty()) return rows
+    val out = mutableListOf<SettingRow>()
+    var group: SettingRow? = null
+    for (row in rows) {
+        if (row.header) { group = row; continue }
+        val text = fold(
+            listOfNotNull(
+                row.label, tr(row.label), row.value, row.value?.let { tr(it) }, row.subtitle, row.subtitle?.let { tr(it) },
+                row.keywords, SETTING_KEYWORDS[row.label],
+            ).joinToString(" "),
+        )
+        if (words.all { it in text }) {
+            if (group != null && out.lastOrNull { it.header } !== group) out += group
+            out += row
+        }
+    }
+    return out
+}
+
+/**
+ * Search words per row, by its English label (both screens' rows share them): what other emulators
+ * and players call the same thing, and what's on the row's sub-page. English only - the label
+ * itself is matched in the language on screen too.
+ */
+val SETTING_KEYWORDS: Map<String, String> = mapOf(
+    "FF" to "fast forward turbo speed up",
+    "FF SPEED" to "fast forward speed rate cap multiplier turbo",
+    "FF MODE" to "smart fast forward menus battles normal",
+    "FF MUSIC" to "fast forward audio sound music steady sped up mute",
+    "REWIND" to "rewind undo go back time",
+    "TOUCH PAD" to "on screen controls virtual gamepad overlay touch buttons",
+    "GAME BUTTONS" to "key bindings keybinds keybinding controls remap remapping rebind mapping input controller gamepad buttons turbo",
+    "HOTKEYS" to "shortcuts combos save state load state slot rewind fast forward key bindings",
+    "STATUS BAR" to "clock time battery money location top bar",
+    "ASPECT" to "stretch ratio fullscreen full screen size scale 3:2",
+    "SHADERS" to "filter lcd crt scanlines grid gba colors color correction effects screen look",
+    "COMPANION" to "portrait phone bottom position layout",
+    "SWAP SCREENS" to "dual screen display switch top bottom",
+    "THEME" to "colors look background skin style",
+    "RESUME GAMES" to "auto resume continue launch boot",
+    "FOLDERS" to "roms folder saves directory path location storage retroarch syncthing save states",
+    "COVER ART" to "box art boxart covers steamgriddb images thumbnails api key",
+    "HIDDEN GAMES" to "hide unhide library show",
+    "CHEATS" to "gameshark action replay codebreaker codes",
+    "RetroAchievements" to "achievements cheevos ra login account trophies",
+    "LANGUAGE" to "language translation locale english japanese french german italian spanish",
+    "VERSION" to "update upgrade check release about",
+    "LICENSES" to "license legal open source credits notices about",
+    "RUN SETUP" to "setup onboarding wizard first time welcome",
+    "TAB BAR" to "tabs layout bar order",
+    "BATTLE HINTS" to "suggestions recommendations best move tips",
+    "FOE IVS" to "enemy opponent ivs stats",
+    "CLICK SOUND" to "sound effects button click audio",
+    "TWEAKS" to "animations bounce blink cursor jump to battle effects motion",
+)
+
+private fun fold(s: String): String =
+    java.text.Normalizer.normalize(s.lowercase(), java.text.Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
 
 /** A group's title row in [GroupedRows]. */
 fun groupTitle(label: String) = SettingRow(label, null, header = true) {}
@@ -64,9 +134,10 @@ fun GroupedRows(
                 }
             } else {
                 OptionLine(
-                    row.label, row.value, selected = i == cursor, m, height = m.rowHeight * 1.2f,
+                    row.label, row.value, selected = i == cursor, m,
+                    height = if (row.subtitle != null) m.rowHeight * 1.2f + m.lineHeight else m.rowHeight * 1.2f,
                     divider = rows.getOrNull(i + 1)?.header == false, labelBadge = row.labelBadge, labelIcon = row.labelIcon,
-                    valueBadge = row.badge, enabled = row.enabled,
+                    valueBadge = row.badge, enabled = row.enabled, subtitle = row.subtitle,
                 ) { onClick(i) }
             }
         }

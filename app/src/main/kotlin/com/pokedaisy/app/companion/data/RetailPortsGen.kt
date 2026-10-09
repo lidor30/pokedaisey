@@ -30,6 +30,7 @@ private val PORT_AXPD0 by lazy {
         playerPartyCount = 0x03004360L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083D1348L, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_SAPPHIRE.copy(
             abilityNames = 0x082071ACL,
             entries = 0x083BD6D4L,
@@ -88,6 +89,7 @@ private val PORT_AXPD1 by lazy {
         playerPartyCount = 0x03004360L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083D1348L, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_SAPPHIRE.copy(
             abilityNames = 0x082071ACL,
             entries = 0x083BD6D4L,
@@ -145,6 +147,7 @@ private val PORT_AXPE0 by lazy {
         playerPartyCount = 0x03004350L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083C55BCL, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_SAPPHIRE.copy(
             abilityNames = 0x081FA1D8L,
             entries = 0x083B18B0L,
@@ -201,6 +204,7 @@ private val PORT_AXPF0 by lazy {
         playerPartyCount = 0x03004360L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083CCAF4L, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_SAPPHIRE.copy(
             abilityNames = 0x08202624L,
             entries = 0x083B8D6CL,
@@ -259,6 +263,7 @@ private val PORT_AXPF1 by lazy {
         playerPartyCount = 0x03004360L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083CCAF4L, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_SAPPHIRE.copy(
             abilityNames = 0x08202624L,
             entries = 0x083B8D6CL,
@@ -317,6 +322,7 @@ private val PORT_AXPI0 by lazy {
         playerPartyCount = 0x03004360L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083C5C9CL, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_SAPPHIRE.copy(
             abilityNames = 0x081FBEB0L,
             entries = 0x083B2150L,
@@ -376,6 +382,7 @@ private val PORT_AXPI1 by lazy {
         playerPartyCount = 0x03004360L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083C5C9CL, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_SAPPHIRE.copy(
             abilityNames = 0x081FBEB0L,
             entries = 0x083B2150L,
@@ -435,6 +442,7 @@ private val PORT_AXPJ0 by lazy {
         playerPartyCount = 0x03004280L,
         saveBlock1Ptr = 0x02025494L,
         saveBlock2Ptr = 0x02024C04L,
+        itemDescs = japaneseItems(0x0839A62CL, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_SAPPHIRE.copy(
             abilityNames = 0x081CBBD4L,
             entries = 0x08384730L,
@@ -496,6 +504,7 @@ private val PORT_AXPJ1 by lazy {
         playerPartyCount = 0x03004280L,
         saveBlock1Ptr = 0x02025494L,
         saveBlock2Ptr = 0x02024C04L,
+        itemDescs = japaneseItems(0x0839A62CL, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_SAPPHIRE.copy(
             abilityNames = 0x081CBBD4L,
             entries = 0x08384730L,
@@ -557,6 +566,7 @@ private val PORT_AXPS0 by lazy {
         playerPartyCount = 0x03004360L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083C8D38L, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_SAPPHIRE.copy(
             abilityNames = 0x081FEF54L,
             entries = 0x083B55F8L,
@@ -616,6 +626,7 @@ private val PORT_AXPS1 by lazy {
         playerPartyCount = 0x03004360L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083C8D38L, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_SAPPHIRE.copy(
             abilityNames = 0x081FEF54L,
             entries = 0x083B55F8L,
@@ -675,6 +686,7 @@ private val PORT_AXVD0 by lazy {
         playerPartyCount = 0x03004360L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083D13DCL, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_RUBY.copy(
             abilityNames = 0x08207218L,
             entries = 0x083BD768L,
@@ -733,6 +745,7 @@ private val PORT_AXVD1 by lazy {
         playerPartyCount = 0x03004360L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083D13DCL, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_RUBY.copy(
             abilityNames = 0x08207218L,
             entries = 0x083BD768L,
@@ -790,6 +803,7 @@ private val PORT_AXVE0 by lazy {
         playerPartyCount = 0x03004350L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083C5564L, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_RUBY.copy(
             abilityNames = 0x081FA248L,
             entries = 0x083B1858L,
@@ -846,6 +860,7 @@ private val PORT_AXVF0 by lazy {
         playerPartyCount = 0x03004360L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083CCFC4L, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_RUBY.copy(
             abilityNames = 0x08202694L,
             entries = 0x083B923CL,
@@ -904,6 +919,7 @@ private val PORT_AXVF1 by lazy {
         playerPartyCount = 0x03004360L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083CCFC4L, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_RUBY.copy(
             abilityNames = 0x08202694L,
             entries = 0x083B923CL,
@@ -962,6 +978,7 @@ private val PORT_AXVI0 by lazy {
         playerPartyCount = 0x03004360L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083C5FF8L, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_RUBY.copy(
             abilityNames = 0x081FBF20L,
             entries = 0x083B24ACL,
@@ -1021,6 +1038,7 @@ private val PORT_AXVI1 by lazy {
         playerPartyCount = 0x03004360L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083C5FF8L, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_RUBY.copy(
             abilityNames = 0x081FBF20L,
             entries = 0x083B24ACL,
@@ -1080,6 +1098,7 @@ private val PORT_AXVJ0 by lazy {
         playerPartyCount = 0x03004280L,
         saveBlock1Ptr = 0x02025494L,
         saveBlock2Ptr = 0x02024C04L,
+        itemDescs = japaneseItems(0x0839A648L, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_RUBY.copy(
             abilityNames = 0x081CBC44L,
             entries = 0x0838474CL,
@@ -1141,6 +1160,7 @@ private val PORT_AXVJ1 by lazy {
         playerPartyCount = 0x03004280L,
         saveBlock1Ptr = 0x02025494L,
         saveBlock2Ptr = 0x02024C04L,
+        itemDescs = japaneseItems(0x0839A648L, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_RUBY.copy(
             abilityNames = 0x081CBC44L,
             entries = 0x0838474CL,
@@ -1202,6 +1222,7 @@ private val PORT_AXVS0 by lazy {
         playerPartyCount = 0x03004360L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083C8FFCL, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_RUBY.copy(
             abilityNames = 0x081FEFC4L,
             entries = 0x083B58BCL,
@@ -1261,6 +1282,7 @@ private val PORT_AXVS1 by lazy {
         playerPartyCount = 0x03004360L,
         saveBlock1Ptr = 0x02025734L,
         saveBlock2Ptr = 0x02024EA4L,
+        itemDescs = vanillaItems(0x083C8FFCL, RUBY_SAPPHIRE_ITEMS),
         pokedex = POKEDEX_RUBY.copy(
             abilityNames = 0x081FEFC4L,
             entries = 0x083B58BCL,
@@ -1323,6 +1345,7 @@ private val PORT_BPGF0 by lazy {
         saveBlock1Ptr = 0x03004F58L,
         saveBlock2Ptr = 0x03004F5CL,
         waitForMonSelection = 0x0803055CL,
+        itemDescs = vanillaItems(0x083D3160L),
         partyMenu = 0x0203B0A0L,
         pokedex = POKEDEX_LEAFGREEN_REV0.copy(
             abilityNames = 0x0824A06CL,
@@ -1383,6 +1406,7 @@ private val PORT_BPGI0 by lazy {
         saveBlock1Ptr = 0x03004F58L,
         saveBlock2Ptr = 0x03004F5CL,
         waitForMonSelection = 0x08030570L,
+        itemDescs = vanillaItems(0x083D1D24L),
         partyMenu = 0x0203B0A0L,
         pokedex = POKEDEX_LEAFGREEN_REV0.copy(
             abilityNames = 0x08248CFCL,
@@ -1444,6 +1468,7 @@ private val PORT_BPGJ0 by lazy {
         saveBlock1Ptr = 0x03005048L,
         saveBlock2Ptr = 0x0300504CL,
         waitForMonSelection = 0x0802FE04L,
+        itemDescs = japaneseItems(0x083A0568L),
         partyMenu = 0x0203B014L,
         pokedex = POKEDEX_LEAFGREEN_REV0.copy(
             abilityNames = 0x0820C250L,
@@ -1507,6 +1532,7 @@ private val PORT_BPGJ1 by lazy {
         saveBlock1Ptr = 0x03004FA8L,
         saveBlock2Ptr = 0x03004FACL,
         waitForMonSelection = 0x0802FD70L,
+        itemDescs = japaneseItems(0x0839BD28L),
         partyMenu = 0x0203B014L,
         pokedex = POKEDEX_LEAFGREEN_REV0.copy(
             abilityNames = 0x08207A68L,
@@ -1573,6 +1599,7 @@ private val PORT_BPGS0 by lazy {
         saveBlock1Ptr = 0x03004F58L,
         saveBlock2Ptr = 0x03004F5CL,
         waitForMonSelection = 0x08030570L,
+        itemDescs = vanillaItems(0x083D4D8CL),
         partyMenu = 0x0203B0A0L,
         pokedex = POKEDEX_LEAFGREEN_REV1.copy(
             abilityNames = 0x0824B3E4L,
@@ -1634,6 +1661,7 @@ private val PORT_BPRD0 by lazy {
         saveBlock1Ptr = 0x03004F58L,
         saveBlock2Ptr = 0x03004F5CL,
         waitForMonSelection = 0x08030584L,
+        itemDescs = vanillaItems(0x083DA518L),
         partyMenu = 0x0203B0A0L,
         pokedex = POKEDEX_FIRERED_REV1.copy(
             abilityNames = 0x0824FB64L,
@@ -1694,6 +1722,7 @@ private val PORT_BPRF0 by lazy {
         saveBlock1Ptr = 0x03004F58L,
         saveBlock2Ptr = 0x03004F5CL,
         waitForMonSelection = 0x0803055CL,
+        itemDescs = vanillaItems(0x083D3324L),
         partyMenu = 0x0203B0A0L,
         pokedex = POKEDEX_FIRERED_REV1.copy(
             abilityNames = 0x0824A090L,
@@ -1754,6 +1783,7 @@ private val PORT_BPRI0 by lazy {
         saveBlock1Ptr = 0x03004F58L,
         saveBlock2Ptr = 0x03004F5CL,
         waitForMonSelection = 0x08030570L,
+        itemDescs = vanillaItems(0x083D1EE8L),
         partyMenu = 0x0203B0A0L,
         pokedex = POKEDEX_FIRERED_REV1.copy(
             abilityNames = 0x08248D20L,
@@ -1815,6 +1845,7 @@ private val PORT_BPRJ0 by lazy {
         saveBlock1Ptr = 0x03005048L,
         saveBlock2Ptr = 0x0300504CL,
         waitForMonSelection = 0x0802FE04L,
+        itemDescs = japaneseItems(0x083A06F8L),
         partyMenu = 0x0203B014L,
         pokedex = POKEDEX_FIRERED_REV1.copy(
             abilityNames = 0x0820C274L,
@@ -1878,6 +1909,7 @@ private val PORT_BPRJ1 by lazy {
         saveBlock1Ptr = 0x03004FA8L,
         saveBlock2Ptr = 0x03004FACL,
         waitForMonSelection = 0x0802FD70L,
+        itemDescs = japaneseItems(0x0839BEB8L),
         partyMenu = 0x0203B014L,
         pokedex = POKEDEX_FIRERED_REV1.copy(
             abilityNames = 0x08207A8CL,
@@ -1944,6 +1976,7 @@ private val PORT_BPRS0 by lazy {
         saveBlock1Ptr = 0x03004F58L,
         saveBlock2Ptr = 0x03004F5CL,
         waitForMonSelection = 0x08030570L,
+        itemDescs = vanillaItems(0x083D4F50L),
         partyMenu = 0x0203B0A0L,
         pokedex = POKEDEX_FIRERED_REV1.copy(
             abilityNames = 0x0824B408L,
@@ -2078,23 +2111,23 @@ val RETAIL_PORT_CODE_TITLES: Map<String, String> = mapOf(
 
 /** Each language's names, by game code; English's map rectangles under them. */
 internal val RETAIL_PORT_TEXTS: Map<String, () -> GameText> = mapOf(
-    "AXPD" to { GameText({ speciesNamesAxpd }, { moveNamesAxpd }, { itemNamesAxpd }, { itemDescriptionsAxpd }, natureNamesAxpd, { mapSecNamesAxpd }, { smallFontWidthsAxpd }, { mapSecDataEmerald }) },
-    "AXPF" to { GameText({ speciesNamesAxpf }, { moveNamesAxpf }, { itemNamesAxpf }, { itemDescriptionsAxpf }, natureNamesAxpf, { mapSecNamesAxpf }, { smallFontWidthsAxpf }, { mapSecDataEmerald }) },
-    "AXPI" to { GameText({ speciesNamesAxpi }, { moveNamesAxpi }, { itemNamesAxpi }, { itemDescriptionsAxpi }, natureNamesAxpi, { mapSecNamesAxpi }, { smallFontWidthsAxpi }, { mapSecDataEmerald }) },
-    "AXPJ" to { GameText({ speciesNamesAxpj }, { moveNamesAxpj }, { itemNamesAxpj }, { itemDescriptionsAxpj }, natureNamesAxpj, { mapSecNamesAxpj }, { smallFontWidthsAxpj }, { mapSecDataEmerald }) },
-    "AXPS" to { GameText({ speciesNamesAxps }, { moveNamesAxps }, { itemNamesAxps }, { itemDescriptionsAxps }, natureNamesAxps, { mapSecNamesAxps }, { smallFontWidthsAxps }, { mapSecDataEmerald }) },
-    "AXVD" to { GameText({ speciesNamesAxvd }, { moveNamesAxvd }, { itemNamesAxvd }, { itemDescriptionsAxvd }, natureNamesAxvd, { mapSecNamesAxvd }, { smallFontWidthsAxvd }, { mapSecDataEmerald }) },
-    "AXVF" to { GameText({ speciesNamesAxvf }, { moveNamesAxvf }, { itemNamesAxvf }, { itemDescriptionsAxvf }, natureNamesAxvf, { mapSecNamesAxvf }, { smallFontWidthsAxvf }, { mapSecDataEmerald }) },
-    "AXVI" to { GameText({ speciesNamesAxvi }, { moveNamesAxvi }, { itemNamesAxvi }, { itemDescriptionsAxvi }, natureNamesAxvi, { mapSecNamesAxvi }, { smallFontWidthsAxvi }, { mapSecDataEmerald }) },
-    "AXVJ" to { GameText({ speciesNamesAxvj }, { moveNamesAxvj }, { itemNamesAxvj }, { itemDescriptionsAxvj }, natureNamesAxvj, { mapSecNamesAxvj }, { smallFontWidthsAxvj }, { mapSecDataEmerald }) },
-    "AXVS" to { GameText({ speciesNamesAxvs }, { moveNamesAxvs }, { itemNamesAxvs }, { itemDescriptionsAxvs }, natureNamesAxvs, { mapSecNamesAxvs }, { smallFontWidthsAxvs }, { mapSecDataEmerald }) },
-    "BPGF" to { GameText({ speciesNamesBpgf }, { moveNamesBpgf }, { itemNamesBpgf }, { itemDescriptionsBpgf }, natureNamesBpgf, { mapSecNamesBpgf }, { smallFontWidthsBpgf }, { mapSecData }) },
-    "BPGI" to { GameText({ speciesNamesBpgi }, { moveNamesBpgi }, { itemNamesBpgi }, { itemDescriptionsBpgi }, natureNamesBpgi, { mapSecNamesBpgi }, { smallFontWidthsBpgi }, { mapSecData }) },
-    "BPGJ" to { GameText({ speciesNamesBpgj }, { moveNamesBpgj }, { itemNamesBpgj }, { itemDescriptionsBpgj }, natureNamesBpgj, { mapSecNamesBpgj }, { smallFontWidthsBpgj }, { mapSecData }) },
-    "BPGS" to { GameText({ speciesNamesBpgs }, { moveNamesBpgs }, { itemNamesBpgs }, { itemDescriptionsBpgs }, natureNamesBpgs, { mapSecNamesBpgs }, { smallFontWidthsBpgs }, { mapSecData }) },
-    "BPRD" to { GameText({ speciesNamesBprd }, { moveNamesBprd }, { itemNamesBprd }, { itemDescriptionsBprd }, natureNamesBprd, { mapSecNamesBprd }, { smallFontWidthsBprd }, { mapSecData }) },
-    "BPRF" to { GameText({ speciesNamesBprf }, { moveNamesBprf }, { itemNamesBprf }, { itemDescriptionsBprf }, natureNamesBprf, { mapSecNamesBprf }, { smallFontWidthsBprf }, { mapSecData }) },
-    "BPRI" to { GameText({ speciesNamesBpri }, { moveNamesBpri }, { itemNamesBpri }, { itemDescriptionsBpri }, natureNamesBpri, { mapSecNamesBpri }, { smallFontWidthsBpri }, { mapSecData }) },
-    "BPRJ" to { GameText({ speciesNamesBprj }, { moveNamesBprj }, { itemNamesBprj }, { itemDescriptionsBprj }, natureNamesBprj, { mapSecNamesBprj }, { smallFontWidthsBprj }, { mapSecData }) },
-    "BPRS" to { GameText({ speciesNamesBprs }, { moveNamesBprs }, { itemNamesBprs }, { itemDescriptionsBprs }, natureNamesBprs, { mapSecNamesBprs }, { smallFontWidthsBprs }, { mapSecData }) },
+    "AXPD" to { GameText({ speciesNamesAxpd }, { moveNamesAxpd }, { itemNamesAxpd }, natureNamesAxpd, { mapSecNamesAxpd }, { smallFontWidthsAxpd }, { mapSecDataEmerald }) },
+    "AXPF" to { GameText({ speciesNamesAxpf }, { moveNamesAxpf }, { itemNamesAxpf }, natureNamesAxpf, { mapSecNamesAxpf }, { smallFontWidthsAxpf }, { mapSecDataEmerald }) },
+    "AXPI" to { GameText({ speciesNamesAxpi }, { moveNamesAxpi }, { itemNamesAxpi }, natureNamesAxpi, { mapSecNamesAxpi }, { smallFontWidthsAxpi }, { mapSecDataEmerald }) },
+    "AXPJ" to { GameText({ speciesNamesAxpj }, { moveNamesAxpj }, { itemNamesAxpj }, natureNamesAxpj, { mapSecNamesAxpj }, { smallFontWidthsAxpj }, { mapSecDataEmerald }) },
+    "AXPS" to { GameText({ speciesNamesAxps }, { moveNamesAxps }, { itemNamesAxps }, natureNamesAxps, { mapSecNamesAxps }, { smallFontWidthsAxps }, { mapSecDataEmerald }) },
+    "AXVD" to { GameText({ speciesNamesAxvd }, { moveNamesAxvd }, { itemNamesAxvd }, natureNamesAxvd, { mapSecNamesAxvd }, { smallFontWidthsAxvd }, { mapSecDataEmerald }) },
+    "AXVF" to { GameText({ speciesNamesAxvf }, { moveNamesAxvf }, { itemNamesAxvf }, natureNamesAxvf, { mapSecNamesAxvf }, { smallFontWidthsAxvf }, { mapSecDataEmerald }) },
+    "AXVI" to { GameText({ speciesNamesAxvi }, { moveNamesAxvi }, { itemNamesAxvi }, natureNamesAxvi, { mapSecNamesAxvi }, { smallFontWidthsAxvi }, { mapSecDataEmerald }) },
+    "AXVJ" to { GameText({ speciesNamesAxvj }, { moveNamesAxvj }, { itemNamesAxvj }, natureNamesAxvj, { mapSecNamesAxvj }, { smallFontWidthsAxvj }, { mapSecDataEmerald }) },
+    "AXVS" to { GameText({ speciesNamesAxvs }, { moveNamesAxvs }, { itemNamesAxvs }, natureNamesAxvs, { mapSecNamesAxvs }, { smallFontWidthsAxvs }, { mapSecDataEmerald }) },
+    "BPGF" to { GameText({ speciesNamesBpgf }, { moveNamesBpgf }, { itemNamesBpgf }, natureNamesBpgf, { mapSecNamesBpgf }, { smallFontWidthsBpgf }, { mapSecData }) },
+    "BPGI" to { GameText({ speciesNamesBpgi }, { moveNamesBpgi }, { itemNamesBpgi }, natureNamesBpgi, { mapSecNamesBpgi }, { smallFontWidthsBpgi }, { mapSecData }) },
+    "BPGJ" to { GameText({ speciesNamesBpgj }, { moveNamesBpgj }, { itemNamesBpgj }, natureNamesBpgj, { mapSecNamesBpgj }, { smallFontWidthsBpgj }, { mapSecData }) },
+    "BPGS" to { GameText({ speciesNamesBpgs }, { moveNamesBpgs }, { itemNamesBpgs }, natureNamesBpgs, { mapSecNamesBpgs }, { smallFontWidthsBpgs }, { mapSecData }) },
+    "BPRD" to { GameText({ speciesNamesBprd }, { moveNamesBprd }, { itemNamesBprd }, natureNamesBprd, { mapSecNamesBprd }, { smallFontWidthsBprd }, { mapSecData }) },
+    "BPRF" to { GameText({ speciesNamesBprf }, { moveNamesBprf }, { itemNamesBprf }, natureNamesBprf, { mapSecNamesBprf }, { smallFontWidthsBprf }, { mapSecData }) },
+    "BPRI" to { GameText({ speciesNamesBpri }, { moveNamesBpri }, { itemNamesBpri }, natureNamesBpri, { mapSecNamesBpri }, { smallFontWidthsBpri }, { mapSecData }) },
+    "BPRJ" to { GameText({ speciesNamesBprj }, { moveNamesBprj }, { itemNamesBprj }, natureNamesBprj, { mapSecNamesBprj }, { smallFontWidthsBprj }, { mapSecData }) },
+    "BPRS" to { GameText({ speciesNamesBprs }, { moveNamesBprs }, { itemNamesBprs }, natureNamesBprs, { mapSecNamesBprs }, { smallFontWidthsBprs }, { mapSecData }) },
 )

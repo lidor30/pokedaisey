@@ -57,6 +57,22 @@ class RomRegionMapTest {
         assertEquals(1, m.sections[0x99]!!.region)
     }
 
+    /** Orange Islands: its archipelago over FireRed's four screens (VALENCIA on the second, PUMMELO the third). */
+    @Test fun orangeIslandsHasItsArchipelago() {
+        val m = read("Pokemon Orange Islands.gba")
+        assertEquals(4, m.images.size)
+        assertEquals(MapSecInfo("Valencia Island", 1, 6, 13, 1, 1), m.sections[0x65])
+        assertEquals(MapSecInfo("Mikan Island", 1, 3, 9, 1, 1), m.sections[91])
+        assertEquals(2, m.sections[147]!!.region) // PUMMELO ISLAND
+    }
+
+    /** Unbound's French translation: English's map, French names (its revision byte is 0x9E, not 0). */
+    @Test fun unboundFrenchHasBorriusInFrench() {
+        val m = read("Pokémon Unbound v2.1.1.1 FR.gba")
+        assertEquals(1, m.images.size)
+        assertEquals(MapSecInfo("Bélenbourg", 0, 12, 4, 1, 1), m.sections[89])
+    }
+
     @Test fun gaiaIsOneMap() {
         val m = read("Pokemon - Gaia (v3.2).gba")
         assertEquals(setOf(0), m.sections.values.map { it.region }.toSet())

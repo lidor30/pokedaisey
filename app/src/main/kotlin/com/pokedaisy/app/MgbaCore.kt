@@ -48,6 +48,12 @@ object MgbaCore {
     external fun pkSetKeys(mask: Int)
     external fun pkRunFrame()
 
+    /** REWIND: keep [entries] states, one every 2 frames (0 = off, its memory freed). Emu thread. */
+    external fun pkSetRewind(entries: Int)
+
+    /** While on, each [pkRunFrame] steps back through the REWIND buffer (standing still at its start). */
+    external fun pkSetRewinding(on: Boolean)
+
     /** Copies up to [out].size interleaved L/R s16 samples of the last frame; returns count. */
     external fun pkReadAudio(out: ShortArray): Int
 

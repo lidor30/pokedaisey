@@ -3,6 +3,7 @@ package com.pokedaisy.app.companion.ui
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import com.android.resources.ScreenOrientation
+import com.pokedaisy.app.companion.data.SnapshotView
 import com.pokedaisy.app.companion.data.withMovesVs
 import com.pokedaisy.app.companion.i18n.AppLanguage
 import com.pokedaisy.app.companion.i18n.L10n
@@ -59,6 +60,31 @@ class LocalizedScreenshotTest(private val lang: AppLanguage) {
     @Test fun map() = tab("MAP")
     @Test fun states() = tab("STATES")
 
+    /** The dex page's EVOLVE (EEVEE: stones, friendship by day / at night) and MOVES (BULBASAUR: level-up, TM / HM). */
+    @Test fun dexEvolve() = dexSection(133, DexSection.EVOLVE)
+    @Test fun dexMoves() = dexSection(1, DexSection.MOVES)
+
+    private fun dexSection(entry: Int, section: DexSection) {
+        val dex = SampleCompanion.snapshot.pokedex!!
+        val g = com.pokedaisy.app.companion.data.GUIDE_TABLES_FIRERED_REV1
+        val species = com.pokedaisy.app.companion.data.PokedexSource.speciesFor(dex.tables, entry)
+        com.pokedaisy.app.companion.data.PokedexSource.entry(dex.tables, entry)
+        com.pokedaisy.app.companion.data.PokedexSource.frontSprite(dex.tables, species)
+        com.pokedaisy.app.companion.data.DexDetails.family(dex.tables, species)?.forEach {
+            com.pokedaisy.app.companion.data.DecompIconSource.get(it.from); com.pokedaisy.app.companion.data.DecompIconSource.get(it.to)
+        }
+        com.pokedaisy.app.companion.data.DexDetails.levelUp(dex.tables, g, species)
+        com.pokedaisy.app.companion.data.DexDetails.teachable(dex.tables, g, species)
+        paparazzi.snapshot(lang.code) {
+            QolTheme {
+                val ui = DexUiState(androidx.compose.foundation.lazy.rememberLazyListState())
+                ui.open = entry
+                ui.section = section
+                PokedexEntryScreen(dex, ui, entry, guide = g)
+            }
+        }
+    }
+
     @Test
     fun partyStats() = paparazzi.snapshot(lang.code) {
         QolTheme { MonDetailScreen(SampleCompanion.snapshot.party, 0, {}, {}, initialShowStats = true) }
@@ -89,6 +115,14 @@ class LocalizedScreenshotTest(private val lang: AppLanguage) {
     }
 
     /** The LANGUAGE row - "(LANGUAGE)" beside the word, so it's findable from any language - in the settings look. */
+    /** NOT SUPPORTED with both buttons side by side: the longest labels must still fit. */
+    @Test fun unsupportedBestEffort() = paparazzi.snapshot(lang.code) {
+        CompanionScreen(
+            SnapshotView(connected = false, error = "unrecognized FireRed-based ROM hack", unsupported = true, canTryBestEffort = true),
+            SampleCompanion.Slots, SampleCompanion.Settings(), askForSupport = {}, tryBestEffort = {},
+        )
+    }
+
     @Test fun languageRow() = languageShot(picker = false)
 
     /** Its picker: each language in its own name. */

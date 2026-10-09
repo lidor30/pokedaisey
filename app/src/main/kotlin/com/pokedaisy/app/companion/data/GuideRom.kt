@@ -53,6 +53,15 @@ data class GuideTables(
     /** Flags / vars past the main arrays that live elsewhere in SaveBlock1 (Quetzal's 0x1000+ flags, 0x5000+ vars). */
     val flagBanks: List<SaveBank> = emptyList(),
     val varBanks: List<SaveBank> = emptyList(),
+    /** gMapGroups (pointers to each group's MapHeader pointers), for naming the wild maps' sections in
+     * the DEX's AREA page ([MapSections]); 0 = found by shape. Each group pointer is XORed with
+     * [mapGroupsXor] (Unbound's hooked lookup). Found by the scan scripts/gen_guide_areas_rom.py uses. */
+    val mapGroups: Long = 0,
+    val mapGroupsXor: Long = 0,
+    /** MapHeader.regionMapSectionId is a u16 (SoulGold), and groups [altMapSecGroups] name theirs as
+     * 0x100 + id (Quetzal's Johto) - as [NativeConfig.mapSecWide] / [NativeConfig.altMapSecGroups]. */
+    val mapSecWide: Boolean = false,
+    val altMapSecGroups: IntRange? = null,
 )
 
 /** A WildPokemonHeader's size and the pointer slot (after the 4-byte map id) of each method. */
@@ -70,6 +79,7 @@ val GUIDE_TABLES_FIRERED_REV1 = GuideTables(
     trainers = 0x0823EB38L,
     learnsets = 0x0825D824L,
     wildHeaders = 0x083C9D28L,
+    mapGroups = 0x08352718L,
 )
 
 // LeafGreen, from pret/pokefirered's `leafgreen` / `leafgreen_rev1` maps (both
@@ -80,6 +90,7 @@ val GUIDE_TABLES_LEAFGREEN_REV0 = GuideTables(
     learnsets = 0x0825D794L,
     wildHeaders = 0x083C9AF4L,
     guide = GuideId.LEAFGREEN,
+    mapGroups = 0x08352688L,
 )
 
 val GUIDE_TABLES_LEAFGREEN_REV1 = GuideTables(
@@ -87,6 +98,7 @@ val GUIDE_TABLES_LEAFGREEN_REV1 = GuideTables(
     learnsets = 0x0825D804L,
     wildHeaders = 0x083C9B64L,
     guide = GuideId.LEAFGREEN,
+    mapGroups = 0x083526F8L,
 )
 
 /**
@@ -107,26 +119,27 @@ val GUIDE_TABLES_EMERALD = GuideTables(
     probeTrainer = 265,
     probeName = "ROXANNE",
     guide = GuideId.EMERALD,
+    mapGroups = 0x08486578L,
 )
 
 // The European Emerald releases: English's tables, moved (found through the
 // literal pools of English's code); ROXANNE is each game's own name for her.
 val GUIDE_TABLES_EMERALD_ES = GUIDE_TABLES_EMERALD.copy(
-    trainers = 0x08316294L, learnsets = 0x0832F638L, wildHeaders = 0x085563A4L, probeName = "PETRA",
+    trainers = 0x08316294L, learnsets = 0x0832F638L, wildHeaders = 0x085563A4L, probeName = "PETRA", mapGroups = 0x08489BD4L,
 )
 val GUIDE_TABLES_EMERALD_DE = GUIDE_TABLES_EMERALD.copy(
-    trainers = 0x083249A0L, learnsets = 0x0833DD3CL, wildHeaders = 0x08564A78L, probeName = "FELIZIA",
+    trainers = 0x083249A0L, learnsets = 0x0833DD3CL, wildHeaders = 0x08564A78L, probeName = "FELIZIA", mapGroups = 0x084982A8L,
 )
 val GUIDE_TABLES_EMERALD_FR = GUIDE_TABLES_EMERALD.copy(
-    trainers = 0x08317B60L, learnsets = 0x08330EECL, wildHeaders = 0x08557C34L, probeName = "ROXANNE",
+    trainers = 0x08317B60L, learnsets = 0x08330EECL, wildHeaders = 0x08557C34L, probeName = "ROXANNE", mapGroups = 0x0848B464L,
 )
 val GUIDE_TABLES_EMERALD_IT = GUIDE_TABLES_EMERALD.copy(
-    trainers = 0x0830F9F4L, learnsets = 0x08328D7CL, wildHeaders = 0x0854FA8CL, probeName = "PETRA",
+    trainers = 0x0830F9F4L, learnsets = 0x08328D7CL, wildHeaders = 0x0854FA8CL, probeName = "PETRA", mapGroups = 0x084832BCL,
 )
 
 // Japanese Emerald: 0x20-byte trainers - trainerName[6] at +4, partySize at +0x18, the party at +0x1C.
 val GUIDE_TABLES_EMERALD_JA = GUIDE_TABLES_EMERALD.copy(
-    trainers = 0x082E383CL, learnsets = 0x082F9D04L, wildHeaders = 0x0852D9F4L, probeName = "ツツジ",
+    trainers = 0x082E383CL, learnsets = 0x082F9D04L, wildHeaders = 0x0852D9F4L, probeName = "ツツジ", mapGroups = 0x0845E998L,
     trainerStride = 0x20, trainerNameLen = 6, trainerSizeOff = 0x18, trainerPartyOff = 0x1C,
 )
 
@@ -147,6 +160,7 @@ val GUIDE_TABLES_RUBY = GuideTables(
     probeTrainer = 265,
     probeName = "ROXANNE",
     guide = GuideId.RUBY,
+    mapGroups = 0x083085A0L,
 )
 
 val GUIDE_TABLES_SAPPHIRE = GUIDE_TABLES_RUBY.copy(
@@ -154,6 +168,7 @@ val GUIDE_TABLES_SAPPHIRE = GUIDE_TABLES_RUBY.copy(
     learnsets = 0x08207B70L,
     wildHeaders = 0x0839D2B4L,
     guide = GuideId.SAPPHIRE,
+    mapGroups = 0x08308530L,
 )
 
 private const val TRAINER_PARTY_CUSTOM_MOVESET = 1
@@ -247,6 +262,11 @@ object GuideRomSource {
     @Volatile private var headers: Map<Int, Long>? = null
     @Volatile private var cachedFor: GuideTables? = null
 
+    /** A new ROM ([PokedexSource.romChanged]): two can share tables, so start over. */
+    fun romChanged() {
+        synchronized(this) { cachedFor = null }
+    }
+
     private fun sync(t: GuideTables) {
         if (cachedFor == t) return
         synchronized(this) {
@@ -285,6 +305,34 @@ object GuideRomSource {
             )
         }.onFailure { android.util.Log.w("pokedaisy", "encounters $group.$num failed", it) }
             .getOrNull()?.also { encounters[key] = it }
+    }
+
+    /** Every map with a wild header, as group << 8 | num (the DEX's AREA index walks them). */
+    fun wildMapKeys(t: GuideTables): Set<Int> {
+        sync(t)
+        return runCatching { headerIndex(t).keys }.getOrDefault(emptySet())
+    }
+
+    /** Map [group].[num]'s wild Pokémon in each of its time-of-day sets ([GuideTables.wildSets]),
+     * each set alone (no fallback to the others, unlike [encounters]); not cached. */
+    fun encounterSets(t: GuideTables, group: Int, num: Int): List<MapEncounters> {
+        sync(t)
+        val hdr = headerIndex(t)[group shl 8 or num] ?: return emptyList()
+        val h = rd(hdr, wildHeaderStride(t))
+        val sets = if (t.wildLayout != null) 1 else t.wildSets
+        return (0 until sets).map { set ->
+            fun ptr(method: Int) = t.wildLayout?.let { l -> u32le(h, 4 + 4 * listOf(l.land, l.water, l.rockSmash, l.fishing)[method]) }
+                ?: u32le(h, 4 + set * wildSetStride(t) + 4 * method)
+            val fishing = slots(ptr(3), 10)
+            MapEncounters(
+                grass = merge(slots(ptr(0), 12), LAND_ODDS),
+                water = merge(slots(ptr(1), 5), WATER_ODDS),
+                rockSmash = merge(slots(ptr(2), 5), WATER_ODDS),
+                oldRod = merge(fishing.take(2), OLD_ROD_ODDS),
+                goodRod = merge(fishing.drop(2).take(3), GOOD_ROD_ODDS),
+                superRod = merge(fishing.drop(5), SUPER_ROD_ODDS),
+            )
+        }
     }
 
     /** Trainer [id]'s party as the game builds it (CreateNPCTrainerParty). */
@@ -448,6 +496,7 @@ val GUIDE_TABLES_HEART_AND_SOUL = GuideTables(
     trainerMon = TrainerMonLayout(stride = 0x24, movesOff = 0x0C, speciesOff = 0x14, itemOff = 0x16, levelOff = 0x1A),
     wildSets = 4,
     wildSet = 1,
+    mapGroups = 0x092DF5A4L,
 )
 
 /**
@@ -465,7 +514,12 @@ val GUIDE_TABLES_UNBOUND = GuideTables(
     probeTrainer = 6,
     probeName = "Mirskle",
     guide = GuideId.UNBOUND,
+    mapGroups = 0x08B70498L,
+    mapGroupsXor = 0x00B749DEL,
 )
+
+// Unbound v2.1.1.1 FR: English's tables, its trainers renamed in place (MIRSKLE is Sylvain).
+val GUIDE_TABLES_UNBOUND_FR = GUIDE_TABLES_UNBOUND.copy(probeName = "Sylvain")
 
 /**
  * Radical Red v4.1 (CFRU): gTrainers rewritten in place at FireRed rev 0's
@@ -481,6 +535,7 @@ val GUIDE_TABLES_RADICAL_RED = GuideTables(
     probeTrainer = 414,
     probeName = "Brock",
     guide = GuideId.RADICAL_RED,
+    mapGroups = 0x083526A8L,
 )
 
 /** Odyssey v4.1.1: FireRed rev 0's gTrainers, learnsets (vanilla format) and save layout; its own gWildMonHeaders. */
@@ -491,6 +546,7 @@ val GUIDE_TABLES_ODYSSEY = GuideTables(
     probeTrainer = 33,
     probeName = "Karin",
     guide = GuideId.ODYSSEY,
+    mapGroups = 0x083526A8L,
 )
 
 /** Gaia v3.2: rev 0's gTrainers (its leaders at FireRed's 414..421), learnsets and wild headers moved. */
@@ -501,6 +557,7 @@ val GUIDE_TABLES_GAIA = GuideTables(
     probeTrainer = 414,
     probeName = "Fernando",
     guide = GuideId.GAIA,
+    mapGroups = 0x083528DCL,
 )
 
 /**
@@ -519,6 +576,7 @@ val GUIDE_TABLES_AMETHYST = GuideTables(
     trainerMon = TrainerMonLayout(stride = 18, movesOff = 8, speciesOff = 4, itemOff = 6, levelOff = 2),
     learnsetCfru = true,
     altTrainers = listOf(0x089CECCCL, 0x089B8A34L, 0x089C63B8L), // HARD, DIVERGENT, DIVERGENT + HARD
+    mapGroups = 0x083526A8L,
 )
 
 /** Amethyst v1.4.1: the same loader and flags (0x93C / 0x945), the tables moved; the gym leaders'
@@ -527,6 +585,7 @@ val GUIDE_TABLES_AMETHYST_V1_4_1 = GUIDE_TABLES_AMETHYST.copy(
     trainers = 0x08A25A14L,
     learnsets = 0x09ADB8D0L,
     guide = GuideId.AMETHYST_V141,
+    mapGroups = 0x083526A8L,
     altTrainers = listOf(0x08A1861CL, 0x08A02384L, 0x08A0FD08L),
 )
 
@@ -571,6 +630,7 @@ val GUIDE_TABLES_IMPERIUM = GuideTables(
     trainerPartyOff = 4,
     trainerMon = TrainerMonLayout(stride = 0x24, movesOff = 0x0C, speciesOff = 0x14, itemOff = 0x16, levelOff = 0x1A),
     wildLayout = WildLayout(stride = 24),
+    mapGroups = 0x08FC2F74L,
 )
 
 /**
@@ -603,6 +663,18 @@ val GUIDE_TABLES_QUETZAL = GuideTables(
     wildLayout = WildLayout(stride = 28, rockSmash = 3, fishing = 4),
     flagBanks = listOf(SaveBank(firstId = 0x1000, sb1Off = 0x2F2C, count = 0x2000)),
     varBanks = listOf(SaveBank(firstId = 0x5000, sb1Off = 0x332C, count = 0x100)),
+    mapGroups = 0x089286BCL,
+    altMapSecGroups = 34..35,
+)
+
+// Quetzal Spanish Alpha 9 v0: English's tables at its own addresses (English's literal pools,
+// read at the same place in its code); its trainers carry Spanish names (265 is PETRA).
+val GUIDE_TABLES_QUETZAL_ES = GUIDE_TABLES_QUETZAL.copy(
+    trainers = 0x085086C0L,
+    wildHeaders = 0x09186278L,
+    probeName = "PETRA",
+    altTrainers = listOf(0x0998AE7CL, 0x099963D0L),
+    mapGroups = 0x08934070L,
 )
 
 // The four below from their release ROMs (expansion 1.9.4 / 1.9.2 / 1.12.3 / 1.15.2 per their RHHEXP
@@ -619,6 +691,7 @@ val GUIDE_TABLES_LAZARUS = GuideTables(
     trainerStride = 0x24, trainerNameOff = 0x13, trainerNameLen = 11, trainerSizeOff = 0x20, trainerPartyOff = 4,
     trainerMon = TrainerMonLayout(stride = 0x24, movesOff = 0x0C, speciesOff = 0x14, itemOff = 0x16, levelOff = 0x1A),
     wildLayout = WildLayout(stride = 24, fishing = 4),
+    mapGroups = 0x08FAF098L,
 )
 
 /** Emerald Seaglass v3.0: gTrainers 0x0851C8CC (34 refs, Emerald's ids: 265 = ROXANNE), 0x20-byte
@@ -631,6 +704,7 @@ val GUIDE_TABLES_SEAGLASS = GuideTables(
     trainerStride = 0x24, trainerNameOff = 0x13, trainerNameLen = 11, trainerSizeOff = 0x20, trainerPartyOff = 4,
     trainerMon = TrainerMonLayout(stride = 0x20, movesOff = 0x0C, speciesOff = 0x14, itemOff = 0x16, levelOff = 0x1A),
     wildLayout = WildLayout(stride = 24, fishing = 4),
+    mapGroups = 0x08B45148L,
 )
 
 /** Too Many Types 2 v1.5.2: gTrainers[EASY][NORMAL][HARD][943] at 0x0853C758 (EASY / HARD empty), so its
@@ -643,6 +717,7 @@ val GUIDE_TABLES_TMT2 = GuideTables(
     trainerStride = 0x2C, trainerNameOff = 0x17, trainerNameLen = 11, trainerSizeOff = 0x24, trainerPartyOff = 8,
     trainerMon = TrainerMonLayout(stride = 0x24, movesOff = 0x0C, speciesOff = 0x14, itemOff = 0x16, levelOff = 0x1A),
     wildSets = 4, wildSet = 0,
+    mapGroups = 0x09047730L,
 )
 
 /** SoulGold v1.1.4: gTrainers[EASY][NORMAL][HARD][1164] at 0x0849606C - NORMAL 0x084A4CDC (0x34-byte records
@@ -657,11 +732,12 @@ val GUIDE_TABLES_SOULGOLD = GuideTables(
     trainerMon = TrainerMonLayout(stride = 0x28, movesOff = 0x0C, speciesOff = 0x14, itemOff = 0x16, levelOff = 0x1C),
     wildSets = 4, wildSet = 0,
     altTrainers = listOf(0x084B394CL), // HARD
+    mapGroups = 0x09587364L, mapSecWide = true,
 )
 
 // v1.2 / v1.2b: the same layouts, ids, flags and scripts; only the tables moved.
-val GUIDE_TABLES_SOULGOLD_V1_2 = GUIDE_TABLES_SOULGOLD.copy(trainers = 0x084A5800L, wildHeaders = 0x09420BA8L, altTrainers = listOf(0x084B4470L))
-val GUIDE_TABLES_SOULGOLD_V1_2B = GUIDE_TABLES_SOULGOLD.copy(trainers = 0x084A5768L, wildHeaders = 0x09420B04L, altTrainers = listOf(0x084B43D8L))
+val GUIDE_TABLES_SOULGOLD_V1_2 = GUIDE_TABLES_SOULGOLD.copy(trainers = 0x084A5800L, wildHeaders = 0x09420BA8L, altTrainers = listOf(0x084B4470L), mapGroups = 0x09592634L)
+val GUIDE_TABLES_SOULGOLD_V1_2B = GUIDE_TABLES_SOULGOLD.copy(trainers = 0x084A5768L, wildHeaders = 0x09420B04L, altTrainers = listOf(0x084B43D8L), mapGroups = 0x09592590L)
 
 val GUIDE_TABLES_CELIA = GuideTables(
     trainers = 0x0871FCA0L,
@@ -670,4 +746,21 @@ val GUIDE_TABLES_CELIA = GuideTables(
     sb1FlagsOff = 0xEF0,
     sb1VarsOff = 0x1010,
     guide = GuideId.CELIA,
+    mapGroups = 0x089DCD7CL,
+)
+
+/**
+ * Pokémon Orange Islands: retail FireRed rev 0's gTrainers (0x0823EAC8, rewritten - its gym
+ * leaders are trainers 1-5, CISSY first) and gLevelUpLearnsets (0x0825D7B4, 0x70 before rev
+ * 1's), its own gWildMonHeaders (repointed to 0x08A1B1B0, FireRed's layout) and FireRed's
+ * SaveBlock1 flags / vars. gMapGroups is rev 0's (0x083526A8).
+ */
+val GUIDE_TABLES_ORANGE_ISLANDS = GuideTables(
+    trainers = 0x0823EAC8L,
+    learnsets = 0x0825D7B4L,
+    wildHeaders = 0x08A1B1B0L,
+    probeTrainer = 1,
+    probeName = "CISSY",
+    guide = GuideId.ORANGE_ISLANDS,
+    mapGroups = 0x083526A8L,
 )

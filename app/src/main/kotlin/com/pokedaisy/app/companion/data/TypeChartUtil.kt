@@ -126,23 +126,14 @@ fun gameCase(name: String): String = when {
     else -> name
 }
 
-fun itemDescription(id: Int): String = localText?.let { it.itemDescriptions[id] ?: "" } ?: when (activeGame) {
-    // Each game's own text, extracted from its ROM.
-    GameKind.HEART_AND_SOUL -> itemDescriptionsHns[id] ?: ""
-    GameKind.LAZARUS -> itemDescriptionsLazarus[id] ?: ""
-    GameKind.SOULGOLD -> (if (soulGoldV12 && id == SOULGOLD_V12_TM75) "User relaxes to sharply raise its Speed." else itemDescriptionsSoulGold[id]) ?: ""
-    GameKind.EMERALD_ROGUE -> itemDescriptionsRogue[id] ?: ""
-    GameKind.RADICAL_RED -> itemDescriptionsRadicalRed[id] ?: ""
-    // Renumbered items with no description table: vanilla text would be wrong.
-    GameKind.EMERALD_SEAGLASS -> itemDescriptionsSeaglass[id] ?: ""
-    GameKind.GLAZED -> itemDescriptionsGlazed[id] ?: ""
-    GameKind.IMPERIUM -> itemDescriptionsImperium[id] ?: ""
-    GameKind.QUETZAL -> itemDescriptionsQuetzal[id] ?: ""
-    GameKind.ROWE -> itemDescriptionsRowe[id] ?: ""
-    GameKind.CELIA, GameKind.TMT2 -> ""
+/**
+ * Item [id]'s description as the running game's bag shows it - read from the player's own
+ * ROM (RomItemText; the games' text isn't bundled), "" without one.
+ */
+fun itemDescription(id: Int): String = when (activeGame) {
     // Gen 1 items have no descriptions of their own: ours, and what each TM / HM teaches.
     GameKind.YELLOW -> itemDescriptionsYellow[id] ?: tmDescriptionsYellow[id] ?: ""
-    else -> itemDescriptions[id] ?: ""
+    else -> RomItemText.description(id)
 }
 
 // Display order/labels for Item.pocket (POCKET_* in Telemetry.kt), matching

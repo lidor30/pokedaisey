@@ -8,7 +8,6 @@ import androidx.activity.result.contract.ActivityResultContract
 /** onCreate() runs normally; its setContent {} lands in [androidx.activity.compose.Captured]. */
 open class ComponentActivity : Context() {
     val intent: Intent = Intent()
-    val packageName = "com.pokedaisy.app"
     val contentResolver = android.content.ContentResolver()
     val packageManager = android.content.pm.PackageManager()
     open fun onCreate(savedInstanceState: android.os.Bundle?) {}

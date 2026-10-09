@@ -32,7 +32,8 @@ object RomUris {
      */
     fun sanitizeFileName(name: String): String {
         val cleaned = name.replace(Regex("[/\\x00]"), "_").trim()
-        return cleaned.ifBlank { "imported-${System.currentTimeMillis()}.gba" }
+        // "." / ".." would name the folder itself or its parent.
+        return cleaned.takeIf { it.isNotBlank() && it != "." && it != ".." } ?: "imported-${System.currentTimeMillis()}.gba"
     }
 
     /**

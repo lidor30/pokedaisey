@@ -10,26 +10,8 @@ between iiSU versions.
 
 ## 1. Add PokeDaisy to iiSU's emulator list (once)
 
-### The quick way: import ready-made files
-
-1. Download both files to your device (on each file's page, use **Download raw file**):
-   - [emuladores.json](emuladores.json): iiSU's emulator list (version 0.0.11)
-     with PokeDaisy added to the GBA console. Nothing else is changed.
-   - [supported_emulators.json](supported_emulators.json): iiSU's list of known
-     emulator apps (version 0.0.5) with PokeDaisy added.
-2. In iiSU, open Settings (Select) > iiSU Settings > Updates, then:
-   - **Import emuladores.json** and pick the downloaded `emuladores.json`.
-   - **Import supported_emulators.json** and pick the downloaded
-     `supported_emulators.json`.
-
-> [!WARNING]
-> Importing replaces iiSU's whole list, for every console, not only GBA. If you
-> changed iiSU's emulator list yourself (your own commands, or a custom
-> `emuladores.json` you imported before), those changes are lost. Also, if your
-> iiSU has a newer list than 0.0.11, this file takes it back to 0.0.11. In either
-> case, add PokeDaisy to your own file instead (below).
-
-### Or add it to your own list
+iiSU's own lists belong to iiSU, so this repo doesn't ship copies of them: you add
+PokeDaisy's entry to the list your iiSU already has.
 
 1. Find iiSU's current list: `emuladores.json` in the `iiSULauncher/Emuladores/`
    folder of iiSU's storage location (for example
@@ -114,8 +96,7 @@ back to iiSU. Other games in the GBA folder still open in the console's emulator
   It hands PokeDaisy the file's path instead of a link, which needs PokeDaisy's
   All files access (it asks for it the first time).
 - **PokeDaisy is gone from the list**: iiSU replaces its emulator list when it
-  downloads an update. Add PokeDaisy to the new list ("Or add it to your own
-  list" above): the ready-made files would take it back to the older version.
+  downloads an update. Add PokeDaisy to the new list again (step 1).
   The games you set to PokeDaisy may need step 2 again too.
 - **The bottom screen says the game isn't supported**: the game plays, but the
   companion only works with the games in the main README's

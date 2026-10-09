@@ -31,6 +31,11 @@ class MoneyTest {
         assertEquals(3000L, money("imperium", NATIVE_IMPERIUM))
         // Quetzal's SaveBlock1 is its own: money at +0x918, the key at SB2+0x2C.
         assertEquals(7450L, money("quetzal", NATIVE_QUETZAL))
+        assertEquals(48937L, money("quetzal_johto", NATIVE_QUETZAL))
+        // Quetzal's money goes past 999,999 (its START menu shows 1048458).
+        assertEquals(1_048_458L, money("quetzal_es", NATIVE_QUETZAL_ES))
+        assertEquals(1748L, money("unbound_fr", NATIVE_UNBOUND_FR))
+        assertEquals(2000L, money("orange_islands", NATIVE_ORANGE_ISLANDS))
     }
 
     @Test

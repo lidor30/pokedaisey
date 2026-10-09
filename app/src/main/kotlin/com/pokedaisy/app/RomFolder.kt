@@ -18,7 +18,25 @@ object RomFolder {
     /** The folder itself plus a couple of levels (e.g. `roms/gba/hacks/`). */
     private const val MAX_DEPTH = 3
 
-    private class Entry(val size: Long, val modified: Long, val supported: Boolean)
+    /** [partial]: read through a PARTIAL best-effort match ([CompanionSupport.Verdict.PARTIAL]) - listed, tagged. */
+    /** [tryable]: unsupported but a Gen 3 Pokémon base game - listed, tagged NOT SUPPORTED, so TRY BEST EFFORT is reachable. */
+    private class Entry(
+        val size: Long, val modified: Long, val supported: Boolean,
+        val partial: Boolean = false, val matched: Boolean = false, val tryable: Boolean = false,
+        /** Written before TRYABLE existed ("0"): checked again once. */
+        val legacy: Boolean = false,
+    ) {
+        val listed get() = supported || partial || tryable
+    }
+
+    private fun entryOf(size: Long, modified: Long, f: File): Entry =
+        when (runCatching { CompanionSupport.verdict(f) }.getOrDefault(CompanionSupport.Verdict.UNSUPPORTED)) {
+            CompanionSupport.Verdict.SUPPORTED -> Entry(size, modified, true)
+            CompanionSupport.Verdict.MATCHED -> Entry(size, modified, true, matched = true)
+            CompanionSupport.Verdict.PARTIAL -> Entry(size, modified, false, partial = true)
+            CompanionSupport.Verdict.TRYABLE -> Entry(size, modified, false, tryable = true)
+            CompanionSupport.Verdict.UNSUPPORTED -> Entry(size, modified, false)
+        }
 
     /** The library: imported ROMs (`files/roms/`), then the linked folder's supported
      * ones from the last scan - minus hidden ones ([Prefs.hiddenRoms]) and any whose
@@ -52,7 +70,7 @@ object RomFolder {
     fun found(context: Context, prefs: Prefs): List<File> {
         val root = prefs.romsFolder ?: return emptyList()
         val hidden = prefs.hiddenRoms
-        return load(context).filter { (path, e) -> e.supported && path.startsWith("$root/") && path !in hidden }
+        return load(context).filter { (path, e) -> e.listed && path.startsWith("$root/") && path !in hidden }
             .map { File(it.key) }.filter { it.isFile }
     }
 
@@ -88,17 +106,65 @@ object RomFolder {
         candidates.forEachIndexed { i, f ->
             val size = f.length()
             val modified = f.lastModified()
-            val cached = old[f.absolutePath]?.takeIf { it.size == size && it.modified == modified }
+            val cached = old[f.absolutePath]?.takeIf { it.size == size && it.modified == modified && !it.legacy }
             fresh[f.absolutePath] = cached
-                ?: Entry(size, modified, runCatching { CompanionSupport.isSupported(f) }.getOrDefault(false))
+                ?: entryOf(size, modified, f)
             onProgress(i + 1, candidates.size)
         }
+        // Imported ROMs' verdicts ([checkImported]) live in the same cache.
+        for ((path, e) in old) if (!path.startsWith("$root/")) fresh.putIfAbsent(path, e)
         save(context, fresh)
         return ScanResult(
-            added = fresh.filter { (path, e) -> e.supported && old[path]?.supported != true }.map { File(it.key) },
+            added = fresh.filter { (path, e) -> e.listed && old[path]?.listed != true }.map { File(it.key) },
             files = fresh.size,
             supported = fresh.values.count { it.supported },
         )
+    }
+
+    /**
+     * Checks imported ROMs (`files/roms/`, the ones added with "add anyway?" included) into the
+     * verdict cache, for the library's NOT SUPPORTED tag ([unsupported]). Blocking; only new or
+     * changed files are read.
+     */
+    @Synchronized
+    fun checkImported(context: Context) {
+        val old = load(context)
+        val fresh = LinkedHashMap(old)
+        var changed = false
+        for (f in importedRoms(context)) {
+            val size = f.length()
+            val modified = f.lastModified()
+            if (old[f.absolutePath]?.let { it.size == size && it.modified == modified && !it.legacy } == true) continue
+            fresh[f.absolutePath] = entryOf(size, modified, f)
+            changed = true
+        }
+        if (changed) save(context, fresh)
+    }
+
+    /** Paths the cache knows the second screen can't read - cheap, never reads a ROM. */
+    fun unsupported(context: Context): Set<String> =
+        load(context).filterValues { !it.supported && !it.partial }.keys
+
+    /** Paths read through a PARTIAL best-effort match - the PARTIALLY SUPPORTED tag. */
+    fun partial(context: Context): Set<String> =
+        load(context).filterValues { it.partial }.keys
+
+    /**
+     * A best-effort match was kept or forgotten ([com.pokedaisy.app.companion.data.BestEffortStore]):
+     * drop the cached verdicts that could change (all but SUPPORTED), so the next scan reads them again.
+     */
+    @Synchronized
+    fun forgetUnsupported(context: Context) {
+        val old = load(context)
+        val kept = old.filterValues { it.supported && !it.matched }
+        if (kept.size != old.size) save(context, kept)
+    }
+
+    /** Where best effort keeps its matches, and the verdicts to drop when one changes. Each activity's onCreate. */
+    fun useBestEffortStore(context: Context) {
+        val app = context.applicationContext
+        com.pokedaisy.app.companion.data.BestEffortStore.dir = app.filesDir
+        com.pokedaisy.app.companion.data.BestEffortStore.onChanged = { forgetUnsupported(app) }
     }
 
     /** Forgets every cached verdict (a newly linked folder starts from scratch). */
@@ -117,7 +183,7 @@ object RomFolder {
                 if (p.size != 4) return@mapNotNull null
                 val size = p[1].toLongOrNull() ?: return@mapNotNull null
                 val modified = p[2].toLongOrNull() ?: return@mapNotNull null
-                p[0] to Entry(size, modified, p[3] == "1")
+                p[0] to Entry(size, modified, p[3] == "1" || p[3] == "M", partial = p[3] == "P", matched = p[3] == "M", tryable = p[3] == "T", legacy = p[3] == "0")
             }.toMap()
         }.getOrDefault(emptyMap())
     }
@@ -127,7 +193,7 @@ object RomFolder {
         val tmp = File(f.parentFile, "${f.name}.tmp")
         runCatching {
             tmp.writeText(entries.entries.joinToString("") { (path, e) ->
-                "$path\t${e.size}\t${e.modified}\t${if (e.supported) 1 else 0}\n"
+                "$path\t${e.size}\t${e.modified}\t${if (e.matched) "M" else if (e.supported) "1" else if (e.partial) "P" else if (e.tryable) "T" else "U"}\n"
             })
             tmp.renameTo(f)
         }

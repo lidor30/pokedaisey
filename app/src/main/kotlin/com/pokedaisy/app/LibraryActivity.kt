@@ -48,6 +48,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.FileOpen
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
@@ -76,6 +78,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import com.pokedaisy.app.companion.i18n.tk
 import com.pokedaisy.app.companion.i18n.tr
 import com.pokedaisy.app.companion.ui.LOGO_PALETTE
 import com.pokedaisy.app.companion.ui.LOGO_ROWS
@@ -84,6 +87,7 @@ import com.pokedaisy.app.companion.ui.AppBackdrop
 import com.pokedaisy.app.companion.ui.BackdropText
 import com.pokedaisy.app.companion.ui.GbaText
 import com.pokedaisy.app.companion.ui.GbaTextMetrics
+import com.pokedaisy.app.companion.ui.OptionBadge
 import com.pokedaisy.app.companion.ui.OptionButton
 import com.pokedaisy.app.companion.ui.OptionColors
 import com.pokedaisy.app.companion.ui.OptionConfirm
@@ -149,6 +153,14 @@ class LibraryActivity : ComponentActivity() {
         pickedFolder(uri)?.let(::useSavesFolder)
     }
 
+    /** SAVE FOLDER's game, while its folder picker is up. */
+    private var saveFolderTarget: File? = null
+    private val pickGameSaveFolder = registerForActivityResult(StorageAccess.PickFolder()) { uri ->
+        val rom = saveFolderTarget ?: return@registerForActivityResult
+        saveFolderTarget = null
+        pickedFolder(uri)?.let { setGameSaveFolder(rom, it) }
+    }
+
     /** A copied ROM the second screen can't read, waiting on the "add anyway?"
      * confirm - still in [importDir], not the library. Internal for the
      * ui-preview harness. */
@@ -169,10 +181,22 @@ class LibraryActivity : ComponentActivity() {
     }
 
     private var revision by mutableStateOf(0)
-    private fun bump() { revision++ }
+    private fun bump() {
+        unsupportedRoms = RomFolder.unsupported(this)
+        partialRoms = RomFolder.partial(this)
+        revision++
+    }
+
+    /** ROMs the second screen can't read, per [RomFolder]'s cache: their NOT SUPPORTED tag (internal for ui-preview). */
+    internal var unsupportedRoms by mutableStateOf(emptySet<String>())
+
+    /** ROMs read through a PARTIAL best-effort match: their PARTIALLY SUPPORTED tag (internal for ui-preview). */
+    internal var partialRoms by mutableStateOf(emptySet<String>())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        RomFolder.useBestEffortStore(this)
+        BestEffortShare.flush(this)   // a shared best-effort match that couldn't go out last time
         prefs = Prefs(this)
         // No ROM here: AUTO = the device's language.
         com.pokedaisy.app.companion.i18n.L10n.apply(prefs.appLanguage, null)
@@ -215,12 +239,16 @@ class LibraryActivity : ComponentActivity() {
         super.onResume()
         com.pokedaisy.app.companion.ui.OptionColors.inGame = false
         com.pokedaisy.app.companion.i18n.L10n.apply(prefs.appLanguage, null)
+        unsupportedRoms = RomFolder.unsupported(this)
+        partialRoms = RomFolder.partial(this)
         if (prefs.setupRequested) {
             prefs.setupRequested = false
             startSetup()
             setup?.fromSettings = true
         }
         setup?.let { s ->
+            // Back from the rebind page: show what's bound now.
+            if (s.step == SetupState.Step.BUTTONS) readButtons(s)
             // Back from Android's All files access page: carry on with the folder pick it was for.
             s.hasAccess = StorageAccess.hasAllFilesAccess(this)
             val waiting = s.awaitingAccess
@@ -339,7 +367,15 @@ class LibraryActivity : ComponentActivity() {
                 )
             }
 
-            gameInfo?.let { info -> GameInfoDialog(info, m, small, onDismiss = { gameInfo = null }) }
+            gameInfo?.let { info -> GameInfoDialog(
+                    info, m, small, onDismiss = { gameInfo = null },
+                    onOpenUrl = { url -> runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } },
+                    onForgetBestEffort = { sha1 ->
+                        com.pokedaisy.app.companion.data.BestEffortStore.forget(sha1)
+                        gameInfo = null
+                        rescanRomsFolder()
+                    },
+                ) }
 
             UpdateDialog(updates, m, small)
 
@@ -353,7 +389,7 @@ class LibraryActivity : ComponentActivity() {
 
             saveLoad?.let { p ->
                 val name = romLabel(p.rom)
-                val current = remember(p) { SavesLocation.resolve(SavesLocation.dir(this@LibraryActivity, prefs), p.rom) }
+                val current = remember(p) { SavesLocation.saveFor(this@LibraryActivity, prefs, p.rom) }
                 val size = p.bytes.size.toLong()
                 val what = "${p.fileName} (${GameInfo.sizeLabel(size)}${GameSaves.kind(size)?.let { " · $it" } ?: ""})"
                 OptionConfirm(
@@ -576,6 +612,19 @@ class LibraryActivity : ComponentActivity() {
                 }
                 MenuItem(tr("LOAD SAVE"), Icons.Filled.FileOpen) { saveTarget = rom; pickSaveFile.launch(arrayOf("*/*")) }
                 MenuItem(tr("RESTORE BACKUP"), Icons.Filled.History) { showBackups(rom) }
+                // This game's saves in a folder of its own (another emulator's), or back to the usual search.
+                MenuItem(tr("SAVE FOLDER"), Icons.Filled.Folder) {
+                    if (!StorageAccess.hasAllFilesAccess(this@LibraryActivity)) {
+                        StorageAccess.requestAllFilesAccess(this@LibraryActivity)
+                        Toast.makeText(this@LibraryActivity, tr("Grant \"All files access\", then tap the button again"), Toast.LENGTH_LONG).show()
+                    } else {
+                        saveFolderTarget = rom
+                        pickGameSaveFolder.launch(null)
+                    }
+                }
+                if (prefs.romSaveDir(rom) != null) {
+                    MenuItem(tr("DEFAULT SAVE FOLDER"), Icons.Filled.FolderOff) { setGameSaveFolder(rom, null) }
+                }
                 // The game's cheats, on Settings' CHEATS page.
                 MenuItem(tr("CHEATS"), Icons.Filled.Code) {
                     startActivity(Intent(this@LibraryActivity, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_CHEATS_ROM, rom.absolutePath))
@@ -630,7 +679,7 @@ class LibraryActivity : ComponentActivity() {
         val display = romLabel(rom)
         // Existing progress indicator: does a .sav/.srm already exist for this ROM?
         val hasSave = remember(rom, revision) {
-            SavesLocation.resolve(SavesLocation.dir(this@LibraryActivity, prefs), rom).exists()
+            SavesLocation.saveFor(this@LibraryActivity, prefs, rom).exists()
         }
         RomCard(isLast, m, Modifier.fillMaxWidth(), onClick = { play(rom) }) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -650,6 +699,13 @@ class LibraryActivity : ComponentActivity() {
                             Spacer(Modifier.width(m.u * 4))
                             GbaText(tr("PLAYING"), OptionColors.value, OptionColors.valueShadow, small)
                         }
+                        if (rom.absolutePath in unsupportedRoms) {
+                            Spacer(Modifier.width(m.u * 4))
+                            OptionBadge(tk("NOT SUPPORTED"), m)
+                        } else if (rom.absolutePath in partialRoms) {
+                            Spacer(Modifier.width(m.u * 4))
+                            OptionBadge(tk("PARTIALLY SUPPORTED"), m, fill = OptionColors.muted)
+                        }
                     }
                     GbaText(
                         prefs.romSourcePath(rom) ?: rom.absolutePath,
@@ -666,7 +722,7 @@ class LibraryActivity : ComponentActivity() {
         val isLast = rom.absolutePath == prefs.lastRomPath
         val display = romLabel(rom)
         val hasSave = remember(rom, revision) {
-            SavesLocation.resolve(SavesLocation.dir(this@LibraryActivity, prefs), rom).exists()
+            SavesLocation.saveFor(this@LibraryActivity, prefs, rom).exists()
         }
         // Just the cover and the title (+ save marker); the options menu is a long press.
         var menu by remember { mutableStateOf(false) }
@@ -688,6 +744,13 @@ class LibraryActivity : ComponentActivity() {
                                 tint = OptionColors.label, modifier = Modifier.size(small.lineHeight),
                             )
                         }
+                    }
+                    if (rom.absolutePath in unsupportedRoms) {
+                        Spacer(Modifier.height(m.u * 2))
+                        OptionBadge(tk("NOT SUPPORTED"), m)
+                    } else if (rom.absolutePath in partialRoms) {
+                        Spacer(Modifier.height(m.u * 2))
+                        OptionBadge(tk("PARTIALLY SUPPORTED"), m, fill = OptionColors.muted)
                     }
                 }
             }
@@ -862,8 +925,8 @@ class LibraryActivity : ComponentActivity() {
 
     /** Every backup of [rom]'s save: the ones each start takes ([SaveBackups]) and LOAD SAVE's. */
     private fun showBackups(rom: File) {
-        val dir = SavesLocation.dir(this, prefs)
-        val save = SavesLocation.resolve(dir, rom)
+        val save = SavesLocation.saveFor(this, prefs, rom)
+        val dir = save.parentFile ?: SavesLocation.dir(this, prefs)
         val files = (SaveBackups.list(save) + RomArchive.saveNames(rom).flatMap { GameSaves.backups(dir, it) })
             .distinctBy { it.absolutePath }
             .sortedByDescending { it.name.substringAfter(".backup-") }
@@ -967,10 +1030,17 @@ class LibraryActivity : ComponentActivity() {
      * archive's name (`Emerald.zip` -> `Emerald.gba`).
      */
     private fun startImport(uri: Uri, play: Boolean) {
+        // VIEW is exported: any app can point it anywhere. Never this app's own files (RomIntake).
+        if (RomIntake.isOwn(this, uri)) return
         Thread({
             val pending = try {
                 var tmp = File(importDir, "import-${System.currentTimeMillis()}.gba")
-                contentResolver.openInputStream(uri)?.use { input -> tmp.outputStream().use { input.copyTo(it) } }
+                try {
+                    contentResolver.openInputStream(uri)?.use { input -> tmp.outputStream().use { RomIntake.copyCapped(input, it) } }
+                } catch (t: Throwable) {
+                    tmp.delete()
+                    throw t
+                }
                 var name = RomUris.sanitizeFileName(RomUris.displayName(this, uri) ?: "imported-${System.currentTimeMillis()}.gba")
                 RomArchive.sniff(tmp)?.let { format ->
                     val rom = File(importDir, "${tmp.name}.rom")
@@ -985,7 +1055,7 @@ class LibraryActivity : ComponentActivity() {
                     name = RomUris.sanitizeFileName("$base.${entry.extension}")
                     tmp = rom
                 }
-                if (tmp.length() > 0) {
+                if (tmp.length() > 0 && RomIdentity.looksLikeRom(tmp)) {
                     PendingImport(tmp, name, RomUris.originalPath(this, uri), play)
                 } else {
                     tmp.delete(); null
@@ -1046,6 +1116,9 @@ class LibraryActivity : ComponentActivity() {
                 if (s.keySaved) s.covers.start(this, prefs, replace = false)
             },
             onBack = { setupBack(s) },
+            onChangeButtons = {
+                startActivity(Intent(this, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_SCREEN, SettingsActivity.SCREEN_CONTROLS))
+            },
             onNext = {
                 val steps = SetupState.Step.entries
                 if (s.step == steps.last()) finishSetup() else enterStep(s, steps[s.step.ordinal + 1])
@@ -1066,11 +1139,19 @@ class LibraryActivity : ComponentActivity() {
 
     private fun enterStep(s: SetupState, step: SetupState.Step) {
         s.step = step
+        if (step == SetupState.Step.BUTTONS) readButtons(s)
         if (step == SetupState.Step.SAVES) {
             Thread({
                 val found = runCatching { SavesLocation.suggestions(prefs) }.getOrDefault(emptyList())
                 runOnUiThread { s.suggestions = found }
             }, "pokedaisy-saves-suggest").apply { isDaemon = true; start() }
+        }
+    }
+
+    /** The GAME BUTTONS step's list: A, B, L, R, START, SELECT (+ the second START / SELECT, turbo) as bound now. */
+    private fun readButtons(s: SetupState) {
+        s.buttons = GbaControls.rawBindings(getExternalFilesDir(null) ?: filesDir).map { (btn, keys) ->
+            btn.label to keys.joinToString(" / ") { it.removePrefix("BUTTON_").replace('_', ' ') }
         }
     }
 
@@ -1105,6 +1186,23 @@ class LibraryActivity : ComponentActivity() {
             )
         }
         return path
+    }
+
+    /**
+     * SAVE FOLDER: [rom]'s save lives in [path] from now on (null: the saves folders' search again). A
+     * folder without a save for it gets a copy of the current one - copied, never moved, so the
+     * old file stays where it was.
+     */
+    private fun setGameSaveFolder(rom: File, path: String?) {
+        val before = SavesLocation.saveFor(this, prefs, rom)
+        prefs.setRomSaveDir(rom, path)
+        val after = SavesLocation.saveFor(this, prefs, rom)
+        if (before.isFile && !after.exists() && before.absolutePath != after.absolutePath) {
+            runCatching { before.copyTo(after) }
+                .onSuccess { Toast.makeText(this, tr("Save copied to {0}", after.parent ?: ""), Toast.LENGTH_LONG).show() }
+                .onFailure { Toast.makeText(this, tr("Can't write the save to {0}", after.parent ?: ""), Toast.LENGTH_LONG).show() }
+        }
+        revision++
     }
 
     private fun linkRomsFolder(path: String) {
@@ -1166,7 +1264,15 @@ class LibraryActivity : ComponentActivity() {
     private fun rescanRomsFolder(s: SetupState? = null) {
         // Setup's own scan always runs (RomFolder.scan queues it behind a running one).
         // A Refresh during another scan (the one onResume starts) gets that one's result.
-        if (prefs.romsFolder == null || (scanningFolder && s == null)) return
+        if (scanningFolder && s == null) return
+        if (prefs.romsFolder == null) {
+            // Nothing linked: just the imported ROMs' NOT SUPPORTED verdicts.
+            Thread({
+                RomFolder.checkImported(this)
+                runOnUiThread { bump() }
+            }, "pokedaisy-rom-check").apply { isDaemon = true; start() }
+            return
+        }
         scanningFolder = true
         s?.scanning = true
         s?.checked = 0
@@ -1175,6 +1281,7 @@ class LibraryActivity : ComponentActivity() {
             val result = RomFolder.scan(this, prefs) { checked, total ->
                 if (s != null) runOnUiThread { s.checked = checked; s.toCheck = total }
             }
+            RomFolder.checkImported(this)
             GameTitles.identify(this, listRoms())
             val found = RomFolder.found(this, prefs).map(::romLabel)
             runOnUiThread {

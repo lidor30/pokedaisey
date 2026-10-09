@@ -69,6 +69,12 @@ data class SpeciesInfoDex(
     val paletteOff: Int,
     /** footprint (32 bytes, 1bpp); -1 = the game has none. */
     val footprintOff: Int = -1,
+    /** levelUpLearnset ({u16 move, u16 level} ending at move 0xFFFF), teachableLearnset (u16 moves
+     * ending 0xFFFF: TMs, HMs and tutors) and evolutions ([EvoLayout]) pointers; -1 = none / unknown.
+     * Found by dumping BULBASAUR's entry (TACKLE 1, GROWL ..., LEVEL 16 -> IVYSAUR). */
+    val levelUpOff: Int = -1,
+    val teachableOff: Int = -1,
+    val evolutionsOff: Int = -1,
 )
 
 /**
@@ -168,6 +174,16 @@ data class PokedexTables(
     /** [metric]'s decimal mark and unit spacing: "0,4 m" in Europe, "0.4m" in Japan. */
     val decimalPoint: Char = ',',
     val unitSpace: Boolean = true,
+    /** Where the DEX page's EVOLVE reads from when it isn't [evolutions]' vanilla table ([DexDetails]). */
+    val evoLayout: EvoLayout? = null,
+    /** A per-species pointer table of {u16 move, u16 level} level-up lists ending at move 0xFFFF, for
+     * games whose [GuideTables] has none (Quetzal, R.O.W.E.); 0 = none. */
+    val levelUpLearnsets: Long = 0,
+    /** sTMHMLearnsets (a u64 per species: TM01-TM50, then HM01-HM08) and sTMHMMoves (u16 x 58), for the
+     * DEX's MOVES page; 0 = not located. Found by BULBASAUR's bits and FOCUS PUNCH, DRAGON CLAW, ...
+     * (TM01-04); both are checked before use, so a port that copied English's addresses gets none. */
+    val tmhmLearnsets: Long = 0,
+    val tmhmMoves: Long = 0,
 ) {
     val hasRegional: Boolean get() = regionName != null
 }
@@ -197,6 +213,8 @@ val POKEDEX_FIRERED_REV1 = PokedexTables(
     abilityNames = 0x0824FCB0L,
     footprints = 0x0843FB20L,
     evolutions = 0x082597C4L,
+    tmhmLearnsets = 0x08252C38L,
+    tmhmMoves = 0x0845A604L,
 )
 
 /**
@@ -236,6 +254,18 @@ val POKEDEX_UNBOUND = PokedexTables(
     regionalOrderIsSpecies = true,
     nationalMagicOff = -1,
     flags = CFRU_DEX_FLAGS,
+    // CFRU's gEvolutionTable: 16 rows per species (Mega Evolutions among them), repointed.
+    evoLayout = EvoLayout(EvoScheme.CFRU, table = 0x099F3A7AL, perMon = 16),
+)
+
+/** Unbound v2.1.1.1 FR: English's tables, the dex text translated in place - its page reads
+ * "Pokémon Graine", "Ta 0.7m", "Po 16.8 kg" (headless, the game's own POKéDEX). */
+val POKEDEX_UNBOUND_FR = POKEDEX_UNBOUND.copy(
+    categoryPrefix = "Pokémon",
+    categorySuffix = "",
+    metric = true,
+    decimalPoint = '.',
+    probeCategory = "Graine",
 )
 
 /** LeafGreen: FireRed's layout, its own tables (and dex text). */
@@ -248,6 +278,8 @@ val POKEDEX_LEAFGREEN_REV0 = PokedexTables(
     abilityNames = 0x0824FC1CL,
     footprints = 0x0843F8ECL,
     evolutions = 0x08259734L,
+    tmhmLearnsets = 0x08252BA4L,
+    tmhmMoves = 0x08459FC4L,
 )
 
 val POKEDEX_LEAFGREEN_REV1 = PokedexTables(
@@ -259,6 +291,8 @@ val POKEDEX_LEAFGREEN_REV1 = PokedexTables(
     abilityNames = 0x0824FC8CL,
     footprints = 0x0843F95CL,
     evolutions = 0x082597A4L,
+    tmhmLearnsets = 0x08252C14L,
+    tmhmMoves = 0x0845A034L,
 )
 
 /** Ruby (rev 1 and rev 2 share every address): Emerald's flag rules,
@@ -272,6 +306,8 @@ val POKEDEX_RUBY = PokedexTables(
     abilityNames = 0x081FA260L,
     footprints = 0x083B4F00L,
     evolutions = 0x08203B80L,
+    tmhmLearnsets = 0x081FD108L,
+    tmhmMoves = 0x0837651CL,
     descriptionPage2Off = 0x14,
     regionalCount = 202,
     regionName = "HOENN",
@@ -292,6 +328,8 @@ val POKEDEX_SAPPHIRE = POKEDEX_RUBY.copy(
     footprints = 0x083B4F5CL,
     evolutions = 0x08203B10L,
     regionalOrder = 0x081FC7F4L,
+    tmhmLearnsets = 0x081FD098L,
+    tmhmMoves = 0x083764ACL,
 )
 
 val POKEDEX_EMERALD = PokedexTables(
@@ -310,6 +348,8 @@ val POKEDEX_EMERALD = PokedexTables(
     nationalMagicOff = 2,
     nationalMagic = 0xDA,
     evolutions = 0x0832531CL,
+    tmhmLearnsets = 0x0831E898L,
+    tmhmMoves = 0x08615B94L,
 )
 
 /*
@@ -323,25 +363,25 @@ val POKEDEX_EMERALD = PokedexTables(
 val POKEDEX_EMERALD_ES = POKEDEX_EMERALD.copy(
     entries = 0x0856F078L, frontPics = 0x083103F0L, palettes = 0x083098DCL, speciesInfo = 0x08326688L,
     speciesToNational = 0x08323F3EL, abilityNames = 0x08321999L, footprints = 0x0857215CL,
-    regionalOrder = 0x08324274L, evolutions = 0x0832B5D8L,
+    regionalOrder = 0x08324274L, evolutions = 0x0832B5D8L, tmhmLearnsets = 0x08324B54L, tmhmMoves = 0x086189D4L,
     probeCategory = "SEMILLA", categoryPrefix = "POKéMON", categorySuffix = "", metric = true,
 )
 val POKEDEX_EMERALD_DE = POKEDEX_EMERALD.copy(
     entries = 0x0857D39CL, frontPics = 0x0831EAFCL, palettes = 0x08317FE8L, speciesInfo = 0x08334D8CL,
     speciesToNational = 0x08332642L, abilityNames = 0x0833009EL, footprints = 0x08580480L,
-    regionalOrder = 0x08332978L, evolutions = 0x08339CDCL,
+    regionalOrder = 0x08332978L, evolutions = 0x08339CDCL, tmhmLearnsets = 0x08333258L, tmhmMoves = 0x0862705CL,
     probeCategory = "SAMEN", categorySuffix = "", metric = true,
 )
 val POKEDEX_EMERALD_FR = POKEDEX_EMERALD.copy(
     entries = 0x08570914L, frontPics = 0x08311CBCL, palettes = 0x0830B1A8L, speciesInfo = 0x08327F3CL,
     speciesToNational = 0x083257F2L, abilityNames = 0x0832324EL, footprints = 0x085739F8L,
-    regionalOrder = 0x08325B28L, evolutions = 0x0832CE8CL,
+    regionalOrder = 0x08325B28L, evolutions = 0x0832CE8CL, tmhmLearnsets = 0x08326408L, tmhmMoves = 0x08619F1CL,
     probeCategory = "GRAINE", categorySuffix = "", metric = true,
 )
 val POKEDEX_EMERALD_IT = POKEDEX_EMERALD.copy(
     entries = 0x08568C80L, frontPics = 0x08309B50L, palettes = 0x0830303CL, speciesInfo = 0x0831FDCCL,
     speciesToNational = 0x0831D682L, abilityNames = 0x0831B0DBL, footprints = 0x0856BD64L,
-    regionalOrder = 0x0831D9B8L, evolutions = 0x08324D1CL,
+    regionalOrder = 0x0831D9B8L, evolutions = 0x08324D1CL, tmhmLearnsets = 0x0831E298L, tmhmMoves = 0x08612730L,
     probeCategory = "SEME", categoryPrefix = "POKéMON", categorySuffix = "", metric = true,
 )
 
@@ -354,7 +394,7 @@ val POKEDEX_EMERALD_IT = POKEDEX_EMERALD.copy(
 val POKEDEX_EMERALD_JA = POKEDEX_EMERALD.copy(
     entries = 0x0854069CL, frontPics = 0x082DDA1CL, palettes = 0x082D6F08L, speciesInfo = 0x082F0D54L,
     speciesToNational = 0x082EE60AL, abilityNames = 0x082EBDC4L, footprints = 0x08543168L,
-    regionalOrder = 0x082EE940L, evolutions = 0x082F5CA4L,
+    regionalOrder = 0x082EE940L, evolutions = 0x082F5CA4L, tmhmLearnsets = 0x082EF220L, tmhmMoves = 0x085E144CL,
     entryStride = 0x1C, entryCategoryLen = 6, entryHeightOff = 6, entryDescOff = 0x0C, abilityNameLength = 8,
     probeCategory = "たね", categorySuffix = "ポケモン", categorySeparator = "",
     metric = true, decimalPoint = '.', unitSpace = false,
@@ -418,6 +458,7 @@ val POKEDEX_RADICAL_RED = PokedexTables(
     speciesCount = 1376,
     nationalCount = 1025,
     flags = DexFlags(DexFlagBlock.SAVE_BLOCK_1, 0x310, 0x3B4, 164),
+    evoLayout = EvoLayout(EvoScheme.CFRU_RADICAL_RED, table = 0x097CD9B0L, perMon = 16),
 )
 
 /**
@@ -443,6 +484,7 @@ val POKEDEX_AMETHYST = PokedexTables(
     nationalCount = 690,
     regionalCount = 390,
     flags = CFRU_DEX_FLAGS,
+    evoLayout = EvoLayout(EvoScheme.CFRU, table = 0x09BD4F3CL, perMon = 16),
 )
 
 /** Amethyst v1.4.1: the same dex (entries byte for byte), its tables moved; 26 more species. */
@@ -454,6 +496,7 @@ val POKEDEX_AMETHYST_V1_4_1 = POKEDEX_AMETHYST.copy(
     speciesToNational = 0x09AF5F14L,
     abilityNames = 0x0894DD1CL,
     speciesCount = 1294,
+    evoLayout = EvoLayout(EvoScheme.CFRU, table = 0x09AAB2FCL, perMon = 16),
 )
 
 /**
@@ -476,6 +519,7 @@ val POKEDEX_GAIA = PokedexTables(
     regionName = null,
     flags = DexFlags(DexFlagBlock.FIXED, 0x0203C400L, 0x0203C45BL, 91),
     nationalMagicOff = -1,
+    evoLayout = EvoLayout(EvoScheme.GAIA, table = 0x08A9556CL, perMon = 16),
 )
 
 /**
@@ -535,7 +579,8 @@ val POKEDEX_HEART_AND_SOUL = PokedexTables(
     regionName = "JOHTO",
     regionalOrder = 0x08D34C78L,
     regionalOrderStride = 4,
-    expansion = SpeciesInfoDex(stride = 0x10C, paletteOff = 0x60, footprintOff = 0x84),
+    expansion = SpeciesInfoDex(stride = 0x10C, paletteOff = 0x60, footprintOff = 0x84, levelUpOff = 0x98, teachableOff = 0x9C, evolutionsOff = 0xA4),
+    evoLayout = EvoLayout(EvoScheme.EXPANSION_PARAMS, record = 12, conditionsEnd = 39),
     flags = DexFlags(DexFlagBlock.SAVE_BLOCK_1, 0x39C0, 0x3A7F, 191),
     nationalMagicOff = 2,
     nationalMagic = 0xDA,
@@ -561,7 +606,8 @@ val POKEDEX_LAZARUS = PokedexTables(
     regionalCount = 430,
     regionName = "ILIOS",
     regionalOrder = 0x088DFC5CL,
-    expansion = SpeciesInfoDex(stride = 0xD4, paletteOff = 0x68),
+    expansion = SpeciesInfoDex(stride = 0xD4, paletteOff = 0x68, levelUpOff = 0x90, teachableOff = 0x94, evolutionsOff = 0x9C),
+    evoLayout = EvoLayout(EvoScheme.EXPANSION_LAZARUS),
     flags = DexFlags(DexFlagBlock.SAVE_BLOCK_1, 0x32A8, 0x3329, 129),
     nationalMagicOff = 2,
     nationalMagic = 0xDA,
@@ -585,7 +631,8 @@ val POKEDEX_EMERALD_SEAGLASS = PokedexTables(
     regionalCount = 212,
     regionName = "HOENN",
     regionalOrder = 0x086E37E0L,
-    expansion = SpeciesInfoDex(stride = 0xD0, paletteOff = 0x68),
+    expansion = SpeciesInfoDex(stride = 0xD0, paletteOff = 0x68, levelUpOff = 0x8C, teachableOff = 0x90, evolutionsOff = 0x98),
+    evoLayout = EvoLayout(EvoScheme.EXPANSION),
     flags = DexFlags(DexFlagBlock.SAVE_BLOCK_1, 0x28FC, 0x2932, 54),
     nationalMagicOff = 2,
     nationalMagic = 0xDA,
@@ -613,7 +660,9 @@ val POKEDEX_TMT2 = PokedexTables(
     expansion = SpeciesInfoDex(
         stride = 0x104, catchRateOff = 0x09, genderOff = 0x14, eggGroupsOff = 0x18, abilitiesOff = 0x1A,
         categoryOff = 0x21, natDexOff = 0x3E, paletteOff = 0x60, footprintOff = 0x80,
+        levelUpOff = 0x94, teachableOff = 0x98, evolutionsOff = 0xA0,
     ),
+    evoLayout = EvoLayout(EvoScheme.EXPANSION_PARAMS, record = 12, conditionsEnd = 37),
     flags = DexFlags(DexFlagBlock.SAVE_BLOCK_1, 0x289C, 0x2920, 132),
     nationalMagicOff = 2,
     nationalMagic = 0xDA,
@@ -647,6 +696,8 @@ val POKEDEX_ROWE = PokedexTables(
     ),
     categorySuffix = "Pokémon",
     probeCategory = "Seed",
+    evoLayout = EvoLayout(EvoScheme.ROWE, table = 0x085B6F60L, perMon = 10),
+    levelUpLearnsets = 0x085E456CL,
     speciesCount = 1960,
     nationalCount = 1019,
     regionalCount = 1019,
@@ -683,7 +734,9 @@ val POKEDEX_EMERALD_ROGUE = PokedexTables(
     regionalOrderIsSpecies = true,
     expansion = SpeciesInfoDex(
         stride = 0x98, natDexOff = 0x3A, descriptionOff = 0x48, frontPicOff = 0x54, paletteOff = 0x64, footprintOff = 0x7C,
+        evolutionsOff = 0x8C,
     ),
+    evoLayout = EvoLayout(EvoScheme.ROGUE),
     flags = DexFlags(
         DexFlagBlock.SAVE_BLOCK_1, seen = 0x30B4, caught = 0x3179, bytes = 197, firstBit = 0,
         bySpecies = true, seenOrCaught = true,
@@ -714,7 +767,8 @@ val POKEDEX_IMPERIUM = PokedexTables(
     regionalCount = 214,
     regionName = "HOENN",
     regionalOrder = 0x08715890L,
-    expansion = SpeciesInfoDex(stride = 0x104, paletteOff = 0x60, footprintOff = 0x80),
+    expansion = SpeciesInfoDex(stride = 0x104, paletteOff = 0x60, footprintOff = 0x80, levelUpOff = 0x94, teachableOff = 0x98, evolutionsOff = 0xA0),
+    evoLayout = EvoLayout(EvoScheme.EXPANSION),
     flags = DexFlags(DexFlagBlock.SAVE_BLOCK_1, 0x2F58, 0x2FD9, 129),
     nationalMagicOff = 2,
     nationalMagic = 0xDA,
@@ -747,6 +801,8 @@ val POKEDEX_QUETZAL = PokedexTables(
     entryHeightOff = 4,
     entryDescOff = 8,
     baseStats = BaseStatsLayout(stride = 0x24, genderOff = 0x12, eggGroupsOff = 0x16, abilitiesOff = 0x18, abilityU16 = true),
+    evoLayout = EvoLayout(EvoScheme.QUETZAL, table = 0x0858911CL, perMon = 11),
+    levelUpLearnsets = 0x085A9EB4L,
     speciesCount = 1529,
     nationalCount = 1034,
     regionalCount = 1034,
@@ -757,6 +813,38 @@ val POKEDEX_QUETZAL = PokedexTables(
     ),
     nationalMagicOff = -1,
     probeCategory = "Seed",
+)
+
+/** Quetzal Spanish Alpha 9 v0: English's shapes at its own addresses (the literal pools of
+ * English's code, read at the same place in its code); the dex text is Spanish - its page reads
+ * "POKéMON Semilla", "ALT. 0,7 m", "PESO 6,9 kg" (headless, the game's own POKéDEX). */
+val POKEDEX_QUETZAL_ES = POKEDEX_QUETZAL.copy(
+    categoryPrefix = "POKéMON",
+    categorySuffix = "",
+    metric = true,
+    entries = 0x091BFA70L,
+    frontPics = 0x084F92B8L,
+    palettes = 0x084E48C4L,
+    speciesInfo = 0x08549E94L,
+    speciesToNational = 0x08542386L,
+    abilityNames = 0x08532F97L,
+    footprints = 0x091C42ACL,
+    probeCategory = "Semilla",
+)
+
+/**
+ * Pokémon Orange Islands: retail FireRed rev 0's tables (each 0x70 before rev 1's, the entries
+ * 0x60), edited in place - its CRYSTAL ONIX (species 409) and rebalanced starters among them.
+ */
+val POKEDEX_ORANGE_ISLANDS = POKEDEX_FIRERED_REV1.copy(
+    entries = 0x0844E850L,
+    frontPics = 0x082350ACL,
+    palettes = 0x0823730CL,
+    speciesInfo = 0x08254784L,
+    speciesToNational = 0x08251FEEL,
+    abilityNames = 0x0824FC40L,
+    footprints = 0x0843FAB0L,
+    evolutions = 0x08259754L,
 )
 
 /** Pokémon SoulGold v1.1.4: national 1-1025, 323 of them disabled (no species),
@@ -789,7 +877,9 @@ val POKEDEX_SOULGOLD = PokedexTables(
     expansion = SpeciesInfoDex(
         stride = 0x118, abilitiesOff = 0x18, categoryOff = 0x26, natDexOff = 0x42,
         descriptionOff = 0x50, frontPicOff = 0x5C, paletteOff = 0x64,
+        levelUpOff = 0xA8, teachableOff = 0xAC, evolutionsOff = 0xB4,
     ),
+    evoLayout = EvoLayout(EvoScheme.EXPANSION_PARAMS, record = 12, conditionsEnd = 39),
     flags = DexFlags(DexFlagBlock.SAVE_BLOCK_1, 0x31F8, 0x3279, 129),
     nationalMagicOff = 2,
     nationalMagic = 0xDA,
@@ -933,6 +1023,17 @@ object PokedexSource {
             entries.clear(); sprites.clear(); footprints.clear(); nationalToSpecies = null; speciesToNational = null; regional = null
             cachedFor = t
         }
+    }
+
+    /**
+     * A new ROM is running: forget what was read from the last one. The caches here and in
+     * [DexDetails] / [GuideRomSource] are keyed by their tables, and two ROMs can share them
+     * (Glazed runs on Emerald's PokedexTables) - Emerald then Glazed in one session kept Emerald's.
+     */
+    fun romChanged() {
+        synchronized(this) { cachedFor = null }
+        DexDetails.romChanged()
+        GuideRomSource.romChanged()
     }
 
     /** Already-loaded data only (no ROM read) - composables start from these,
@@ -1237,12 +1338,32 @@ object Gen3Text {
     // by code - charmap.txt's EXT_CTRL_CODE_* list.
     private val FC_ARGS = intArrayOf(0, 1, 1, 1, 3, 1, 1, 0, 1, 0, 0, 2, 1, 1, 1, 0, 2, 1, 1, 1, 1, 0, 0, 0, 0)
 
+    // Western glyphs that draw more than one letter (charmap.txt's PK, MN, POKéBLOCK's
+    // tiles, LV, the small raised letters), arrows, a spacer, the yen sign.
+    private val western = mapOf(
+        0x53 to "PK", 0x54 to "MN", 0x55 to "PO", 0x56 to "Ké", 0x34 to "Lv", 0x2C to "er", 0x84 to "e", 0xA0 to "re",
+        0x79 to "↑", 0x7A to "↓", 0x7B to "←", 0x7C to "→", 0x77 to "", 0xB7 to "¥",
+    )
+
+    // The POKéBLOCK word's own glyphs, which each language redrew for its word
+    // (POKéBLOCK, POKéCUBO, POKéRIEGEL, POKéBLOC, POKéMELLE / POKéMELLA), and in the
+    // European releases 0x2A is the ordinal º ("2.º turno"), not expansion's degree sign.
+    private val pokeblock = mapOf(
+        'E' to mapOf(0x57 to "BL", 0x58 to "OC", 0x59 to "K"),
+        'S' to mapOf(0x57 to "CU", 0x58 to "BO", 0x59 to "", 0x2A to "º"),
+        'D' to mapOf(0x57 to "RIE", 0x58 to "GE", 0x59 to "L", 0x2A to "º"),
+        'F' to mapOf(0x57 to "BL", 0x58 to "O", 0x59 to "C", 0x2A to "º"),
+        'I' to mapOf(0x5E to "PO", 0x5F to "Ké", 0x60 to "ME", 0x61 to "LL", 0x62 to "A", 0x63 to "E", 0x2A to "º"),
+    )
+
     /** Up to [max] bytes from [off], stopping at 0xFF; line breaks become
-     * spaces, control codes (0xFC + args, e.g. a font change) are dropped. */
+     * spaces, control codes (0xFC + args, e.g. a font change) and placeholders
+     * (0xFD + id, e.g. the player's name) are dropped. */
     fun decode(b: ByteArray, off: Int = 0, max: Int = b.size - off): String = buildString {
         val end = minOf(b.size, off + max)
         val jp = romLanguage == 'J'
         val chars = if (jp) japanese else table
+        val block = pokeblock[romLanguage] ?: pokeblock.getValue('E')
         var i = off
         while (i < end) {
             val c = b[i].toInt() and 0xFF
@@ -1251,8 +1372,17 @@ object Gen3Text {
                 i += 2 + FC_ARGS.getOrElse(b[i + 1].toInt() and 0xFF) { 0 }
                 continue
             }
+            if (c == 0xFD) {
+                i += 2
+                continue
+            }
             // A line break reads as a space; in Japanese, the full-width one its phrases are spaced with.
-            append(if (c == 0xFE || c == 0xFA || c == 0xFB) (if (jp) '　' else ' ') else chars[c])
+            when {
+                c == 0xFE || c == 0xFA || c == 0xFB -> append(if (jp) '　' else ' ')
+                !jp && c in block -> append(block.getValue(c))
+                !jp && c in western -> append(western.getValue(c))
+                else -> append(chars[c])
+            }
             i++
         }
     }.trim()

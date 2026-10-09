@@ -1,6 +1,8 @@
 package com.pokedaisy.app.companion.data
 
 import com.pokedaisy.app.companion.i18n.tk
+import com.pokedaisy.app.companion.i18n.tr
+import com.pokedaisy.app.companion.i18n.trGuide
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -43,6 +45,7 @@ private fun rawAreas(guide: GuideId): List<String> = when (guide) {
     GuideId.AMETHYST -> GUIDE_AREAS_AMETHYST_RAW
     GuideId.AMETHYST_V141 -> GUIDE_AREAS_AMETHYST_V141_RAW
     GuideId.CELIA -> GUIDE_AREAS_CELIA_RAW
+    GuideId.ORANGE_ISLANDS -> GUIDE_AREAS_ORANGE_ISLANDS_RAW
     // No area data yet: HERE lists the wild Pokémon alone.
     GuideId.GLAZED, GuideId.IMPERIUM, GuideId.QUETZAL, GuideId.LAZARUS, GuideId.SEAGLASS, GuideId.TMT2, GuideId.SOULGOLD -> emptyList()
 }
@@ -68,6 +71,10 @@ fun allAreaThings(guide: GuideId): Map<Int, List<AreaThing>> {
 
 private val PLACEHOLDER_NAME = Regex("[0-9a-fA-F]{1,4}")
 
+/** An HM by its name in the game's language: HM01, CS01 (French), VM01 (German), MN01 (Italian), MO01 (Spanish), ひでんマシン. */
+private fun isHm(name: String): Boolean =
+    Regex("^(HM|CS|VM|MN|MO)\\s?\\d", RegexOption.IGNORE_CASE).containsMatchIn(name) || name.startsWith("ひでん")
+
 /** An area name reduced for matching: FireRed's table says "Pokemon Tower", Emerald's "Pokémon Tower". */
 fun areaKey(name: String): String =
     name.uppercase().replace('É', 'E').filter { it.isLetterOrDigit() }
@@ -85,11 +92,12 @@ fun generatedWhereIs(guide: GuideId, areaName: (Int) -> String, done: (AreaThing
             val area = areaName(sec)
             GuideEntry(
                 title = title(t),
-                hint = "In $area.",
+                hint = tr("In {0}.", area),
                 answer = when {
-                    t.kind == AreaKind.ITEM -> "Lying " + (if (t.where.isEmpty()) "around $area." else "in the ${t.where} ($area).")
-                    t.where.isEmpty() -> "Someone around $area."
-                    else -> "Someone in the ${t.where} ($area)."
+                    t.kind == AreaKind.ITEM && t.where.isEmpty() -> tr("Lying around {0}.", area)
+                    t.kind == AreaKind.ITEM -> tr("Lying in the {0} ({1}).", trGuide(t.where), area)
+                    t.where.isEmpty() -> tr("Someone around {0}.", area)
+                    else -> tr("Someone in the {0} ({1}).", trGuide(t.where), area)
                 },
                 owned = done(t),
             )
@@ -101,10 +109,10 @@ fun generatedWhereIs(guide: GuideId, areaName: (Int) -> String, done: (AreaThing
     // Headings and the page title stay English (GuideUiState keys on them); GuideScreen translates them where drawn.
     val sections = listOf(
         // An HM may be handed out or lie in an item ball (Heart and Soul's HM07).
-        GuideSection(tk("HMs"), entries({ (it.kind in gifts || it.kind == AreaKind.ITEM) && itemName(it.id).startsWith("HM", ignoreCase = true) }) { itemName(it.id) }),
-        GuideSection(tk("KEY ITEMS"), entries({ it.kind == AreaKind.KEY && !itemName(it.id).startsWith("HM", ignoreCase = true) }) { itemName(it.id) }),
+        GuideSection(tk("HMs"), entries({ (it.kind in gifts || it.kind == AreaKind.ITEM) && isHm(itemName(it.id)) }) { itemName(it.id) }),
+        GuideSection(tk("KEY ITEMS"), entries({ it.kind == AreaKind.KEY && !isHm(itemName(it.id)) }) { itemName(it.id) }),
         GuideSection(tk("GIFT POKéMON"), entries({ it.kind == AreaKind.MON || it.kind == AreaKind.EGG }) { t ->
-            speciesName(t.id) + if (t.kind == AreaKind.EGG) " (egg)" else ""
+            speciesName(t.id) + if (t.kind == AreaKind.EGG) " " + tr("(egg)") else ""
         }),
     ).filter { it.entries.isNotEmpty() }
     return if (sections.isEmpty()) null else GuidePage(tk("WHERE IS"), sections)

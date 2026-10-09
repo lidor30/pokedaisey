@@ -48,7 +48,10 @@ data class ExpProgress(val total: Long, val levelStart: Long, val nextLevel: Lon
 fun expProgress(species: Int, level: Int, exp: Long?): ExpProgress? {
     if (exp == null || level !in 1..100) return null
     // Gen 1's growth rates and curves are Gen 3's for the first 151 (Yellow's species are Dex numbers here).
-    if (activeGame != GameKind.FIRERED && activeGame != GameKind.EMERALD && activeGame != GameKind.YELLOW) return null
+    if (activeGame != GameKind.FIRERED && activeGame != GameKind.EMERALD && activeGame != GameKind.YELLOW &&
+        activeGame != GameKind.ORANGE_ISLANDS) return null
+    // Orange Islands kept FireRed's growth rates but for its CRYSTAL ONIX slots.
+    if (activeGame == GameKind.ORANGE_ISLANDS && species >= 409) return null
     val rate = gen3GrowthRates.getOrNull(species)?.toInt() ?: return null
     val table = gen3ExperienceTables.getOrNull(rate) ?: return null
     val start = table[level].toLong()
@@ -74,11 +77,23 @@ data class LocationView(
     val highlightH: Int,
 )
 
+/** A BEST EFFORT match: read as [title]; [full] = every part held, else [off] are switched off; [fresh] = matched just now
+ * ([report]: what sharing it would send, when the ROM's hash is known). */
+data class BestEffortView(
+    val title: String, val full: Boolean, val off: Set<BestEffort.Part>, val fresh: Boolean,
+    val report: BestEffortReport? = null,
+)
+
 data class SnapshotView(
     val connected: Boolean,
     val error: String? = null,
     /** The running ROM is one the companion can't read (see TelemetrySampler.detect). */
     val unsupported: Boolean = false,
+    /** Read through BEST EFFORT ([BestEffort]): what as, and how well; null = a ROM the app knows. */
+    val bestEffort: BestEffortView? = null,
+    /** NOT SUPPORTED offers TRY BEST EFFORT (a Gen 3 base game); [bestEffortMiss] = why the last try found nothing. */
+    val canTryBestEffort: Boolean = false,
+    val bestEffortMiss: BestEffort.Miss? = null,
     val frameCounter: Long = 0,
     val inBattle: Boolean = false,
     val isDoubleBattle: Boolean = false,
@@ -369,7 +384,7 @@ const val SPECIES_EGG_VANILLA = 412
 fun isVanillaEgg(species: Int): Boolean =
     species == SPECIES_EGG_VANILLA && when (activeGame) {
         GameKind.FIRERED, GameKind.EMERALD,
-        GameKind.UNBOUND, GameKind.RADICAL_RED, GameKind.ODYSSEY, GameKind.AMETHYST -> true
+        GameKind.UNBOUND, GameKind.RADICAL_RED, GameKind.ODYSSEY, GameKind.AMETHYST, GameKind.ORANGE_ISLANDS -> true
         else -> false
     }
 

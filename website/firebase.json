@@ -1,7 +1,10 @@
 {
+  "firestore": {
+    "rules": "firestore.rules"
+  },
   "hosting": {
     "public": "dist",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "ignore": ["firebase.json", "firestore.rules", "**/.*", "**/node_modules/**"],
     "cleanUrls": true,
     "trailingSlash": true,
     "headers": [

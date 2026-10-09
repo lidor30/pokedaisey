@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.pokedaisy.app.companion.data.DexEntry
 import com.pokedaisy.app.companion.data.GameKind
+import com.pokedaisy.app.companion.data.GuideTables
 import com.pokedaisy.app.companion.data.activeGame
 import com.pokedaisy.app.companion.data.PokedexSource
 import com.pokedaisy.app.companion.data.PokedexState
@@ -84,6 +85,8 @@ class DexUiState(val list: LazyListState) {
     var national by mutableStateOf<Boolean?>(null)
     /** National dex number of the open entry; null = the list. */
     var open by mutableStateOf<Int?>(null)
+    /** The entry page's section (INFO / EVOLVE / AREA / MOVES), kept while stepping through entries. */
+    var section by mutableStateOf(DexSection.INFO)
 
     fun showsNational(dex: PokedexState) = !dex.tables.hasRegional || (national ?: dex.national)
 
@@ -274,14 +277,16 @@ private fun DexMark(caught: Boolean, seen: Boolean, modifier: Modifier) {
 
 /**
  * One dex page, filling the tab: the front sprite, number, name, category,
- * types, height / weight and footprint on the left; the dex text, base stats
- * and abilities on the right - all read from the ROM. Up / down step through
- * the list as it's currently filtered; back returns to it. [current] is
- * passed in (not read from [DexUiState.open]) so the page stays drawn while
- * it animates out after Back.
+ * types, height / weight and footprint on the left; on the right, chips switch
+ * between INFO (the dex text, base stats and abilities), EVOLVE, AREA and
+ * MOVES ([DexSection], those the game's tables have) - all read from the ROM;
+ * [guide] (the GUIDE's tables) feeds AREA and, for most games, MOVES. Up /
+ * down step through the list as it's currently filtered; back returns to it.
+ * [current] is passed in (not read from [DexUiState.open]) so the page stays
+ * drawn while it animates out after Back.
  */
 @Composable
-fun PokedexEntryScreen(dex: PokedexState, ui: DexUiState, current: Int, modifier: Modifier = Modifier) {
+fun PokedexEntryScreen(dex: PokedexState, ui: DexUiState, current: Int, modifier: Modifier = Modifier, guide: GuideTables? = null) {
     // Dense pages sized to Pixel Operator: a game font keeps its metrics here.
     val m = rememberGbaTextMetrics()
     val small = rememberGbaTextMetrics(1f)
@@ -321,15 +326,15 @@ fun PokedexEntryScreen(dex: PokedexState, ui: DexUiState, current: Int, modifier
             val entry by produceState(PokedexSource.cachedEntry(dex.tables, n), dex.tables, n) {
                 if (value == null) value = withContext(Dispatchers.IO) { PokedexSource.entry(dex.tables, n) }
             }
-            EntryPage(n, order.number(n), entry, dex.tables, n in dex.caught, n in dex.seen, m, small)
+            EntryPage(n, order.number(n), entry, dex.tables, guide, n in dex.caught, n in dex.seen, m, small, ui)
         }
     }
 }
 
 @Composable
 private fun EntryPage(
-    n: Int, shownNo: Int, e: DexEntry?, t: PokedexTables, caught: Boolean, seen: Boolean,
-    m: GbaTextMetrics, small: GbaTextMetrics,
+    n: Int, shownNo: Int, e: DexEntry?, t: PokedexTables, guide: GuideTables?, caught: Boolean, seen: Boolean,
+    m: GbaTextMetrics, small: GbaTextMetrics, ui: DexUiState,
 ) {
     val u = m.u
     val gap = u * 3
@@ -363,22 +368,40 @@ private fun EntryPage(
             }
         }
         Separator(m, Modifier.fillMaxHeight(), vertical = true)
-        Column(
-            Modifier.weight(0.58f).fillMaxHeight().padding(start = gap + u * 2).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(u * 2),
-        ) {
-            GbaText(e?.description ?: "", OptionColors.label, OptionColors.labelShadow, small, maxLines = 6)
-            Separator(m, Modifier.fillMaxWidth())
-            if (e != null) {
-                BaseStats(e.baseStats, small)
-                Separator(m, Modifier.fillMaxWidth())
-                // Gen 1 has none of these: no abilities, eggs or genders (genderRatio -1).
-                if (e.abilities.isNotEmpty()) InfoLine(tr("ABILITY"), e.abilities.joinToString(" / "), small)
-                e.hiddenAbility?.let { InfoLine(tr("HIDDEN|ability"), it, small) }
-                if (e.eggGroups.isNotEmpty()) InfoLine(tr("EGG GROUP"), e.eggGroups.joinToString(" / ") { dexCase(it) }, small)
-                if (e.genderRatio >= 0) InfoLine(tr("GENDER"), genderLabel(e.genderRatio), small)
-                InfoLine(tr("CATCH RATE"), "${e.catchRate}", small)
+        val sections = remember(t, guide) { dexSections(t, guide) }
+        val section = ui.section.takeIf { it in sections } ?: DexSection.INFO
+        Column(Modifier.weight(0.58f).fillMaxHeight().padding(start = gap + u * 2)) {
+            if (sections.size > 1) {
+                DexSectionChips(sections, section, small) { ui.section = it }
+                Spacer(Modifier.height(u * 3))
             }
+            val body = Modifier.fillMaxWidth().weight(1f)
+            when {
+                section == DexSection.EVOLVE -> Box(body) { DexEvolveSection(t, species, m, small) { no -> ui.open = no } }
+                section == DexSection.AREA && guide != null -> Box(body) { DexAreaSection(guide, species, m, small) }
+                section == DexSection.MOVES -> Box(body) { DexMovesSection(t, guide, species, m, small) }
+                else -> DexInfoSection(e, small, m, body)
+            }
+        }
+    }
+}
+
+/** INFO: the dex text, base stats, abilities, egg groups, gender and catch rate. */
+@Composable
+private fun DexInfoSection(e: DexEntry?, small: GbaTextMetrics, m: GbaTextMetrics, modifier: Modifier) {
+    val u = m.u
+    Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(u * 2)) {
+        GbaText(e?.description ?: "", OptionColors.label, OptionColors.labelShadow, small, maxLines = 6)
+        Separator(m, Modifier.fillMaxWidth())
+        if (e != null) {
+            BaseStats(e.baseStats, small)
+            Separator(m, Modifier.fillMaxWidth())
+            // Gen 1 has none of these: no abilities, eggs or genders (genderRatio -1).
+            if (e.abilities.isNotEmpty()) InfoLine(tr("ABILITY"), e.abilities.joinToString(" / "), small)
+            e.hiddenAbility?.let { InfoLine(tr("HIDDEN|ability"), it, small) }
+            if (e.eggGroups.isNotEmpty()) InfoLine(tr("EGG GROUP"), e.eggGroups.joinToString(" / ") { dexCase(it) }, small)
+            if (e.genderRatio >= 0) InfoLine(tr("GENDER"), genderLabel(e.genderRatio), small)
+            InfoLine(tr("CATCH RATE"), "${e.catchRate}", small)
         }
     }
 }

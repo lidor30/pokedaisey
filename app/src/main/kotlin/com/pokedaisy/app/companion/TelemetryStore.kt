@@ -23,6 +23,9 @@ class TelemetryStore {
 
     /** A different ROM is about to run in this activity: forget the detected
      * game. Call while the emulator is stopped. */
+    /** NOT SUPPORTED's TRY BEST EFFORT ([com.pokedaisy.app.companion.data.BestEffort]), on the next sample. */
+    fun requestBestEffort() = sampler.requestBestEffort()
+
     fun reset() {
         sampler = TelemetrySampler()
         _snapshot.value = SnapshotView(connected = false, error = tk("starting…"))

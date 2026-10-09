@@ -35,6 +35,10 @@ interface CompanionSettings {
     val ffMode: FfMode
     fun setFfMode(mode: FfMode)
 
+    /** REWIND on / off ([Prefs.rewind]); hosts without a game leave it off. */
+    val rewind: Boolean get() = false
+    fun setRewind(on: Boolean) {}
+
     /** 0 = auto (only if no gamepad), 1 = always, 2 = never. */
     val touchControlsMode: Int
     fun setTouchControlsMode(v: Int)

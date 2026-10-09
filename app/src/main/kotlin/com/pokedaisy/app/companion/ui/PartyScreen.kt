@@ -367,6 +367,8 @@ fun partySlotStyleFor(game: GameKind): PartySlotStyle? = when (game) {
     GameKind.RADICAL_RED -> RadicalRedPartyStyle
     GameKind.ODYSSEY -> OdysseyPartyStyle
     GameKind.AMETHYST -> AmethystPartyStyle
+    // Orange Islands kept FireRed's party menu art (its own backdrop: theme's backdropColors).
+    GameKind.ORANGE_ISLANDS -> FireRedPartyStyle
     else -> null
 }
 

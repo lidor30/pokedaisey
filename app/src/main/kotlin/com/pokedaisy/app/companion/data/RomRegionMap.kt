@@ -105,7 +105,10 @@ object RomRegionMap {
     /** The region map [rom] carries, or null if it isn't a FireRed 1.0 ROM whose map code is where this expects. */
     fun read(rom: Rom): Parsed? {
         val header = rom.read(0xAC, 0x11)
-        if (header.size < 0x11 || String(header, 0, 4, Charsets.US_ASCII) != "BPRE" || header[0x10].toInt() != 0) return null
+        // Rev 1 has its code elsewhere. Anything else is taken as rev 0's code - Unbound's French
+        // translation left its revision byte at 0x9E - and the literal pools below must still
+        // land on data of the right shape.
+        if (header.size < 0x11 || String(header, 0, 4, Charsets.US_ASCII) != "BPRE" || header[0x10].toInt() == 1) return null
 
         fun u16(b: ByteArray, i: Int) = (b[i].toInt() and 0xFF) or ((b[i + 1].toInt() and 0xFF) shl 8)
         fun ptr(at: Int): Int? {

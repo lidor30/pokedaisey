@@ -56,10 +56,14 @@ class EmulatorEngine(
     @Volatile private var ffHeld = false
     @Volatile private var ffToggled = false
     @Volatile private var slowmoHeld = false
+    @Volatile private var rewindHeld = false
     @Volatile private var speedIdx = 0          // index into SPEED_STEPS
 
     /** Cap for hold/toggle fast-forward. 0 = unlimited. (Phase 4: make configurable.) */
     @Volatile var ffMaxSpeed = 2f
+
+    /** REWIND (Settings): states kept for the rewind hotkey, 0 = off. Picked up on the emu thread. */
+    @Volatile var rewindEntries = 0
 
     /** What fast-forward sounds like (Settings: STEADY / SPED-UP / OFF). */
     @Volatile var ffMusicMode = FfMusicMode.STEADY
@@ -189,6 +193,11 @@ class EmulatorEngine(
      * this to persist the choice (see Prefs.ffToggled). */
     var onFastForwardToggledChanged: ((Boolean) -> Unit)? = null
 
+    /** The rewind hotkey held: the game runs backwards (muted) through what REWIND kept. */
+    fun setRewindHeld(on: Boolean) {
+        rewindHeld = on
+    }
+
     fun setSlowmoHeld(on: Boolean) {
         if (slowmoHeld == on) return
         slowmoHeld = on
@@ -219,6 +228,8 @@ class EmulatorEngine(
 
     /** What the emulator actually runs at: [requestedSpeed], unless SMART is holding it at 1x for now. */
     private fun effectiveSpeed(): Float {
+        // Rewinding steps back at the display's pace (2 game frames a frame), whatever FF says.
+        if (rewindHeld && rewindEntries > 0) return 1f
         val s = requestedSpeed()
         // SMART: menus and the region map's cursor can't be steered sped up -
         // 1x while one is up, and FF (still on) picks up again when it closes.
@@ -421,10 +432,20 @@ class EmulatorEngine(
         var underruns = track?.underrunCount ?: 0
         var vsyncMode = false
         val silence = ShortArray(bufferFrames * 2)
+        var rewindApplied = -1   // pkInit dropped any buffer: set it again for this core
+        var frame = 0L
         try {
             while (running) {
                 battleInput.tick()
-                MgbaCore.pkSetKeys(input.mask)
+                val rewindWanted = rewindEntries
+                if (rewindWanted != rewindApplied) {
+                    MgbaCore.pkSetRewind(rewindWanted)
+                    rewindApplied = rewindWanted
+                }
+                val rewinding = rewindHeld && rewindWanted > 0
+                MgbaCore.pkSetRewinding(rewinding)
+                // TURBO A / B: pressed 2 frames, released 2, in game frames - so FF mashes faster too.
+                MgbaCore.pkSetKeys(input.mask or (if ((frame++ / 2) % 2 == 0L) input.turboMask else 0))
                 MgbaCore.pkRunFrame()
                 onFrame?.invoke()
                 // Achievements never take the game down with them (a pending JNI
@@ -486,7 +507,7 @@ class EmulatorEngine(
                 // only as SPED-UP (which STEADY falls back to until its clip is ready,
                 // or on a ROM it can't render). Slow-mo stays muted.
                 val spedUp = speed > 1f && clip == null && mode != FfMusicMode.OFF
-                val wantPaused = !((speed == 1f && clip == null) || spedUp)
+                val wantPaused = rewinding || !((speed == 1f && clip == null) || spedUp)
                 // Refreshes per frame when the display paces 1x; 0 = the timer and blocking audio.
                 val perFrame = if (speed == 1f && track != null && bufferFrames > 0) vsyncsPerFrame() else 0
                 if ((perFrame > 0) != vsyncMode) {

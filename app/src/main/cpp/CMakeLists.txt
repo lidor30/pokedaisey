@@ -72,7 +72,12 @@ target_compile_definitions(rcheevos PUBLIC
 # ---------------------------------------------------------------------------
 # Our JNI bridge.
 # ---------------------------------------------------------------------------
-add_library(pokedaisy SHARED pokedaisy_jni.c pokedaisy_ra.c pk_cheats.c)
+add_library(pokedaisy SHARED pokedaisy_jni.c pokedaisy_ra.c pk_cheats.c pk_rewind.c)
+
+# mGBA's own sources get these (add_definitions in its directory only). Some of its
+# structs change shape with them - mCoreRewindContext is ~100 bytes longer with
+# USE_PTHREADS - so our files must see the same headers, or mGBA writes past ours.
+target_compile_definitions(pokedaisy PRIVATE USE_PTHREADS M_CORE_GBA M_CORE_GB)
 
 target_include_directories(pokedaisy PRIVATE
     "${MGBA_DIR}/include"

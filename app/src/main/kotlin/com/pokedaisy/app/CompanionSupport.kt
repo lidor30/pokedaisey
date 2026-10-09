@@ -1,5 +1,6 @@
 package com.pokedaisy.app
 
+import com.pokedaisy.app.companion.data.BestEffortStore
 import com.pokedaisy.app.companion.data.TelemetrySampler
 import java.io.File
 
@@ -16,6 +17,22 @@ import java.io.File
  * the tables `SiteDataExportTest` exports: change this, change that.
  */
 object CompanionSupport {
+    /** MATCHED: supported through a FULL best-effort match - kept apart so forgetting it is noticed.
+     * TRYABLE: not supported, but a Gen 3 Pokémon base game, so TRY BEST EFFORT may read it. */
+    enum class Verdict { SUPPORTED, MATCHED, PARTIAL, TRYABLE, UNSUPPORTED }
+
+    /**
+     * [isSupported], then a BEST EFFORT match the player kept for this ROM ([BestEffortStore], by
+     * SHA-1): every part holding counts as supported (a supported version under another hash),
+     * some off as PARTIAL. Blocking, like [isSupported].
+     */
+    fun verdict(rom: File): Verdict {
+        if (isSupported(rom)) return Verdict.SUPPORTED
+        val e = BestEffortStore.load(RomIdentity.sha1(rom))
+            ?: return if (RomIdentity.gameCode(rom)?.let(com.pokedaisy.app.companion.data.BestEffort::canTry) == true) Verdict.TRYABLE else Verdict.UNSUPPORTED
+        return if (e.full) Verdict.MATCHED else Verdict.PARTIAL
+    }
+
     fun isSupported(rom: File): Boolean {
         // Game Boy / Color: the exact carts the GB reader knows (Pokémon Yellow).
         if (RomIdentity.isGameBoy(rom)) return TelemetrySampler.GAME_BOY_SUPPORT && RomIdentity.sha1(rom) in TelemetrySampler.SUPPORTED_GB_SHA1S

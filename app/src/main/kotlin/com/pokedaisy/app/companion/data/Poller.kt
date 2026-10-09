@@ -13,6 +13,7 @@ class TelemetrySampler {
 
     init {
         resetNativeBagCache()
+        RomItemText.use(null)
     }
 
     private var kind: GameKind? = null
@@ -29,6 +30,56 @@ class TelemetrySampler {
     // detect() re-runs while the QOLT probe is still undecided - don't
     // re-hash a 16 MB ROM on every retry.
     private var smallBpeeHashChecked = false
+    private var smallBpreHashChecked = false
+
+    // BEST EFFORT (BestEffort.kt) for an unsupported ROM of a Gen 3 base game: its header code and
+    // SHA-1 (what the match is kept by), the match in use and the config it was made from (the
+    // version flags below compare by identity, and a partial match reads through a trimmed copy).
+    private var beCode: String? = null
+    private var beSha1: String? = null
+    private var beSize = 0L
+    private var beRev = 0
+    private var beMatch: BestEffort.Match? = null
+    private var beFresh = false
+    private var beMiss: BestEffort.Miss? = null
+    private var baseCfg: NativeConfig? = null
+    @Volatile private var bestEffortRequested = false
+
+    /** NOT SUPPORTED's TRY BEST EFFORT: tried on the next sample (the emulator thread). */
+    fun requestBestEffort() {
+        bestEffortRequested = true
+    }
+
+    /** [label]: the ROM isn't one detect() knows. One best effort kept for it ([BestEffortStore]) reads it anyway. */
+    private fun unsupportedRom(reader: MemoryReader, code: String, size: Long, hash: String?, label: String) {
+        unsupportedHackLabel = label
+        if (!BestEffort.canTry(code)) return
+        beCode = code
+        beSize = size
+        beRev = runCatching { reader.readCoreMemory(0x080000BCL, 1)[0].toInt() and 0xFF }.getOrDefault(0)
+        beSha1 = hash ?: runCatching { sha1HexChunked(reader, 0x08000000L, size) }.getOrNull()
+        BestEffortStore.load(beSha1)?.let(BestEffortStore::matchOf)?.let(::useBestEffort)
+    }
+
+    private fun useBestEffort(m: BestEffort.Match) {
+        kind = m.candidate.kind
+        nativeCfg = m.config
+        baseCfg = m.candidate.cfg
+        unsupportedHackLabel = null
+        beMatch = m
+        itemTextChosen = false
+    }
+
+    private fun runBestEffort(reader: MemoryReader) {
+        val code = beCode ?: return
+        val (m, miss) = BestEffort.match(reader, code)
+        beMiss = miss
+        if (m == null) return
+        beSha1?.let { BestEffortStore.save(it, m) }
+        useBestEffort(m)
+        beFresh = true
+        android.util.Log.i("pokedaisy", "best effort: ${m.candidate.id} full=${m.full} off=${m.off} for sha1=$beSha1")
+    }
 
     /**
      * The QoL struct doesn't carry experience or IVs / EVs, but the party's own
@@ -95,20 +146,45 @@ class TelemetrySampler {
     fun sample(reader: MemoryReader): SnapshotView {
         val s = sampleUntagged(reader)
         // An unsupported ROM has no game look to borrow - the app's own backdrop.
-        return s.copy(game = if (s.unsupported) null else kind ?: if (s.connected) activeGame else null)
+        return s.copy(
+            game = if (s.unsupported) null else kind ?: if (s.connected) activeGame else null,
+            bestEffort = beMatch?.let { m ->
+                BestEffortView(
+                    m.candidate.title, m.full, m.off, beFresh,
+                    report = beSha1?.takeIf { beFresh }?.let { BestEffortReport(it.lowercase(), beSize, beCode.orEmpty(), beRev, m.candidate.id, m.full, m.off) },
+                )
+            },
+            canTryBestEffort = s.unsupported && beCode != null,
+            bestEffortMiss = beMiss,
+        )
     }
 
     private fun sampleUntagged(reader: MemoryReader): SnapshotView {
         try {
             if (kind == null) detect(reader)
+            if (bestEffortRequested) {
+                bestEffortRequested = false
+                if (unsupportedHackLabel != null) runBestEffort(reader)
+            }
+            if (kind != null && !itemTextChosen) {
+                itemTextChosen = true
+                PokedexSource.romChanged()
+                nativeCfg?.language?.let { com.pokedaisy.app.companion.i18n.L10n.applyGameLanguage(it) }
+                RomItemText.use(itemTable(reader))
+            }
             activeGame = kind ?: GameKind.FIRERED
-            soulGoldV12 = nativeCfg === NATIVE_SOULGOLD_V1_2 || nativeCfg === NATIVE_SOULGOLD_V1_2B
-            amethystV141 = nativeCfg === NATIVE_AMETHYST_V1_4_1
+            val base = baseCfg ?: nativeCfg
+            soulGoldV12 = base === NATIVE_SOULGOLD_V1_2 || base === NATIVE_SOULGOLD_V1_2B
+            amethystV141 = base === NATIVE_AMETHYST_V1_4_1
             romLanguage = nativeCfg?.language ?: 'E'
             romGameCode = nativeCfg?.gameCode.orEmpty()
+            // Quetzal picks each kind of name's language from its own options (a few bytes a sample).
+            quetzalNames = nativeCfg?.takeIf { it.quetzalPlacesDefault >= 0 }
+                ?.let { runCatching { readQuetzalNames(reader, it) }.getOrNull() } ?: QuetzalNames()
 
             val telemetry = when (kind) {
-                GameKind.UNBOUND -> readNativeTelemetry(reader, NATIVE_UNBOUND_WITH_DEX)
+                // English Unbound leaves nativeCfg null (see detect()); its French translation sets its own.
+                GameKind.UNBOUND -> readNativeTelemetry(reader, nativeCfg ?: NATIVE_UNBOUND_WITH_DEX)
                 GameKind.YELLOW -> readGen1Telemetry(reader, gen1Cfg ?: GEN1_YELLOW)
                 else -> {
                     unsupportedHackLabel?.let { return SnapshotView(connected = false, error = it, unsupported = true) }
@@ -141,6 +217,21 @@ class TelemetrySampler {
         }
     }
 
+    private var itemTextChosen = false
+
+    /** Where the detected game's item descriptions are ([RomItemText]): its config's
+     * table when the ROM has it there, else (the QoL builds, whose gItems moves with
+     * every rebuild) the vanilla table found by its shape. */
+    private fun itemTable(reader: MemoryReader): ItemDescTable? {
+        if (kind == GameKind.YELLOW || unsupportedHackLabel != null) return null
+        val cfg = if (kind == GameKind.UNBOUND) nativeCfg ?: NATIVE_UNBOUND_WITH_DEX else nativeCfg
+        val t = cfg?.itemDescs
+        if (t != null && RomItemText.matchesRom(reader, t)) return t
+        if (cfg != null && t == null) return null
+        val size = runCatching { MgbaCore.pkRomSize() }.getOrDefault(0L)
+        return RomItemText.findVanillaItems(reader, size)
+    }
+
     private fun detect(reader: MemoryReader) {
         if (runCatching { MgbaCore.pkPlatform() }.getOrDefault(0) == 1) return detectGameBoy()
         val code = runCatching { MgbaCore.pkRomCode() }.getOrNull().orEmpty()
@@ -154,9 +245,9 @@ class TelemetrySampler {
             val cfg = otherRetailConfig(code, rev)
             kind = if (code.startsWith("BPR") || code.startsWith("BPG")) GameKind.FIRERED else GameKind.EMERALD
             when {
-                size > 0x1000000L -> unsupportedHackLabel =
-                    "unrecognized $code-based ROM hack (${size / (1024 * 1024)} MB) - no known RAM addresses for this build"
-                cfg == null -> unsupportedHackLabel = "${gameLabel(code)} revision $rev isn't supported yet"
+                size > 0x1000000L -> unsupportedRom(reader, code, size, null,
+                    "unrecognized $code-based ROM hack (${size / (1024 * 1024)} MB) - no known RAM addresses for this build")
+                cfg == null -> unsupportedRom(reader, code, size, null, "${gameLabel(code)} revision $rev isn't supported yet")
                 else -> nativeCfg = withCheckedTables(reader, cfg)
             }
             return
@@ -167,8 +258,22 @@ class TelemetrySampler {
         // [CompanionSupport] makes the same call from the file at import.
         if (code.length == 4 && code != "BPRE" && code != "BPEE") {
             kind = GameKind.FIRERED
-            unsupportedHackLabel = "game code $code isn't a supported Pokémon game"
+            // A Gen 3 base game's code under another letter (a regional build nothing maps) may still read as one.
+            unsupportedRom(reader, code, size, null, "game code $code isn't a supported Pokémon game")
             return
+        }
+
+        // Not every BPRE hack expands past 16 MB either (Orange Islands is exactly 16 MB, like
+        // retail and the FireRed QoL build): hash once, like the small-BPEE check below. An
+        // unknown hash falls through to the QoL / retail probe unchanged.
+        if (code == "BPRE" && size <= 0x1000000L && !smallBpreHashChecked) {
+            smallBpreHashChecked = true
+            val hash = runCatching { sha1HexChunked(reader, 0x08000000L, size) }.getOrNull()
+            if (hash == ORANGE_ISLANDS_UNVERSIONED_SHA1 || hash == ORANGE_ISLANDS_V5_7_BETA_SHA1) {
+                kind = GameKind.ORANGE_ISLANDS
+                nativeCfg = NATIVE_ORANGE_ISLANDS
+                return
+            }
         }
 
         // A big (>16 MB) BPRE ROM isn't unique to Unbound - other FireRed-based
@@ -190,6 +295,7 @@ class TelemetrySampler {
             val hash = runCatching { sha1HexChunked(reader, 0x08000000L, size) }.getOrNull()
             when (hash) {
                 UNBOUND_V2_1_1_1_SHA1 -> kind = GameKind.UNBOUND
+                UNBOUND_V2_1_1_1_FR_SHA1 -> { kind = GameKind.UNBOUND; nativeCfg = NATIVE_UNBOUND_FR }
                 GAIA_V3_2_SHA1 -> { kind = GameKind.GAIA; nativeCfg = NATIVE_GAIA_V3_2 }
                 RADICAL_RED_V4_1_SHA1 -> { kind = GameKind.RADICAL_RED; nativeCfg = NATIVE_RADICAL_RED_V4_1 }
                 ODYSSEY_V4_1_1_SHA1 -> { kind = GameKind.ODYSSEY; nativeCfg = NATIVE_ODYSSEY }
@@ -198,9 +304,9 @@ class TelemetrySampler {
                 CELIA_V1_1_4_SHA1 -> { kind = GameKind.CELIA; nativeCfg = NATIVE_CELIA }
                 else -> {
                     kind = GameKind.FIRERED
-                    unsupportedHackLabel = "unrecognized FireRed-based ROM hack " +
+                    unsupportedRom(reader, code, size, hash, "unrecognized FireRed-based ROM hack " +
                         "(BPRE, ${size / (1024 * 1024)} MB, sha1 ${hash?.take(12) ?: "unknown"}…) " +
-                        "- no known RAM addresses for this build"
+                        "- no known RAM addresses for this build")
                     // Full hash, not just the 12-char prefix in the UI-facing
                     // message above - needed to add a new *_SHA1 constant.
                     // This is the LIVE-BUS hash (see RADICAL_RED_V4_1_SHA1's
@@ -233,11 +339,12 @@ class TelemetrySampler {
                 GLAZED_V9_2_0_SHA1 -> { kind = GameKind.GLAZED; nativeCfg = NATIVE_GLAZED }
                 IMPERIUM_V1_3_1_SHA1 -> { kind = GameKind.IMPERIUM; nativeCfg = NATIVE_IMPERIUM }
                 QUETZAL_V9_0_ALPHA_SHA1 -> { kind = GameKind.QUETZAL; nativeCfg = NATIVE_QUETZAL }
+                QUETZAL_V9_0_ALPHA_ES_SHA1 -> { kind = GameKind.QUETZAL; nativeCfg = NATIVE_QUETZAL_ES }
                 else -> {
                     kind = GameKind.EMERALD
-                    unsupportedHackLabel = "unrecognized Emerald-based ROM hack " +
+                    unsupportedRom(reader, code, size, hash, "unrecognized Emerald-based ROM hack " +
                         "(BPEE, ${size / (1024 * 1024)} MB, sha1 ${hash?.take(12) ?: "unknown"}…) " +
-                        "- no known RAM addresses for this build"
+                        "- no known RAM addresses for this build")
                     android.util.Log.i("pokedaisy", "unrecognized BPEE hack: full sha1=$hash size=$size")
                 }
             }
@@ -404,6 +511,9 @@ class TelemetrySampler {
         }
 
         const val UNBOUND_V2_1_1_1_SHA1 = "b4776b82a4c7915d0fadeaa27e013523f99dfd94"
+        // Its French fan translation (the same release's code and RAM, French text) - host-side
+        // masked hash (GPIO bytes zero, so a plain `shasum`).
+        const val UNBOUND_V2_1_1_1_FR_SHA1 = "0ce2a880aa097f1dce4e1db8ee513d0e82d15859"
         // Pokémon Gaia v3.2 - see NATIVE_GAIA_V3_2 in NativeReader.kt for the
         // verification this address reuse is based on.
         const val GAIA_V3_2_SHA1 = "d5b1e77975fcda831e0e9a7b527906bf3f40ecd0"
@@ -455,6 +565,14 @@ class TelemetrySampler {
         const val IMPERIUM_V1_3_1_SHA1 = "1d20091c4d936f5eb122db8780554dd0829ffb63"
         // Pokémon Quetzal English Alpha 9 v0 (BPEE, 32 MB) - host-side masked hash (GPIO bytes zero).
         const val QUETZAL_V9_0_ALPHA_SHA1 = "d0658315da1e8827f66f15c3d3a000fe747e163e"
+        // Pokémon Quetzal Spanish Alpha 9 v0 (BPEE, 32 MB) - host-side masked hash (GPIO bytes zero).
+        const val QUETZAL_V9_0_ALPHA_ES_SHA1 = "fe346b5b0eb022e3a103f81e7dcefba6f1dc542f"
+        // Pokémon Orange Islands (BPRE rev 0, 16 MB - the size of retail, so checked by hash before
+        // the QoL / retail probe): Beta 5.7, and a build with no version on it that differs from it
+        // in 80 bytes of map text and data (a typo Beta 5.7 doesn't have - likely an earlier beta).
+        // Both host-side masked hashes (GPIO bytes zero).
+        const val ORANGE_ISLANDS_V5_7_BETA_SHA1 = "d2e3800e69e44c9649c3d9a15dc1cd12c1d90501"
+        const val ORANGE_ISLANDS_UNVERSIONED_SHA1 = "8bac897de515f88e6ce92d0712ce2c018a394b37"
 
         // Pokémon Yellow (USA, Europe) - the Game Boy cart (pret/pokeyellow builds it byte for byte).
         const val YELLOW_SHA1 = "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1"
@@ -471,13 +589,14 @@ class TelemetrySampler {
         const val GAME_BOY_SUPPORT = true
 
         /** Every hack detect() has RAM addresses for - the >16 MB ones it
-         * hashes, plus Seaglass (16 MB). [CompanionSupport] checks imports against it. */
+         * hashes, plus Seaglass and Orange Islands (16 MB). [CompanionSupport] checks imports against it. */
         val SUPPORTED_HACK_SHA1S = setOf(
             UNBOUND_V2_1_1_1_SHA1, GAIA_V3_2_SHA1, RADICAL_RED_V4_1_SHA1, ODYSSEY_V4_1_1_SHA1,
             AMETHYST_V1_3_0_SHA1, AMETHYST_V1_4_1_SHA1, CELIA_V1_1_4_SHA1, HEART_AND_SOUL_V2_0_6_SHA1, LAZARUS_V2_0_SHA1,
             ROWE_V2_1_9_1_SHA1, EMERALD_ROGUE_V2_2_1_EX_SHA1, TMT2_V1_5_2_SHA1, EMERALD_SEAGLASS_V3_0_SHA1,
             SOULGOLD_V1_1_4_SHA1, SOULGOLD_V1_2_SHA1, SOULGOLD_V1_2B_SHA1, GLAZED_V9_2_0_SHA1, IMPERIUM_V1_3_1_SHA1,
-            QUETZAL_V9_0_ALPHA_SHA1,
+            QUETZAL_V9_0_ALPHA_SHA1, QUETZAL_V9_0_ALPHA_ES_SHA1, UNBOUND_V2_1_1_1_FR_SHA1,
+            ORANGE_ISLANDS_V5_7_BETA_SHA1, ORANGE_ISLANDS_UNVERSIONED_SHA1,
         )
     }
 }

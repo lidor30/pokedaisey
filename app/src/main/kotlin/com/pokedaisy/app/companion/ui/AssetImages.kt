@@ -27,8 +27,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Art images by path, decoded once: what [RomArt] rebuilt from a ROM the
- * player has run (FireRed / Emerald party menu, backdrops, region maps), else
- * a bundled asset (the other games' art). A path missing now is retried once
+ * player has run (party menus, backdrops, region maps - no game art is
+ * bundled), else an asset of that name. A path missing now is retried once
  * [RomArt.updates] moves - key composables on [rememberArtGeneration].
  */
 internal object GameArt {

@@ -93,7 +93,14 @@ class AppUpdateFlow(private val activity: ComponentActivity) {
             val ok = AppUpdater.download(r, apk) { p -> activity.runOnUiThread { progress = p } }
             activity.runOnUiThread {
                 progress = null
-                if (ok) install(apk) else error = tr("THE DOWNLOAD FAILED - CHECK THE CONNECTION AND TRY AGAIN")
+                when {
+                    !ok -> error = tr("THE DOWNLOAD FAILED - CHECK THE CONNECTION AND TRY AGAIN")
+                    !isOurUpdate(apk) -> {
+                        apk.delete()
+                        error = tr("THE DOWNLOAD ISN'T A POKéDAISY UPDATE - NOT INSTALLED")
+                    }
+                    else -> install(apk)
+                }
             }
         }, "pokedaisy-update-download").apply { isDaemon = true; start() }
     }
@@ -106,6 +113,40 @@ class AppUpdateFlow(private val activity: ComponentActivity) {
             launchInstaller(apk)
         }
     }
+
+    /**
+     * Only an APK of this app, signed with this app's own key, newer than this build, goes to the
+     * installer. Android would refuse a differently-signed update of this app anyway, but an APK
+     * with another package name would install as a new app - so a release asset swapped on GitHub
+     * (or anything in between) can't pass itself off as an update.
+     */
+    private fun isOurUpdate(apk: File): Boolean = runCatching {
+        val pm = activity.packageManager
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            @Suppress("DEPRECATION") android.content.pm.PackageManager.GET_SIGNATURES
+        }
+        // Some Android 9-12 builds leave signingInfo null for an archive: fall back to the signatures.
+        @Suppress("DEPRECATION")
+        fun certs(info: android.content.pm.PackageInfo) =
+            (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.signingInfo?.apkContentsSigners else null)
+                ?.map { it.toCharsString() }?.toSet()
+                ?: info.signatures?.map { it.toCharsString() }?.toSet().orEmpty()
+        @Suppress("DEPRECATION")
+        fun withSignatures(info: android.content.pm.PackageInfo?, refetch: (Int) -> android.content.pm.PackageInfo?) =
+            if (info != null && certs(info).isEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                refetch(android.content.pm.PackageManager.GET_SIGNATURES) ?: info
+            } else info
+        @Suppress("DEPRECATION")
+        fun version(info: android.content.pm.PackageInfo) =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode else info.versionCode.toLong()
+        val theirs = withSignatures(pm.getPackageArchiveInfo(apk.path, flags)) { f -> pm.getPackageArchiveInfo(apk.path, f) } ?: return false
+        val ours = withSignatures(pm.getPackageInfo(activity.packageName, flags)) { f -> pm.getPackageInfo(activity.packageName, f) }!!
+        theirs.packageName == activity.packageName &&
+            certs(ours).isNotEmpty() && certs(theirs) == certs(ours) &&
+            version(theirs) > version(ours)
+    }.getOrDefault(false)
 
     private fun canInstall() =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.O || activity.packageManager.canRequestPackageInstalls()

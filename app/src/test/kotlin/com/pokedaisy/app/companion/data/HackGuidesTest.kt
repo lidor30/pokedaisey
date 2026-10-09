@@ -131,6 +131,44 @@ class HackGuidesTest {
         assertEquals("LEADER SPARKY", GUIDE_GLAZED.bosses.first { !it.isDone(progress) }.title)
     }
 
+    private val orangeIslands = Game("Pokemon Orange Islands.gba", GameKind.ORANGE_ISLANDS, NATIVE_ORANGE_ISLANDS, "orange_islands")
+    private val quetzalEs = Game("QuetzalDaisy/PokemonQuetzalSpanishAlpha9v0.gba", GameKind.QUETZAL, NATIVE_QUETZAL_ES, "quetzal_es")
+    private val unboundFr = Game("Pokémon Unbound v2.1.1.1 FR.gba", GameKind.UNBOUND, NATIVE_UNBOUND_FR, "unbound_fr")
+
+    /** Orange Islands: its four gym leaders and DRAKE (trainers 1-5), the next one on the save, HERE and WHERE IS. */
+    @Test fun `orange islands`() {
+        val rom = load(orangeIslands) ?: return
+        assertTrue(guideTablesMatchRom(rom, orangeIslands.t))
+        for (boss in GUIDE_ORANGE_ISLANDS.bosses) {
+            val team = GuideRomSource.party(orangeIslands.t, boss.trainer(noProgress))!!
+            assertTrue(boss.title, team.size in 1..6 && team.all { it.species in 1..411 && it.level in 1..100 && it.moves.isNotEmpty() })
+        }
+        assertEquals(listOf(20, 22), GuideRomSource.party(orangeIslands.t, 1)!!.map { it.level }) // CISSY
+        val p = readSaveProgress(FixtureMemoryReader.load("orange_islands"), NATIVE_ORANGE_ISLANDS, orangeIslands.t)!!
+        assertEquals("LEADER CISSY", GUIDE_ORANGE_ISLANDS.bosses.first { !it.isDone(p) }.title)
+        // Its repointed wild headers: some map has grass.
+        assertTrue(GuideRomSource.wildMapKeys(orangeIslands.t).isNotEmpty())
+        val whereIs = generatedWhereIs(GuideId.ORANGE_ISLANDS, { "AREA $it" }) { false }
+        assertNotNull(whereIs)
+    }
+
+    /** The translations: their own tables (Quetzal Spanish) or English's (Unbound French), names in their language. */
+    @Test fun `quetzal spanish and unbound french`() {
+        load(quetzalEs)?.let { rom ->
+            assertTrue(guideTablesMatchRom(rom, quetzalEs.t))
+            for (boss in GUIDE_QUETZAL.bosses) for ((label, id) in boss.teams(noProgress)) {
+                val team = GuideRomSource.party(quetzalEs.t, id)
+                assertTrue("${boss.title} $label ($id)", team != null && team.size in 1..6 && team.all { it.species > 0 && it.level in 1..100 })
+            }
+            // Jagged Pass, where the save stands.
+            assertTrue(GuideRomSource.encounters(quetzalEs.t, 24, 13)!!.grass.any { speciesNamesQuetzal[it.species] == "Phanpy" })
+        }
+        load(unboundFr)?.let { rom ->
+            assertTrue(guideTablesMatchRom(rom, unboundFr.t))
+            assertEquals(listOf(15, 16), GuideRomSource.party(unboundFr.t, 719)!!.map { it.level })
+        }
+    }
+
     private val imperium = Game("Emerald Imperium (v1.3.1).gba", GameKind.IMPERIUM, NATIVE_IMPERIUM, "imperium")
     private val quetzal = Game("PokemonQuetzalEnglishAlpha9v0.gba", GameKind.QUETZAL, NATIVE_QUETZAL, "quetzal")
 

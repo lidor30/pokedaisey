@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Fingerprints of the FireRed / Emerald graphics the companion rebuilds from
-the player's own ROM (companion/data/RomArt.kt) - the party-menu slot, Poke
-Ball, status icons, small font, party backdrop, region maps, the region
-map's player icons and the trainer card's pieces (kept raw for
-TrainerCardArt.kt). Nothing of the
+"""Fingerprints of the graphics the companion rebuilds from the player's own ROM
+(companion/data/RomArt.kt) - FireRed / Emerald's party-menu slot, Poke Ball,
+status icons, small font, party backdrop, region maps, the region map's player
+icons and the trainer card's pieces (kept raw for TrainerCardArt.kt), and the
+hacks' own: Heart and Soul's and the CFRU hacks' party menus, region maps, ... Nothing of the
 ROM is bundled: per blob this stores only
 
   size    decoded length (LZ77 blobs: the decompressed length)
@@ -18,10 +18,9 @@ Retail, QoL builds and hacks that kept the art all match, wherever the linker
 put it. Source: the pinned decomp builds (see CLAUDE.md) and their ELFs.
 
 Usage: scripts/gen_rom_art_sigs.py   (needs $DECOMPS/pokefirered and
-$DECOMPS/pokeemerald built once, and the Unbound / Lazarus / Seaglass / SoulGold / Glazed /
-Imperium / Quetzal ROMs at UNBOUND_ROM / LAZARUS_ROM / SEAGLASS_ROM / SOULGOLD_ROM / GLAZED_ROM / IMPERIUM_ROM /
-QUETZAL_ROM; re-run only
-if a pin changes)
+$DECOMPS/pokeemerald built once, and the hack ROMs at the *_ROM paths below - Unbound /
+Radical Red / Odyssey / Amethyst / Heart and Soul / Lazarus / Seaglass / SoulGold / Glazed / Imperium /
+Quetzal / R.O.W.E.; a missing one keeps its rows as they were. Re-run only if a pin changes)
 """
 import os
 import subprocess
@@ -73,14 +72,24 @@ def lz77(rom, off):
                     out.append(out[-((d & 0xFFF) + 1)])
             else:
                 out.append(rom[i]); i += 1
-    return bytes(out), i - off
+    # A last back-reference can run past the size in the header (CFRU's party palette: 512
+    # bytes, its last copy ends at 513); the game, and RomArt.lz77, stop at the size.
+    return bytes(out[:size]), i - off
 
 
 # Pokemon Unbound v2.1.1.1 (sha1 b4776b82...): a binary hack with no ELF. Its
 # player's front pics replace Red / Leaf at the same pic ids (TRAINER_PIC_RED
 # 135, _LEAF 136) in its own gTrainerFrontPicTable / PaletteTable (found by
 # shape: 148 {ptr, size, tag = index} records, 18 / 20 literal-pool refs).
-UNBOUND_ROM = os.path.expanduser("~/Downloads/Game ROMs & Emulation/gba/Pokemon - Unbound (v2.1.1.1).gba")
+GBA_DIR = os.path.expanduser("~/Downloads/Game ROMs & Emulation/gba/")
+
+
+def first_rom(*names):
+    """The first of [names] (one ROM's file names seen on this machine) that exists."""
+    return next((GBA_DIR + n for n in names if os.path.exists(GBA_DIR + n)), GBA_DIR + names[0])
+
+
+UNBOUND_ROM = first_rom("Pokemon - Unbound (v2.1.1.1).gba", "Pokémon Unbound (v2.1.1.1).gba")
 UNBOUND_PIC_TABLE = 0x23957C
 UNBOUND_PAL_TABLE = 0x239A1C
 
@@ -92,7 +101,29 @@ def unbound_symbols(rom):
     return {
         "PicMale": entry(UNBOUND_PIC_TABLE, 135), "PalMale": entry(UNBOUND_PAL_TABLE, 135),
         "PicFemale": entry(UNBOUND_PIC_TABLE, 136), "PalFemale": entry(UNBOUND_PAL_TABLE, 136),
+        **cfru_symbols(rom),
     }
+
+
+# The CFRU hacks (Unbound, Radical Red, Odyssey, Amethyst) share one party menu: FireRed's
+# party_menu.c with 112x40 slot windows, new slot tilemaps and new background art (see
+# scripts/gen_cfru_party_assets.py, which checked it the same in all four). Through FireRed rev 0's
+# literal pools, which the hacks kept: AllocPartyMenuBgGfx's (gPartyMenuBg_Gfx / _Tilemap / _Pal,
+# LZ77) and the status icons' CompressedSpriteSheet; the slot tilemaps sit at fixed addresses.
+# The font, the Poke Ball (only Unbound draws one) and both sprite palettes are FireRed's own
+# bytes, which FR_FONT_SMALL / FR_BALL_* / FR_STATUS_PAL already find. Only the status icons
+# differ per hack.
+RADICAL_RED_ROM = GBA_DIR + "Pokemon - Radical Red (v4.1).gba"
+ODYSSEY_ROM = GBA_DIR + "Pokémon Odyssey (English) (v4.1.1).gba"
+AMETHYST_ROM = GBA_DIR + "Pokemon Amethyst (v1.3.0).gba"  # v1.4.1's status icons are the same bytes
+
+
+def cfru_symbols(rom):
+    def ptr(at):
+        return int.from_bytes(rom[at:at + 4], "little") & 0x1FFFFFF, 0
+    return {"PartyBgGfx": ptr(0x11EFB0), "PartyBgMap": ptr(0x11EFCC), "PartyBgPal": ptr(0x11EFF4),
+            "SlotMain": (0x45A180, 70), "SlotNoHp": (0x45A1C8, 70), "SlotEmpty": (0x45A210, 70),
+            "StatusGfx": ptr(0x45A574)}
 
 
 # Pokemon Lazarus v2.0 (sha1 7dcdc7e2...): a pokeemerald build (gcc) with its own
@@ -175,7 +206,15 @@ HNS_ROM = os.path.expanduser("~/Downloads/Game ROMs & Emulation/gba/Pokémon Hea
 
 
 def hns_symbols(rom):
-    return {"RegionGfx": (0xD4D630, 0), "RegionMap": (0xD4D3F4, 0)}
+    # Its party menu (graphics/party_menu/hns/, the expansion's party_menu.c): background tiles
+    # (smol) + palette (raw, the whole .gbapal) + tilemap (smol tilemap), through
+    # AllocPartyMenuBgGfx's literal pool; the Poke Ball's and status icons' sheets (smol) and
+    # palettes (raw), through their sprite-sheet structs; FONT_SMALL (raw, gFontSmallLatinGlyphs,
+    # 512 16x16 glyphs). Its slot tilemaps are Emerald's bytes (EM_SLOT_MAIN / _NO_HP find them).
+    return {"RegionGfx": (0xD4D630, 0), "RegionMap": (0xD4D3F4, 0),
+            "PartyBgGfx": (0x6CC324, 0), "PartyBgPal": (0x6CC124, 512), "PartyBgMap": (0x6CC07C, 0),
+            "BallGfx": (0x6CBF60, 0), "BallPal": (0x6CBE9C, 32), "StatusGfx": (0x6CBCC4, 0),
+            "StatusPal": (0x6CBCA4, 32), "FontSmall": (0x665040, 32768)}
 
 
 # Pokemon R.O.W.E. v2.1.9.1 Experimental (sha1 81bd0f4b...): Emerald's region_map.c with three maps
@@ -318,7 +357,17 @@ GAMES = {
         ("UB_PIC_MALE_PAL", "PalMale", True),
         ("UB_PIC_FEMALE", "PicFemale", True),
         ("UB_PIC_FEMALE_PAL", "PalFemale", True),
+        ("CFRU_PARTY_BG_GFX", "PartyBgGfx", True),
+        ("CFRU_PARTY_BG_PAL", "PartyBgPal", True),
+        ("CFRU_PARTY_BG_MAP", "PartyBgMap", True),
+        ("CFRU_SLOT_MAIN", "SlotMain", False),
+        ("CFRU_SLOT_NO_HP", "SlotNoHp", False),
+        ("CFRU_SLOT_EMPTY", "SlotEmpty", False),
+        ("UB_STATUS_GFX", "StatusGfx", True),
     ]),
+    "RR": (RADICAL_RED_ROM, None, [("RR_STATUS_GFX", "StatusGfx", True)]),
+    "OD": (ODYSSEY_ROM, None, [("OD_STATUS_GFX", "StatusGfx", True)]),
+    "AM": (AMETHYST_ROM, None, [("AM_STATUS_GFX", "StatusGfx", True)]),
     "LZ": (LAZARUS_ROM, None, [
         ("LZ_REGION_GFX", "RegionGfx", True),
         ("LZ_REGION_PAL", "RegionPal", False),
@@ -345,6 +394,14 @@ GAMES = {
     "HNS": (HNS_ROM, None, [
         ("HNS_REGION_GFX", "RegionGfx", "smol"),
         ("HNS_REGION_MAP", "RegionMap", "smol"),
+        ("HNS_PARTY_BG_GFX", "PartyBgGfx", "smol"),
+        ("HNS_PARTY_BG_PAL", "PartyBgPal", False),
+        ("HNS_PARTY_BG_MAP", "PartyBgMap", "smol"),
+        ("HNS_BALL_GFX", "BallGfx", "smol"),
+        ("HNS_BALL_PAL", "BallPal", False),
+        ("HNS_STATUS_GFX", "StatusGfx", "smol"),
+        ("HNS_STATUS_PAL", "StatusPal", False),
+        ("HNS_FONT_SMALL", "FontSmall", False),
     ]),
     "QTZ": (QUETZAL_ROM, None, [
         ("QTZ_REGION_PAL", "RegionPal", False),
@@ -419,7 +476,7 @@ def fireRed_symbols(p):
 
 
 # The binary hacks' made-up symbols (no ELF).
-ROM_SYMBOLS = {"UB": unbound_symbols, "LZ": lazarus_symbols, "SGL": seaglass_symbols, "SG": soulgold_symbols,
+ROM_SYMBOLS = {"UB": unbound_symbols, "RR": cfru_symbols, "OD": cfru_symbols, "AM": cfru_symbols, "LZ": lazarus_symbols, "SGL": seaglass_symbols, "SG": soulgold_symbols,
                "GZ": glazed_symbols, "IMP": imperium_symbols, "QTZ": quetzal_symbols, "HNS": hns_symbols, "RW": rowe_symbols,
                **{"EM" + lang: emerald_eu_symbols(lang) for lang in EMERALD_EU_ROMS},
                **{"FR" + lang: fireRed_symbols(p) for lang, p in fireRed_ports().items()}}

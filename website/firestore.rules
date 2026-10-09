@@ -1,0 +1,29 @@
+rules_version = '2';
+
+// PokéDaisy's Firestore: only the app's opt-in BEST EFFORT reports (BestEffortShare.kt), write-only.
+// A report is exactly these fields, about the ROM alone - no names, accounts or device details - and
+// nobody can read, change or delete one through the API (look at them in the Firebase console).
+// Deploy from website/: firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /bestEffortReports/{report} {
+      allow create: if request.resource.data.keys().hasOnly(
+            ['sha1', 'size', 'gameCode', 'revision', 'matchedAs', 'full', 'off', 'appVersion'])
+        && request.resource.data.keys().hasAll(
+            ['sha1', 'size', 'gameCode', 'revision', 'matchedAs', 'full', 'off', 'appVersion'])
+        && request.resource.data.sha1 is string && request.resource.data.sha1.matches('^[0-9a-f]{40}$')
+        && request.resource.data.size is int && request.resource.data.size > 0 && request.resource.data.size <= 67108864
+        && request.resource.data.gameCode is string && request.resource.data.gameCode.matches('^[A-Z0-9]{4}$')
+        && request.resource.data.revision is int && request.resource.data.revision >= 0 && request.resource.data.revision <= 255
+        && request.resource.data.matchedAs is string && request.resource.data.matchedAs.matches('^[A-Z0-9_]{1,40}$')
+        && request.resource.data.full is bool
+        && request.resource.data.off is list && request.resource.data.off.size() <= 3
+        && request.resource.data.off.hasOnly(['DEX', 'GUIDE', 'ITEM_TEXT'])
+        && request.resource.data.appVersion is string && request.resource.data.appVersion.matches('^[0-9A-Za-z.-]{1,20}$');
+      allow read, update, delete: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

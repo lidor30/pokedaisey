@@ -122,7 +122,6 @@ class PokeDaisyActivity : Activity() {
     private var fromFrontend = false
     private var romKey: String = ""      // ROM CRC32, for per-ROM prefs
     private var states: SaveStates? = null
-    private lateinit var saveDir: File
 
     private val telemetry = TelemetryStore()
     private lateinit var displayManager: DisplayManager
@@ -195,6 +194,24 @@ class PokeDaisyActivity : Activity() {
         else -> null
     }
 
+    /** NOT SUPPORTED's TRY BEST EFFORT: the sampler tries it on its next pass (the emulator thread). */
+    private val tryBestEffort: () -> Unit = { telemetry.requestBestEffort() }
+
+    /** The match notice's SHARE - the player's yes to sending exactly what it listed. */
+    private val shareBestEffort: (com.pokedaisy.app.companion.data.BestEffortReport) -> Unit = { r ->
+        BestEffortShare.share(this, r)
+    }
+
+    /** NOT SUPPORTED's ASK FOR SUPPORT: the ROM's SHA-1 off the UI thread, then the issue in a browser. */
+    private val askForSupport: () -> Unit = {
+        rom?.let { r ->
+            Thread({
+                val url = RomSupportRequest.url(r)
+                runOnUiThread { runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } }
+            }, "pokedaisy-support-request").apply { isDaemon = true; start() }
+        }
+    }
+
     private val itemUse = object : com.pokedaisy.app.companion.ItemUse {
         override fun canUse(itemId: Int) =
             itemId in com.pokedaisy.app.companion.data.REPEL_ITEMS && fieldItemsFor(telemetry.snapshot.value.game) != null
@@ -234,6 +251,9 @@ class PokeDaisyActivity : Activity() {
         game == com.pokedaisy.app.companion.data.GameKind.EMERALD &&
             (romCode == "BPEE" || romCode in com.pokedaisy.app.companion.data.EMERALD_EUROPEAN_CODES) ->
             BattleInputController.SwitchAddrs(partyMenu = 0x0203CEC8L, party = 0x020244ECL)
+        // Orange Islands is retail FireRed rev 0's RAM and party menu, edited in place.
+        game == com.pokedaisy.app.companion.data.GameKind.ORANGE_ISLANDS ->
+            BattleInputController.SwitchAddrs(partyMenu = 0x0203B0A0L, party = 0x02024284L)
         game == com.pokedaisy.app.companion.data.GameKind.TMT2 ->
             BattleInputController.SwitchAddrs(partyMenu = 0x0203242CL, party = 0x02032C94L)
         game == com.pokedaisy.app.companion.data.GameKind.AMETHYST ->
@@ -282,6 +302,11 @@ class PokeDaisyActivity : Activity() {
             Prefs(this@PokeDaisyActivity).ffMusicMode = mode
             if (::engine.isInitialized) engine.ffMusicMode = mode
         }
+        override val rewind get() = Prefs(this@PokeDaisyActivity).rewind
+        override fun setRewind(on: Boolean) {
+            Prefs(this@PokeDaisyActivity).rewind = on
+            if (::engine.isInitialized) engine.rewindEntries = rewindEntries(on)
+        }
         override val ffMode get() = Prefs(this@PokeDaisyActivity).ffMode
         override fun setFfMode(mode: FfMode) {
             Prefs(this@PokeDaisyActivity).ffMode = mode
@@ -320,8 +345,7 @@ class PokeDaisyActivity : Activity() {
             view.unbindCoreBlocking()
             engine.stop()
             states?.resumeFile?.let { if (it.exists()) it.delete() }
-            saveDir = SavesLocation.dir(this@PokeDaisyActivity)
-            val save = SavesLocation.resolve(saveDir, r)
+            val save = SavesLocation.saveFor(this@PokeDaisyActivity, Prefs(this@PokeDaisyActivity), r)
             syncCheats()
             engine.start(romData ?: r, save, null)
             showHud(com.pokedaisy.app.companion.i18n.tr("Game restarted"))
@@ -449,6 +473,8 @@ class PokeDaisyActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        RomFolder.useBestEffortStore(this)
+        BestEffortShare.flush(this)   // a shared match that couldn't go out last time
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         goImmersive()
         RetroAchievements.init(this)
@@ -543,18 +569,17 @@ class PokeDaisyActivity : Activity() {
         root.setViewTreeViewModelStoreOwner(owner)
         sidePanel = SidePanel(root, view, touchControls, Prefs(this), panelBack, playClick) {
             val snap by telemetry.snapshot.collectAsState()
-            CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = panelBack, clickSound = playClick, achievements = RetroAchievements, statusBar = companionStatusBar, itemUse = itemUse)
+            CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = panelBack, clickSound = playClick, achievements = RetroAchievements, statusBar = companionStatusBar, itemUse = itemUse, askForSupport = askForSupport, tryBestEffort = tryBestEffort, shareBestEffort = shareBestEffort)
         }
         portraitPanel = PortraitPanel(root, view, touchControls, Prefs(this), portraitBack, playClick) {
             val snap by telemetry.snapshot.collectAsState()
-            CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = portraitBack, clickSound = playClick, achievements = RetroAchievements, statusBar = companionStatusBar, itemUse = itemUse)
+            CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = portraitBack, clickSound = playClick, achievements = RetroAchievements, statusBar = companionStatusBar, itemUse = itemUse, askForSupport = askForSupport, tryBestEffort = tryBestEffort, shareBestEffort = shareBestEffort)
         }
         // Two screens: the game stays on the landscape top one. One screen (a phone): it turns
         // with the device (the user's rotation setting), the companion under the game upright.
         syncOrientation(Screens.hasSecond(this))
         syncGameScreen()
 
-        saveDir = SavesLocation.dir(this)
         hotkeys = Hotkeys.load(getExternalFilesDir(null) ?: filesDir)
         displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
         inputManager = getSystemService(Context.INPUT_SERVICE) as android.hardware.input.InputManager
@@ -698,6 +723,7 @@ class PokeDaisyActivity : Activity() {
             ffMaxSpeed = Prefs(this@PokeDaisyActivity).ffMaxSpeed
             ffMusicMode = Prefs(this@PokeDaisyActivity).ffMusicMode
             ffMode = Prefs(this@PokeDaisyActivity).ffMode
+            rewindEntries = rewindEntries(Prefs(this@PokeDaisyActivity).rewind)
             restoreFastForwardToggled(Prefs(this@PokeDaisyActivity).ffToggled)
             restoreSpeedIndex(Prefs(this@PokeDaisyActivity).speedIndexFor(romKey))
         }
@@ -755,8 +781,8 @@ class PokeDaisyActivity : Activity() {
             engine.ffMaxSpeed = Prefs(this).ffMaxSpeed
             engine.ffMusicMode = Prefs(this).ffMusicMode
             engine.ffMode = Prefs(this).ffMode
+            engine.rewindEntries = rewindEntries(Prefs(this).rewind)
         }
-        saveDir = SavesLocation.dir(this)
         if (!startGame()) return
         displayManager.registerDisplayListener(displayListener, null)
         syncPresentation()
@@ -786,7 +812,7 @@ class PokeDaisyActivity : Activity() {
     private fun startGame(): Boolean {
         val r = rom ?: return false
         val st = states ?: return false
-        val save = SavesLocation.resolve(saveDir, r)
+        val save = SavesLocation.saveFor(this, Prefs(this), r)
         // Cheats may have changed in the library's Settings since the game was last up.
         syncCheats()
         // Auto-resume from wherever was written most recently: normally that's
@@ -901,7 +927,7 @@ class PokeDaisyActivity : Activity() {
                 if (swap) stage
                 else DualScreenPresentation.companionView(
                     ctx, telemetry, stateSlots, companionSettings, battleInput, companionBack, playClick, RetroAchievements,
-                    initialTab = companionStartTab, statusBar = companionStatusBar, itemUse = itemUse,
+                    initialTab = companionStartTab, statusBar = companionStatusBar, itemUse = itemUse, askForSupport = askForSupport, tryBestEffort = tryBestEffort, shareBestEffort = shareBestEffort,
                 )
             }.also { it.show() }
         }.onFailure { Log.w("pokedaisy", "presentation failed", it) }.getOrNull()
@@ -952,7 +978,7 @@ class PokeDaisyActivity : Activity() {
         val owner = ComposeHostOwner().apply { create(); resume() }
         val view = DualScreenPresentation.companionView(
             this, telemetry, stateSlots, companionSettings, battleInput, companionBack, playClick, RetroAchievements,
-            initialTab = companionStartTab, statusBar = companionStatusBar, itemUse = itemUse,
+            initialTab = companionStartTab, statusBar = companionStatusBar, itemUse = itemUse, askForSupport = askForSupport, tryBestEffort = tryBestEffort, shareBestEffort = shareBestEffort,
         ).apply {
             setViewTreeLifecycleOwner(owner)
             setViewTreeSavedStateRegistryOwner(owner)
@@ -1149,11 +1175,19 @@ class PokeDaisyActivity : Activity() {
             Hotkeys.Action.FF_TOGGLE -> if (e.pressed) engine.toggleFastForward()
             Hotkeys.Action.SPEED_CYCLE -> if (e.pressed) engine.cycleSpeed()
             Hotkeys.Action.SLOWMO_HOLD -> engine.setSlowmoHeld(e.pressed)
+            Hotkeys.Action.REWIND_HOLD -> {
+                if (e.pressed && !Prefs(this).rewind) showHud(com.pokedaisy.app.companion.i18n.tr("Rewind is off - turn it on in SETTINGS"))
+                else if (e.pressed) showHud(com.pokedaisy.app.companion.i18n.tr("Rewinding"))
+                engine.setRewindHeld(e.pressed)
+            }
             Hotkeys.Action.EXIT_GAME -> if (e.pressed) exitGame()
         }
     }
 
     // --- helpers -----------------------------------------------------------------
+
+    /** REWIND's buffer: 600 states, one every 2 frames - the last ~20 s of play. */
+    private fun rewindEntries(on: Boolean) = if (on) 600 else 0
 
     private fun showHud(text: String) {
         hud.text = text
@@ -1296,7 +1330,7 @@ class PokeDaisyActivity : Activity() {
         return ComposeView(this).apply {
             setContent {
                 val snap by telemetry.snapshot.collectAsState()
-                CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = mirrorBack, clickSound = playClick, achievements = RetroAchievements, statusBar = companionStatusBar, itemUse = itemUse)
+                CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = mirrorBack, clickSound = playClick, achievements = RetroAchievements, statusBar = companionStatusBar, itemUse = itemUse, askForSupport = askForSupport, tryBestEffort = tryBestEffort, shareBestEffort = shareBestEffort)
             }
         }
     }

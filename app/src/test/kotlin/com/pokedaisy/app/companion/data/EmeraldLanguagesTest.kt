@@ -76,7 +76,6 @@ class EmeraldLanguagesTest {
         select(l)
         assertEquals(l.torchic, speciesName(280))
         assertEquals(l.potion, itemName(13))
-        assertTrue(itemDescription(13).isNotEmpty())
         assertEquals(l.pound, lookupMove(1).name)
         assertEquals(pound.type to pound.power, lookupMove(1).type to lookupMove(1).power) // English's type and power
         assertEquals(l.hardy, natureName(0))

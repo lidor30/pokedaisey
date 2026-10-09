@@ -43,6 +43,32 @@ class HackPokedexTest {
         assertTrue(dex.national)
     }
 
+    /** Quetzal's Spanish release (its dex said AVISTADOS 468 / ATRAPADOS 349) and a second English save. */
+    @Test
+    fun `Quetzal - the Spanish save and the Johto one`() {
+        val es = state("quetzal_es", NATIVE_QUETZAL_ES)
+        assertEquals(468 to 349, es.seen.size to es.caught.size)
+        assertTrue(es.caught.containsAll(listOf(6, 130)))
+        val johto = state("quetzal_johto", NATIVE_QUETZAL)
+        assertTrue(johto.caught.containsAll(listOf(4, 215, 408, 442, 627)))
+    }
+
+    /** Unbound FR: CFRU's flags, as English's - its dex said Seen 6 Borrius / 8 National, Caught 2 / 3. */
+    @Test
+    fun `Unbound FR - seen 8, caught 3`() {
+        val dex = state("unbound_fr", NATIVE_UNBOUND_FR)
+        assertEquals(8 to 3, dex.seen.size to dex.caught.size)
+        assertEquals(setOf(225, 246, 361), dex.caught)
+    }
+
+    /** Orange Islands: FireRed's flags - its continue screen said POKéDEX 2 (PIKACHU and the MEWTWO it starts with). */
+    @Test
+    fun `Orange Islands - two caught`() {
+        val dex = state("orange_islands", NATIVE_ORANGE_ISLANDS)
+        assertEquals(setOf(25, 150), dex.caught)
+        assertFalse(dex.national)
+    }
+
     /** Glazed: retail's flags (its own numbering, CHIMCHAR No.322); Imperium: SaveBlock1's, by national number. */
     @Test
     fun `Glazed and Imperium - the starter caught`() {
@@ -274,6 +300,28 @@ class HackPokedexTest {
         assertEquals("Solar Power", charmander.hiddenAbility)
         assertEquals(31, charmander.genderRatio)
         assertEquals(1244, PokedexSource.speciesFor(t, 915)) // LECHONK
+    }
+
+    @Test
+    fun `Quetzal Spanish entries`() = roms("QuetzalDaisy/PokemonQuetzalSpanishAlpha9v0.gba", GameKind.QUETZAL, POKEDEX_QUETZAL_ES) { t ->
+        val charmander = PokedexSource.entry(t, 4)!!
+        assertEquals("Lagartija" to (6 to 85), charmander.category to (charmander.heightDm to charmander.weightHg))
+        assertTrue(charmander.description.startsWith("Prefiere las cosas calientes"))
+        assertEquals(1244, PokedexSource.speciesFor(t, 915)) // LECHONK
+    }
+
+    @Test
+    fun `Unbound FR entries in French`() = roms("Pokémon Unbound v2.1.1.1 FR.gba", GameKind.UNBOUND, POKEDEX_UNBOUND_FR) { t ->
+        val charmander = PokedexSource.entry(t, 4)!!
+        assertEquals("Lézard" to (6 to 85), charmander.category to (charmander.heightDm to charmander.weightHg))
+        assertEquals(listOf("Brasier"), charmander.abilities)
+    }
+
+    @Test
+    fun `Orange Islands entries - FireRed rev 0's tables, edited`() = roms("Pokemon Orange Islands.gba", GameKind.ORANGE_ISLANDS, POKEDEX_ORANGE_ISLANDS) { t ->
+        val charmander = PokedexSource.entry(t, 4)!!
+        assertEquals("LIZARD" to (6 to 85), charmander.category to (charmander.heightDm to charmander.weightHg))
+        assertEquals(listOf("BLAZE"), charmander.abilities)
     }
 
     @Test

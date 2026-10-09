@@ -4,9 +4,10 @@ the user owns (nothing is downloaded):
 
     scripts/gen_rogue_tables.py <Pokemon Emerald Rogue (v2.2.1-EX).gba>
 
-Writes ItemNamesRogue.kt, ItemDescriptionsRogue.kt, MapSecDataRogue.kt,
-MoveDataRogue.kt, SpeciesNamesRogue.kt, SpeciesTypesRogue.kt and TypeChartRogue.kt under
-app/src/main/kotlin/.../companion/data.
+Writes ItemNamesRogue.kt, MapSecDataRogue.kt, MoveDataRogue.kt,
+SpeciesNamesRogue.kt, SpeciesTypesRogue.kt and TypeChartRogue.kt under
+app/src/main/kotlin/.../companion/data. Item descriptions aren't written: the app
+reads them from the player's ROM (RomItemText, NATIVE_EMERALD_ROGUE.itemDescs).
 
 Rogue (Pokabbie/pokeemerald-rogue, `expansion` branch = v2.2.1) mixes vanilla
 and expansion shapes, so it isn't a gen_expansion_tables.py entry. Addresses
@@ -88,38 +89,26 @@ def main():
         sys.exit(f"not {LABEL} (sha1 {SHA1})")
     rom = Rom(data)
 
-    names, descs = {}, {}
+    names = {}
     for i in range(1, ROGUE_ITEM_FIRST):
         a = ITEMS + i * ITEM_STRIDE
         n = rom.text(a + 0x10, 17)
-        if not n or n.startswith("?"):
-            continue
-        names[i] = n
-        p = rom.u32(a + 0xC)
-        d = rom.text(p, 200) if rom.is_ptr(p) else None
-        if d:
-            descs[i] = d
+        if n and not n.startswith("?"):
+            names[i] = n
     for k in range(ROGUE_ITEM_COUNT):
         a = ROGUE_ITEMS + k * ROGUE_ITEM_STRIDE
         if rom.u16(a + 0x14) != ROGUE_ITEM_FIRST + k:
             continue  # an unused slot
         n = rom.text(a, 17)
-        if not n:
-            continue
-        names[ROGUE_ITEM_FIRST + k] = n
-        p = rom.u32(a + 0x10)
-        d = rom.text(p, 200) if rom.is_ptr(p) else None
-        if d:
-            descs[ROGUE_ITEM_FIRST + k] = d
+        if n:
+            names[ROGUE_ITEM_FIRST + k] = n
     assert names.get(1) == "Poké Ball" and names.get(39) == "Potion", "gItems address is wrong"
     assert names.get(827) == "Link Cable" and names.get(828) == "Quest Book", "gRogueItems address is wrong"
-    assert "20 points" in descs.get(39, ""), "item description offset is wrong"
+    p = rom.u32(ITEMS + 39 * ITEM_STRIDE + 0xC)  # gItems' description pointer (gRogueItems': +0x10)
+    assert rom.is_ptr(p) and "20 points" in (rom.text(p, 200) or ""), "item description offset is wrong"
     write("ItemNamesRogue.kt", header("gItems + gRogueItems (827+) names, keyed by item id.\n") +
           "val itemNamesRogue: Map<Int, String> = mapOf(\n" +
           "".join(f"    {i} to {kstr(n)},\n" for i, n in sorted(names.items())) + ")\n")
-    write("ItemDescriptionsRogue.kt", header("gItems + gRogueItems descriptions, keyed by item id.\n") +
-          "val itemDescriptionsRogue: Map<Int, String> = mapOf(\n" +
-          "".join(f"    {i} to {kstr(n)},\n" for i, n in sorted(descs.items())) + ")\n")
 
     rows = []
     for m in range(MAPSEC_NONE):
@@ -192,7 +181,7 @@ def main():
           "".join(f"    {i} to {kstr(n)},\n" for i, n in enumerate(TYPE_NAMES)) + ")\n\n" +
           "val typeEffectivenessRogue: Map<Int, Int> = mapOf(\n" +
           "".join(f"    {k} to {v},\n" for k, v in sorted(chart.items())) + ")\n")
-    print(f"{len(names)} items, {len(descs)} descriptions, {len(rows)} mapsecs, {len(moves)} moves, {len(types)} species")
+    print(f"{len(names)} items, {len(rows)} mapsecs, {len(moves)} moves, {len(types)} species")
 
 
 if __name__ == "__main__":

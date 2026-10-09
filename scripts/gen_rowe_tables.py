@@ -5,8 +5,10 @@ github.com/BelialClover/RoweSource; nothing is downloaded).
 
     scripts/gen_rowe_tables.py <rom.gba> [out_dir]
 
-Writes {SpeciesNames,SpeciesTypes,GenderRatios,ItemNames,ItemDescriptions,
-MoveData,TypeChart,MapSecData}Rowe.kt (default: the app's data package).
+Writes {SpeciesNames,SpeciesTypes,GenderRatios,ItemNames,MoveData,TypeChart,
+MapSecData}Rowe.kt (default: the app's data package).
+Item descriptions aren't written: the app reads them from the player's ROM
+(RomItemText, NativeConfig.itemDescs).
 
 R.O.W.E. v2.1.9.1 Experimental (BPEE, 32 MB, header title "POKEMON EMER")
 keeps vanilla pokeemerald's table *shapes* (names in their own arrays, not
@@ -205,26 +207,19 @@ def main():
           "val moveDataRowe: Map<Int, MoveInfo> = mapOf(\n" +
           "".join(f"    {i} to MoveInfo({kstr(n)}, {t}, {p}),\n" for i, n, t, p in moves) + ")\n")
 
-    items, descs = {}, {}
+    items = {}
     for i in range(1, ITEM_LIMIT):
         a = ITEMS + 0x38 * i
         n = text(rom, a, 18)
-        if not n or u16(rom, a + 0x12) != i:
-            continue
-        items[i] = n
-        p = u32(rom, a + 0x1C)
-        d = text(rom, p, 200) if is_ptr(rom, p) else None
-        if d:
-            descs[i] = d
+        if n and u16(rom, a + 0x12) == i:
+            items[i] = n
     assert all(items.get(i) == n for i, n in CHECKS["items"].items()), "item names are wrong"
-    assert "20 points" in descs.get(28, ""), "item description offset is wrong"
+    p = u32(rom, ITEMS + 0x38 * 28 + 0x1C)
+    assert is_ptr(rom, p) and "20 points" in (text(rom, p, 200) or ""), "item description offset is wrong"
     assert u8(rom, ITEMS + 0x38 * 28 + 0x22) == 2 and u8(rom, ITEMS + 0x38 * 214 + 0x22) == 10, "item pocket is wrong"
     write("ItemNamesRowe.kt", header("gItems names, keyed by item id.\n") +
           "val itemNamesRowe: Map<Int, String> = mapOf(\n" +
           "".join(f"    {i} to {kstr(n)},\n" for i, n in sorted(items.items())) + ")\n")
-    write("ItemDescriptionsRowe.kt", header("gItems descriptions, keyed by item id.\n") +
-          "val itemDescriptionsRowe: Map<Int, String> = mapOf(\n" +
-          "".join(f"    {i} to {kstr(d)},\n" for i, d in sorted(descs.items())) + ")\n")
 
     chart = {}
     for atk in TYPE_NAMES:
@@ -281,7 +276,7 @@ def main():
           "internal val regionLayoutsRowe: List<RegionLayout> = listOf(\n" +
           "".join(f"    RegionLayout({GRID_OX}, {GRID_OY}, {GRID_W}, {GRID_H}, 0x{MAPSEC_COUNT:02X}, listOf(\n"
                   f"        hexBytes(\"{g.hex()}\"),\n    )),\n" for g in grids) + ")\n")
-    print(f"{len(names)} species, {len(moves)} moves, {len(items)} items, {len(descs)} descriptions, "
+    print(f"{len(names)} species, {len(moves)} moves, {len(items)} items, "
           f"{len(chart)} chart pairs, {len(mapsecs)} map sections")
 
 

@@ -39,6 +39,5 @@ class SeaglassBattleDecodeTest {
         assertEquals("Normal", typeName(lookupMove(10).type))
         assertEquals("Fire", typeName(lookupMove(52).type)) // Ember
         assertEquals(SpeciesTypes(11, 11), activeSpeciesTypeData[255]) // Torchic, by National Dex number
-        assertTrue(itemDescription(28).contains("20 points"))
     }
 }

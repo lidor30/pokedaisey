@@ -21,10 +21,13 @@
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
 
-    <!-- Two uses, both outbound HTTPS only: library cover art (Settings > Cover
-         Art) from SteamGridDB's API with a user-supplied key (Prefs.steamGridDbApiKey /
-         SteamGridDbClient), and the update check against this app's GitHub releases
-         (AppUpdater: api.github.com + GitHub's download host). Nothing else. -->
+    <!-- Outbound HTTPS only: library cover art (Settings > Cover Art) from SteamGridDB's
+         API with a user-supplied key (Prefs.steamGridDbApiKey / SteamGridDbClient) and
+         RetroAchievements' box art; the update check against this app's GitHub releases
+         (AppUpdater: api.github.com + GitHub's download host); RetroAchievements itself
+         once the player signs in (achievements/RetroAchievements.kt); a BEST EFFORT match the player
+         chose to SHARE (BestEffortShare: one Firestore write, the fields it showed). ASK FOR SUPPORT and
+         the footer links only open a browser. Nothing else. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- In-app update: hands a downloaded release APK to Android's installer (AppUpdateFlow). -->

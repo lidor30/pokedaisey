@@ -31,8 +31,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -108,6 +111,12 @@ fun CompanionScreen(
     statusBar: (@Composable () -> Unit)? = null,
     /** USE on the ITEMS tab (a Repel on the field); null = no such button. */
     itemUse: com.pokedaisy.app.companion.ItemUse? = null,
+    /** NOT SUPPORTED's ASK FOR SUPPORT (a GitHub issue with the ROM's name and SHA-1); null hides it. */
+    askForSupport: (() -> Unit)? = null,
+    /** NOT SUPPORTED's TRY BEST EFFORT ([com.pokedaisy.app.companion.data.BestEffort]); null hides it. */
+    tryBestEffort: (() -> Unit)? = null,
+    /** The match notice's SHARE (the player's yes): sends exactly what it lists. Null = no ask. */
+    shareBestEffort: ((com.pokedaisy.app.companion.data.BestEffortReport) -> Unit)? = null,
 ) {
     // Everything below is keyed on the snapshot's game: the per-game look
     // (backdrops, party slots, bag) reads the plain `activeGame` global, which
@@ -377,7 +386,10 @@ fun CompanionScreen(
                         // so the cream window behind them just read as a
                         // mismatched extra layer.
                         if (paneKey == "UNSUPPORTED") {
-                            UnsupportedView(snapshot.error, Modifier.fillMaxSize())
+                            UnsupportedView(
+                                snapshot.error, askForSupport,
+                                tryBestEffort?.takeIf { snapshot.canTryBestEffort }, snapshot.bestEffortMiss, Modifier.fillMaxSize(),
+                            )
                         } else if (paneKey == "LOADING") {
                             LoadingView(snapshot.error, Modifier.fillMaxSize())
                         } else if (paneKey == "PARTY/DETAIL") {
@@ -388,7 +400,7 @@ fun CompanionScreen(
                                 onBack = { detailIndex = null },
                             )
                         } else if (tab == "DEX" && dex != null) {
-                            if (paneKey == "DEX/DETAIL") PokedexEntryScreen(dex, dexUi, lastDexEntry.value)
+                            if (paneKey == "DEX/DETAIL") PokedexEntryScreen(dex, dexUi, lastDexEntry.value, guide = snapshot.guideTables)
                             else PokedexScreen(dex, dexUi)
                         } else if (tab == "GUIDE" && guide != null) {
                             if (noticeAccepted) GuideScreen(guide, guideUi, snapshot)
@@ -505,8 +517,96 @@ fun CompanionScreen(
 
             // Unlocks and the like, over every tab.
             AchievementPopupHost(achievements, Modifier.padding(top = 12.dp), initial = initialPopup)
+
+            // TRY BEST EFFORT just found a match: what the game is read as, and what's off.
+            snapshot.bestEffort?.takeIf { it.fresh }?.let { be ->
+                var seen by remember(be.title) { mutableStateOf(false) }
+                if (!seen) {
+                    val report = be.report
+                    if (report != null && shareBestEffort != null) {
+                        BestEffortShareNotice(be, report, onShare = { shareBestEffort(report); seen = true }, onDismiss = { seen = true })
+                    } else {
+                        BestEffortNotice(be) { seen = true }
+                    }
+                }
+            }
         }
     } } }
+}
+
+@Composable
+private fun bestEffortSummary(be: com.pokedaisy.app.companion.data.BestEffortView): String {
+    val parts = be.off.map {
+        when (it) {
+            com.pokedaisy.app.companion.data.BestEffort.Part.DEX -> tr("the POKéDEX")
+            com.pokedaisy.app.companion.data.BestEffort.Part.GUIDE -> tr("the GUIDE's live pages")
+            com.pokedaisy.app.companion.data.BestEffort.Part.ITEM_TEXT -> tr("item descriptions")
+        }
+    }
+    return if (be.full) tr("Read as {0}: everything matched, so it works like a supported game.", be.title)
+    else tr("Read as {0}: party, bag, map and battles should work, names may differ. Off: {1}. The library tags it PARTIALLY SUPPORTED.", be.title, parts.joinToString(", "))
+}
+
+/**
+ * The match notice with the ask to share it: what the match is, then every field [com.pokedaisy.app.BestEffortShare]
+ * would send, value by value - nothing goes out unless SHARE is tapped.
+ */
+@Composable
+private fun BestEffortShareNotice(
+    be: com.pokedaisy.app.companion.data.BestEffortView,
+    report: com.pokedaisy.app.companion.data.BestEffortReport,
+    onShare: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val m = rememberGbaTextMetrics()
+    val small = rememberGbaTextMetrics(1f)
+    OptionOverlay(onDismiss, Modifier.widthIn(max = 640.dp).fillMaxHeight()) {
+        Column(Modifier.fillMaxHeight()) {
+            OptionTitleWindow(tr("BEST EFFORT"), m)
+            Spacer(Modifier.height(m.u * 4))
+            OptionListWindow(m, Modifier.fillMaxWidth().weight(1f)) {
+                Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = m.u * 8, vertical = m.u * 4)) {
+                    GbaText(bestEffortSummary(be), OptionColors.label, OptionColors.labelShadow, small, maxLines = Int.MAX_VALUE)
+                    Spacer(Modifier.height(m.u * 6))
+                    GbaText(tr("SHARE THIS MATCH?"), OptionColors.value, OptionColors.valueShadow, m)
+                    GbaText(
+                        tr("It helps other players and lets a future release support this ROM properly. Sent once to PokéDaisy's database (Google Firebase): exactly the lines below - no file name, account or device details."),
+                        OptionColors.label, OptionColors.labelShadow, small, maxLines = Int.MAX_VALUE,
+                        modifier = Modifier.padding(top = m.u * 2, bottom = m.u * 3),
+                    )
+                    com.pokedaisy.app.BestEffortShare.fields(report).forEach { (label, value) ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = m.u)) {
+                            GbaText(tr(label), OptionColors.muted, OptionColors.mutedShadow, small, Modifier.weight(0.35f))
+                            GbaText(value, OptionColors.label, OptionColors.labelShadow, small, Modifier.weight(0.65f), maxLines = 2)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(m.u * 4))
+            Row(horizontalArrangement = Arrangement.spacedBy(m.u * 4), modifier = Modifier.fillMaxWidth()) {
+                OptionButton(tk("NO THANKS"), m, onClick = onDismiss, modifier = Modifier.weight(1f).height(m.rowHeight * 1.4f))
+                OptionButton(tk("SHARE"), m, onClick = onShare, emphasis = true, modifier = Modifier.weight(1f).height(m.rowHeight * 1.4f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun BestEffortNotice(be: com.pokedaisy.app.companion.data.BestEffortView, onDismiss: () -> Unit) {
+    val m = rememberGbaTextMetrics()
+    val parts = be.off.map {
+        when (it) {
+            com.pokedaisy.app.companion.data.BestEffort.Part.DEX -> tr("the POKéDEX")
+            com.pokedaisy.app.companion.data.BestEffort.Part.GUIDE -> tr("the GUIDE's live pages")
+            com.pokedaisy.app.companion.data.BestEffort.Part.ITEM_TEXT -> tr("item descriptions")
+        }
+    }
+    OptionConfirm(
+        tr("BEST EFFORT"),
+        if (be.full) tr("Read as {0}: everything matched, so it works like a supported game.", be.title)
+        else tr("Read as {0}: party, bag, map and battles should work, names may differ. Off: {1}. The library tags it PARTIALLY SUPPORTED.", be.title, parts.joinToString(", ")),
+        tk("OK"), m, onConfirm = onDismiss, onDismiss = onDismiss, cancelLabel = null,
+    )
 }
 
 /**
@@ -626,7 +726,10 @@ private fun TabChipShell(
 /** Every tab but SETTINGS while the running ROM is one the companion can't
  * read ([SnapshotView.unsupported]); [detail] is the reader's reason. */
 @Composable
-private fun UnsupportedView(detail: String?, modifier: Modifier = Modifier) {
+private fun UnsupportedView(
+    detail: String?, askForSupport: (() -> Unit)?, tryBestEffort: (() -> Unit)?,
+    miss: com.pokedaisy.app.companion.data.BestEffort.Miss?, modifier: Modifier = Modifier,
+) {
     val m = rememberGbaTextMetrics()
     val big = rememberGbaTextMetrics(1.6f)
     val small = rememberGbaTextMetrics(1f)
@@ -635,7 +738,7 @@ private fun UnsupportedView(detail: String?, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(m.u * 4))
         OptionListWindow(m, Modifier.fillMaxWidth().weight(1f)) {
             Column(
-                Modifier.fillMaxSize().padding(horizontal = m.u * 16, vertical = m.u * 8),
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = m.u * 16, vertical = m.u * 8),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -645,13 +748,40 @@ private fun UnsupportedView(detail: String?, modifier: Modifier = Modifier) {
                     tr("The game plays normally on the top screen, but the second screen can't read its party, map, items or battles."),
                     OptionColors.label, OptionColors.labelShadow, m, maxLines = 4,
                 )
+                if (tryBestEffort == null) {
+                    Spacer(Modifier.height(m.u * 6))
+                    GbaText(
+                        tr("SETTINGS (the gear below) still works."),
+                        OptionColors.label, OptionColors.labelShadow, m, maxLines = 2,
+                    )
+                } else {
+                    Spacer(Modifier.height(m.u * 8))
+                    GbaText(
+                        when (miss) {
+                            com.pokedaisy.app.companion.data.BestEffort.Miss.NO_PARTY ->
+                                tr("Nothing to match yet: carry on until you have a Pokémon, then try again.")
+                            com.pokedaisy.app.companion.data.BestEffort.Miss.NO_MATCH ->
+                                tr("No game PokéDaisy knows reads this one. Asking for support is the way to go.")
+                            null -> tr("BEST EFFORT reads it as each game PokéDaisy knows and keeps the one that fits. Be in the game with a Pokémon.")
+                        },
+                        if (miss != null) OptionColors.value else OptionColors.label,
+                        if (miss != null) OptionColors.valueShadow else OptionColors.labelShadow, small, maxLines = 3,
+                    )
+                }
                 Spacer(Modifier.height(m.u * 6))
-                GbaText(
-                    tr("SETTINGS (the gear below) still works."),
-                    OptionColors.label, OptionColors.labelShadow, m, maxLines = 2,
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(m.u * 6)) {
+                    tryBestEffort?.let { OptionButton(tk("TRY BEST EFFORT"), m, emphasis = true, onClick = it) }
+                    askForSupport?.let { OptionButton(tk("ASK FOR SUPPORT"), m, emphasis = tryBestEffort == null, onClick = it) }
+                }
+                if (askForSupport != null) {
+                    Spacer(Modifier.height(m.u * 4))
+                    GbaText(
+                        tr("Opens a GitHub issue with the ROM's file name and SHA-1 - never the ROM itself."),
+                        OptionColors.label.copy(alpha = 0.7f), OptionColors.labelShadow, small, maxLines = 2,
+                    )
+                }
                 if (!detail.isNullOrBlank()) {
-                    Spacer(Modifier.height(m.u * 10))
+                    Spacer(Modifier.height(m.u * 6))
                     GbaText(detail, OptionColors.label.copy(alpha = 0.7f), OptionColors.labelShadow, small, maxLines = 3)
                 }
             }

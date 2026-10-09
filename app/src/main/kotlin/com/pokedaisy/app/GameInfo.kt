@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -31,7 +32,14 @@ import java.text.DateFormat
 import java.util.Date
 
 /** The library menu's INFO: everything known about a game, its ROM and its saves, by section. */
-class GameInfo(val title: String, val sections: List<Section>) {
+class GameInfo(
+    val title: String,
+    val sections: List<Section>,
+    /** A ROM the companion can't read: ASK FOR SUPPORT's issue ([RomSupportRequest]). */
+    val supportUrl: String? = null,
+    /** The ROM's SHA-1 when a best-effort match is kept for it: FORGET MATCH. */
+    val bestEffortSha1: String? = null,
+) {
     class Section(val title: String, val rows: List<Pair<String, String>>)
 
     companion object {
@@ -46,11 +54,20 @@ class GameInfo(val title: String, val sections: List<Section>) {
             val crc = if (hashes) runCatching { SaveStates.crc32(rom) }.getOrNull() else null
             val game = sha1?.let { GameTitles.BY_SHA1[it] } ?: baseGame(code)
             val linked = RomFolder.isLinked(prefs, rom)
+            val supported = if (hashes) CompanionSupport.isSupported(rom) else null
+            val bestEffort = if (supported == false) com.pokedaisy.app.companion.data.BestEffortStore.load(sha1) else null
+            val bestEffortAs = bestEffort?.let { com.pokedaisy.app.companion.data.BestEffort.candidate(it.id)?.title }
 
             val gameRows = buildList {
                 add(tr("NAME") to name)
                 add(tr("GAME") to (game ?: tr("Unknown")))
-                add(tr("SECOND SCREEN") to if (!hashes) pending else if (CompanionSupport.isSupported(rom)) tr("Supported") else tr("Not supported"))
+                add(tr("SECOND SCREEN") to when {
+                    !hashes -> pending
+                    supported == true -> tr("Supported")
+                    bestEffort != null && bestEffort.full -> tr("Supported (best effort, as {0})", bestEffortAs ?: "?")
+                    bestEffort != null -> tr("Partly (best effort, as {0})", bestEffortAs ?: "?")
+                    else -> tr("Not supported")
+                })
                 if (rom.absolutePath in prefs.recentRomPaths()) {
                     add(tr("LAST PLAYED") to tr("#{0} in recent games", prefs.recentRomPaths().indexOf(rom.absolutePath) + 1))
                 }
@@ -75,8 +92,8 @@ class GameInfo(val title: String, val sections: List<Section>) {
                 add("SHA1" to (sha1 ?: pending))
             }
 
-            val savesDir = SavesLocation.dir(context, prefs)
-            val save = SavesLocation.resolve(savesDir, rom)
+            val save = SavesLocation.saveFor(context, prefs, rom)
+            val savesDir = save.parentFile ?: SavesLocation.dir(context, prefs)
             val backups = GameSaves.backups(savesDir, save.nameWithoutExtension)
             val saveRows = buildList {
                 if (save.isFile) {
@@ -115,6 +132,8 @@ class GameInfo(val title: String, val sections: List<Section>) {
                     Section(tr("SAVE STATES"), stateRows),
                     Section("RetroAchievements", achievementRows(rom, hashes)),
                 ),
+                supportUrl = if (supported == false && bestEffort?.full != true) RomSupportRequest.url(rom, sha1) else null,
+                bestEffortSha1 = sha1.takeIf { bestEffort != null },
             )
         }
 
@@ -183,7 +202,10 @@ class GameInfo(val title: String, val sections: List<Section>) {
 
 /** [info] over the library: a title window, its sections in one scrolling list window, CLOSE. */
 @Composable
-fun GameInfoDialog(info: GameInfo, m: GbaTextMetrics, small: GbaTextMetrics, onDismiss: () -> Unit) {
+fun GameInfoDialog(
+    info: GameInfo, m: GbaTextMetrics, small: GbaTextMetrics, onDismiss: () -> Unit, onOpenUrl: (String) -> Unit = {},
+    onForgetBestEffort: (String) -> Unit = {},
+) {
     OptionOverlay(onDismiss, Modifier.widthIn(max = 1100.dp).fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             OptionTitleWindow(tr("INFO"), m, trailing = info.title, onBack = onDismiss)
@@ -204,6 +226,15 @@ fun GameInfoDialog(info: GameInfo, m: GbaTextMetrics, small: GbaTextMetrics, onD
             }
             Spacer(Modifier.height(m.u * 4))
             Row(Modifier.fillMaxWidth()) {
+                info.supportUrl?.let { url ->
+                    // Not read by the companion: a GitHub issue with the file's name and SHA-1 (never the ROM).
+                    OptionButton(tr("ASK FOR SUPPORT"), m, onClick = { onOpenUrl(url) })
+                }
+                info.bestEffortSha1?.let { sha1 ->
+                    // Back to NOT SUPPORTED: the companion asks again next time.
+                    Spacer(Modifier.width(m.u * 4))
+                    OptionButton(tr("FORGET MATCH"), m, onClick = { onForgetBestEffort(sha1) })
+                }
                 Spacer(Modifier.weight(1f))
                 OptionButton(tr("CLOSE"), m, emphasis = true, modifier = Modifier.widthIn(min = 160.dp), onClick = onDismiss)
             }

@@ -90,11 +90,13 @@ out_dir="$OUT_ROOT/$KEY"
 mkdir -p "$out_dir"
 cp "$work/out/ewram.bin" "$out_dir/ewram.bin"
 cp "$work/out/iwram.bin" "$out_dir/iwram.bin"
+# The README is committed with the fixture: home paths as ~ (the repo is public).
+tilde() { case "$1" in "$HOME"/*) printf '~%s' "${1#"$HOME"}" ;; *) printf '%s' "$1" ;; esac; }
 {
     echo "captured: $(date -u +%Y-%m-%dT%H:%M:%SZ) (headless, scripts/capture_fixture_headless.sh)"
-    echo "rom: $label ($rom_path)"
-    echo "save: ${save_path:-<none - fresh new game>}"
-    echo "boot script: $BOOT_SCRIPT"
+    echo "rom: $label ($(tilde "$rom_path"))"
+    echo "save: $(tilde "${save_path:-<none - fresh new game>}")"
+    echo "boot script: $(tilde "$BOOT_SCRIPT")"
 } >"$out_dir/README.txt"
 
 echo "Wrote $out_dir/{ewram.bin,iwram.bin,README.txt}"

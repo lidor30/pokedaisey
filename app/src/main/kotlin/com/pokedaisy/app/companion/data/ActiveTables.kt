@@ -27,7 +27,7 @@ package com.pokedaisy.app.companion.data
 // hacks above, via NATIVE_HEART_AND_SOUL/NATIVE_LAZARUS/NATIVE_ROWE in
 // NativeReader.kt. Heart and Soul and Lazarus now have their own
 // ROM-extracted tables (*Hns.kt / *Lazarus.kt, scripts/gen_expansion_tables.py).
-enum class GameKind { FIRERED, EMERALD, UNBOUND, GAIA, RADICAL_RED, ODYSSEY, HEART_AND_SOUL, LAZARUS, ROWE, EMERALD_ROGUE, AMETHYST, EMERALD_SEAGLASS, CELIA, TMT2, SOULGOLD, YELLOW, GLAZED, IMPERIUM, QUETZAL }
+enum class GameKind { FIRERED, EMERALD, UNBOUND, GAIA, RADICAL_RED, ODYSSEY, HEART_AND_SOUL, LAZARUS, ROWE, EMERALD_ROGUE, AMETHYST, EMERALD_SEAGLASS, CELIA, TMT2, SOULGOLD, YELLOW, GLAZED, IMPERIUM, QUETZAL, ORANGE_ISLANDS }
 
 @Volatile
 var activeGame: GameKind = GameKind.FIRERED
@@ -47,7 +47,9 @@ val localText: GameText? get() = if (romGameCode.isEmpty()) null else gameText(r
 
 /** [shown]'s English name - what hand-written GUIDE entries tag areas with - for map section [mapsec]. */
 fun englishMapSecName(mapsec: Int, shown: String): String =
-    localText?.let { it.baseMapSecs[mapsec]?.name } ?: shown
+    localText?.let { it.baseMapSecs[mapsec]?.name }
+        ?: (if (activeGame == GameKind.QUETZAL && quetzalNames.places != 0) mapSecDataQuetzal[mapsec]?.name else null)
+        ?: shown
 private inline val seaglass get() = activeGame == GameKind.EMERALD_SEAGLASS
 private inline val celia get() = activeGame == GameKind.CELIA
 private inline val tmt2 get() = activeGame == GameKind.TMT2
@@ -59,6 +61,8 @@ private inline val glazed get() = activeGame == GameKind.GLAZED
 private inline val imperium get() = activeGame == GameKind.IMPERIUM
 private inline val quetzal get() = activeGame == GameKind.QUETZAL
 private inline val rowe get() = activeGame == GameKind.ROWE
+// Pokémon Orange Islands: FireRed 1.0 edited in place, its own names / types / chart (gen_orange_islands_tables.py).
+private inline val orangeIslands get() = activeGame == GameKind.ORANGE_ISLANDS
 // Pokémon Yellow (Game Boy): Gen 1's own tables (gen_gen1_tables.py), keyed by National Dex number.
 private inline val yellow get() = activeGame == GameKind.YELLOW
 
@@ -110,8 +114,9 @@ val activeSpeciesNames: Map<Int, String> get() = localText?.species ?: when {
     soulGold -> speciesNamesSoulGold
     glazed -> speciesNamesGlazed
     imperium -> speciesNamesImperium
-    quetzal -> speciesNamesQuetzal
+    quetzal -> if (quetzalNames.species != 0) speciesNamesQuetzalSpanish else speciesNamesQuetzal
     rowe -> speciesNamesRowe
+    orangeIslands -> speciesNamesOrangeIslands
     else -> speciesNames
 }
 val activeMoveData: Map<Int, MoveInfo> get() = localText?.moveData ?: when {
@@ -127,8 +132,9 @@ val activeMoveData: Map<Int, MoveInfo> get() = localText?.moveData ?: when {
     radicalRed -> moveDataRadicalRed
     glazed -> moveDataGlazed
     imperium -> moveDataImperium
-    quetzal -> moveDataQuetzal
+    quetzal -> quetzalMoves(quetzalNames.moves)
     rowe -> moveDataRowe
+    orangeIslands -> moveDataOrangeIslands
     else -> moveData
 }
 val activeItemNames: Map<Int, String> get() = localText?.items ?: when {
@@ -145,8 +151,9 @@ val activeItemNames: Map<Int, String> get() = localText?.items ?: when {
     radicalRed -> itemNamesRadicalRed
     glazed -> itemNamesGlazed
     imperium -> itemNamesImperium
-    quetzal -> itemNamesQuetzal
+    quetzal -> quetzalItems(quetzalNames.items)
     rowe -> itemNamesRowe
+    orangeIslands -> itemNamesOrangeIslands
     else -> itemNames
 }
 val activeSpeciesTypeData: Map<Int, SpeciesTypes> get() = when {
@@ -164,6 +171,7 @@ val activeSpeciesTypeData: Map<Int, SpeciesTypes> get() = when {
     imperium -> speciesTypeDataImperium
     quetzal -> speciesTypeDataQuetzal
     rowe -> speciesTypeDataRowe
+    orangeIslands -> speciesTypeDataOrangeIslands
     else -> speciesTypeData
 }
 val activeTypeEffectiveness: Map<Int, Int> get() = when {
@@ -181,6 +189,7 @@ val activeTypeEffectiveness: Map<Int, Int> get() = when {
     imperium -> typeEffectivenessImperium
     quetzal -> typeEffectivenessQuetzal
     rowe -> typeEffectivenessRowe
+    orangeIslands -> typeEffectivenessOrangeIslands
     else -> typeEffectiveness
 }
 val activeTypeNames: Map<Int, String> get() = when {
@@ -198,6 +207,7 @@ val activeTypeNames: Map<Int, String> get() = when {
     imperium -> typeNamesImperium
     quetzal -> typeNamesQuetzal
     rowe -> typeNamesRowe
+    orangeIslands -> typeNamesOrangeIslands
     else -> typeNames
 }
 val activeMapSecData: Map<Int, MapSecInfo> get() = localText?.mapSecData ?: when {
@@ -212,8 +222,9 @@ val activeMapSecData: Map<Int, MapSecInfo> get() = localText?.mapSecData ?: when
     rogue -> mapSecDataRogue
     glazed -> mapSecDataGlazed
     imperium -> mapSecDataImperium
-    quetzal -> mapSecDataQuetzalOnMap
+    quetzal -> quetzalMapSecs(quetzalNames.places)
     rowe -> mapSecDataRowe
+    orangeIslands -> mapSecDataOrangeIslands
     else -> mapSecData
 }
 /**
@@ -236,6 +247,30 @@ internal val regionLayoutsQuetzal: List<RegionLayout> by lazy {
     regionLayoutsFireRed.map { RegionLayout(it.offX + QUETZAL_MAP_DX, it.offY + QUETZAL_MAP_DY, it.w, it.h, it.none, it.layers, it.cellBytes) }
 }
 
+/**
+ * Which language Quetzal shows each kind of name in - its own START > OPCIONES > TEXTO > IDIOMA
+ * options, read from the save every sample ([readQuetzalNames]; set by the Poller): 0 English,
+ * 1 Spanish, 2 Latin American Spanish (Portuguese, 3, isn't generated: English). Its Spanish
+ * release only changes the LUGARES default. [QuetzalNamesGen.kt] holds the names that differ.
+ */
+@Volatile
+var quetzalNames = QuetzalNames()
+
+private val speciesNamesQuetzalSpanish by lazy { speciesNamesQuetzal + speciesNamesQuetzalEs }
+private val moveDataQuetzalEs by lazy { moveDataQuetzal.renamed(moveNamesQuetzalEs) }
+private val moveDataQuetzalLa by lazy { moveDataQuetzal.renamed(moveNamesQuetzalLa) }
+private val itemNamesQuetzalSpanish by lazy { itemNamesQuetzal + itemNamesQuetzalEs }
+private val itemNamesQuetzalLatam by lazy { itemNamesQuetzal + itemNamesQuetzalLa }
+private val mapSecDataQuetzalEs by lazy { mapSecDataQuetzalOnMap.renamedSecs(mapSecNamesQuetzalEs) }
+private val mapSecDataQuetzalLa by lazy { mapSecDataQuetzalOnMap.renamedSecs(mapSecNamesQuetzalLa) }
+
+private fun Map<Int, MoveInfo>.renamed(names: Map<Int, String>) = mapValues { (id, m) -> names[id]?.let { m.copy(name = it) } ?: m }
+private fun Map<Int, MapSecInfo>.renamedSecs(names: Map<Int, String>) = mapValues { (id, m) -> names[id]?.let { m.copy(name = it) } ?: m }
+
+private fun quetzalMoves(lang: Int) = when (lang) { 1 -> moveDataQuetzalEs; 2 -> moveDataQuetzalLa; else -> moveDataQuetzal }
+private fun quetzalItems(lang: Int) = when (lang) { 1 -> itemNamesQuetzalSpanish; 2 -> itemNamesQuetzalLatam; else -> itemNamesQuetzal }
+private fun quetzalMapSecs(lang: Int) = when (lang) { 1 -> mapSecDataQuetzalEs; 2 -> mapSecDataQuetzalLa; else -> mapSecDataQuetzalOnMap }
+
 // Seaglass's own Hoenn art (RomArt's regionmap/seaglass.png) on Emerald's tilemap and grid.
 private val regionMapImagesSeaglass = arrayOf("seaglass")
 
@@ -252,6 +287,8 @@ val activeRegionMapImages: Array<String> get() = when {
     imperium -> regionMapImagesImperium
     quetzal -> regionMapImagesQuetzalOnMap
     rowe -> regionMapImagesRowe
+    // Its own Orange Archipelago, drawn from the ROM (RomRegionMap) - none bundled.
+    orangeIslands -> emptyArray()
     else -> regionMapImages
 }
 
@@ -296,4 +333,5 @@ fun GameKind.displayName(): String = when (this) {
     GameKind.GLAZED -> "Pokémon Glazed"
     GameKind.IMPERIUM -> "Emerald Imperium"
     GameKind.QUETZAL -> "Pokémon Quetzal"
+    GameKind.ORANGE_ISLANDS -> "Pokémon Orange Islands"
 }

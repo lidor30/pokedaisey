@@ -73,6 +73,7 @@ import com.pokedaisy.app.companion.ui.GbaText
 import com.pokedaisy.app.companion.ui.GitHubMark
 import com.pokedaisy.app.companion.ui.GoldTrophy
 import com.pokedaisy.app.companion.ui.GroupedRows
+import com.pokedaisy.app.companion.ui.filterRows
 import com.pokedaisy.app.companion.ui.STATUS_BAR_PLACES
 import com.pokedaisy.app.companion.ui.statusBarLabel
 import com.pokedaisy.app.companion.ui.SettingRow
@@ -111,7 +112,7 @@ import com.pokedaisy.app.companion.ui.drawPixelRoundRect
  */
 class SettingsActivity : ComponentActivity() {
 
-    private enum class Screen { HOME, HOTKEYS, CONTROLS, SHADERS, FOLDERS, COVER_ART, HIDDEN, ACHIEVEMENTS, CHEATS, CHEAT_ADD }
+    private enum class Screen { HOME, HOTKEYS, CONTROLS, SHADERS, FOLDERS, COVER_ART, HIDDEN, ACHIEVEMENTS, CHEATS, CHEAT_ADD, LICENSES }
 
     private lateinit var prefs: Prefs
     private var screen by mutableStateOf(Screen.HOME)
@@ -142,9 +143,13 @@ class SettingsActivity : ComponentActivity() {
 
     /** Opened from a game's library menu (CHEATS): BACK from its cheats leaves, not to the hub. */
     private var cheatsOnly = false
+    /** HOME's search box; kept while a sub-page it led to is open. */
+    private var searchQuery by mutableStateOf("")
+    private var controlsOnly = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        RomFolder.useBestEffortStore(this)
         prefs = Prefs(this)
         com.pokedaisy.app.companion.i18n.L10n.apply(prefs.appLanguage, null)
         RetroAchievements.init(this)
@@ -152,6 +157,11 @@ class SettingsActivity : ComponentActivity() {
             cheatsOnly = true
             cheatRom = File(path)
             screen = Screen.CHEATS
+        }
+        // First-time setup's GAME BUTTONS step: the rebind page alone, BACK returns to setup.
+        if (intent?.getStringExtra(EXTRA_SCREEN) == SCREEN_CONTROLS) {
+            controlsOnly = true
+            screen = Screen.CONTROLS
         }
         setContent { QolTheme { Root() } }
     }
@@ -214,6 +224,7 @@ class SettingsActivity : ComponentActivity() {
                         Screen.ACHIEVEMENTS -> "RetroAchievements"
                         Screen.CHEATS -> tk("CHEATS")
                         Screen.CHEAT_ADD -> tk("ADD CODE")
+                        Screen.LICENSES -> tk("LICENSES")
                     },
                     m = m,
                     onBack = {
@@ -233,6 +244,7 @@ class SettingsActivity : ComponentActivity() {
                     Screen.ACHIEVEMENTS -> AchievementsScreen(m, small)
                     Screen.CHEATS -> CheatsScreen(m, small)
                     Screen.CHEAT_ADD -> CheatAddScreen(m, small)
+                    Screen.LICENSES -> LicensesScreen(m, small)
                 }
             }
 
@@ -308,7 +320,7 @@ class SettingsActivity : ComponentActivity() {
     private fun goBack() {
         when {
             screen == Screen.CHEAT_ADD -> screen = Screen.CHEATS
-            screen == Screen.HOME || (screen == Screen.CHEATS && cheatsOnly) -> finish()
+            screen == Screen.HOME || (screen == Screen.CHEATS && cheatsOnly) || (screen == Screen.CONTROLS && controlsOnly) -> finish()
             else -> { cheatRemoveMode = false; screen = Screen.HOME }
         }
     }
@@ -365,6 +377,8 @@ class SettingsActivity : ComponentActivity() {
                     badge = { l -> tk("ALPHA").takeIf { modes.first { it.label == l }.alpha } },
                 ) { l -> prefs.ffMusicMode = modes.first { it.label == l } }
             },
+            // Keeps the last ~20 s; the REWIND HOLD hotkey plays them backwards.
+            SettingRow(tk("REWIND"), if (prefs.rewind) tk("ON") else tk("OFF")) { prefs.rewind = !prefs.rewind; revision++ },
             groupTitle(tk("CONTROLS")),
             // Takes effect the next time a game is opened.
             SettingRow(tk("TOUCH PAD"), TOUCH_NAMES[prefs.touchControlsMode]) {
@@ -372,7 +386,7 @@ class SettingsActivity : ComponentActivity() {
                     prefs.touchControlsMode = TOUCH_NAMES.indexOf(it)
                 }
             },
-            SettingRow(tk("GAME BUTTONS"), null) { screen = Screen.CONTROLS },
+            SettingRow(tk("GAME BUTTONS"), null, subtitle = "Key bindings: which button presses A, B, START...") { screen = Screen.CONTROLS },
             SettingRow(tk("HOTKEYS"), onOff(prefs.hotkeysEnabled)) { screen = Screen.HOTKEYS },
             groupTitle(tk("SCREEN")),
             // Game, location, money, clock and battery: OFF, over the game, or over the companion's tabs.
@@ -433,12 +447,30 @@ class SettingsActivity : ComponentActivity() {
             },
             // Tap: look for a newer release on GitHub now.
             SettingRow(tk("VERSION"), if (updates.checking) tk("CHECKING…") else BuildConfig.VERSION_NAME) { updates.check(manual = true) },
+            // The GPL's notices and every bundled component's license.
+            SettingRow(tk("LICENSES"), null) { screen = Screen.LICENSES },
             // Back to the library, which opens the first-time setup again.
             SettingRow(tk("RUN SETUP"), null) { prefs.setupRequested = true; finish() },
         )
+        // Search: every row whose name, value or keywords (SETTING_KEYWORDS: "rebind", "keybinds"...) match.
+        val shown = filterRows(rows, searchQuery)
         Column(Modifier.fillMaxSize()) {
+            OptionTextField(
+                searchQuery, { searchQuery = it }, m, Modifier.fillMaxWidth(),
+                placeholder = tr("SEARCH SETTINGS (e.g. KEY BINDINGS)"),
+            )
+            Spacer(Modifier.height(m.u * 4))
             OptionListWindow(m, Modifier.fillMaxWidth().weight(1f)) {
-                GroupedRows(rows, m, cursor = -1, onClick = { rows[it].onClick() }, scroll = homeScroll)
+                if (shown.isEmpty()) {
+                    GbaText(
+                        tr("NOTHING MATCHES \"{0}\"", searchQuery.trim()), OptionColors.muted, OptionColors.mutedShadow, m,
+                        modifier = Modifier.padding(horizontal = m.u * 8, vertical = m.u * 4),
+                    )
+                } else if (searchQuery.isBlank()) {
+                    GroupedRows(rows, m, cursor = -1, onClick = { rows[it].onClick() }, scroll = homeScroll)
+                } else {
+                    GroupedRows(shown, m, cursor = -1, onClick = { shown[it].onClick() })
+                }
             }
             Spacer(Modifier.height(m.u * 4))
             AboutFooter(m)
@@ -793,6 +825,56 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
+    /** A hard-wrapped paragraph as running text; a "- " / "(a)" / "1." line starts a new one. */
+    private fun reflow(p: String): List<String> {
+        val out = mutableListOf<String>()
+        for (line in p.lines().map { it.trim() }.filter { it.isNotEmpty() }) {
+            if (out.isEmpty() || line.matches(Regex("^([-*•]|\\(?[a-z0-9]{1,3}[.)]).*"))) out += line
+            else out[out.lastIndex] = out.last() + " " + line
+        }
+        return out
+    }
+
+    /** LICENSES: the build's licenses.txt (NOTICE, then each component's text; "=== " starts a part). */
+    @Composable
+    private fun LicensesScreen(m: GbaTextMetrics, small: GbaTextMetrics) {
+        val parts = remember {
+            val text = runCatching { assets.open("licenses.txt").use { it.readBytes().decodeToString() } }.getOrNull()
+                ?: "=== PokeDaisy\n\nGNU GPL v3 - https://github.com/lidor30/pokedaisy"
+            text.split(Regex("(?m)^=== ")).filter { it.isNotBlank() }.map { part ->
+                val title = part.substringBefore('\n').trim()
+                // Paragraphs reflowed: the license files are hard-wrapped at ~70 columns.
+                title to part.substringAfter('\n').trim().split(Regex("\n\\s*\n"))
+                    .flatMap { p -> reflow(p) }.filter { it.isNotBlank() }
+            }
+        }
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Hint(tr("PokéDaisy and the software it carries, each under its own license."), m, small)
+            OptionListWindow(m, Modifier.fillMaxWidth().weight(1f, fill = false)) {
+                androidx.compose.foundation.lazy.LazyColumn(
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = m.u * 8, vertical = m.u * 4),
+                ) {
+                    parts.forEach { (title, paragraphs) ->
+                        item {
+                            GbaText(
+                                title, OptionColors.value, OptionColors.valueShadow, m,
+                                modifier = Modifier.padding(top = m.u * 4, bottom = m.u * 2),
+                            )
+                        }
+                        paragraphs.forEach { p ->
+                            item {
+                                GbaText(
+                                    p, OptionColors.label, OptionColors.labelShadow, small, maxLines = Int.MAX_VALUE,
+                                    modifier = Modifier.padding(bottom = m.u * 2),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // ---- cover art (SteamGridDB) --------------------------------------------
 
     @Composable
@@ -940,6 +1022,11 @@ class SettingsActivity : ComponentActivity() {
             prefs.savesDirOverride = path
             folderTick++
         }
+        val pickExtraSavesDir = rememberLauncherForActivityResult(StorageAccess.PickFolder()) { uri ->
+            val path = pickedFolder(uri) ?: return@rememberLauncherForActivityResult
+            prefs.extraSaveDirs = prefs.extraSaveDirs + path
+            folderTick++
+        }
         val pickRomsDir = rememberLauncherForActivityResult(StorageAccess.PickFolder()) { uri ->
             val path = pickedFolder(uri) ?: return@rememberLauncherForActivityResult
             if (path != prefs.romsFolder) {
@@ -958,6 +1045,8 @@ class SettingsActivity : ComponentActivity() {
                     OptionButton(tk("USE DEFAULT"), small, onClick = { prefs.savesDirOverride = null; folderTick++ })
                 }
             }
+            Spacer(Modifier.height(m.u * 4))
+            AlsoLookInSection(tick, m, small, onAdd = { pickFolder(pickExtraSavesDir) })
             Spacer(Modifier.height(m.u * 4))
             FolderSection(tr("SAVE STATES"), statesDir, tick, m, small)
         }
@@ -1035,6 +1124,31 @@ class SettingsActivity : ComponentActivity() {
         launcher.launch(null)
     }
 
+    /** More folders a game's save is looked for in ([SavesLocation.saveFor]), e.g. RetroArch's per-core ones. */
+    @Composable
+    private fun AlsoLookInSection(tick: Int, m: GbaTextMetrics, small: GbaTextMetrics, onAdd: () -> Unit) {
+        val dirs = remember(tick) { prefs.extraSaveDirs }
+        OptionListWindow(m, Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(horizontal = m.u * 4)) {
+                GbaText(tr("ALSO LOOK IN"), OptionColors.label, OptionColors.labelShadow, m)
+                GbaText(
+                    tr("A game's save found in one of these folders is played and saved right there, so another emulator keeps seeing it. New saves go to the saves folder above. A game can have its own folder too: SAVE FOLDER in its library menu."),
+                    OptionColors.muted, OptionColors.mutedShadow, small, maxLines = Int.MAX_VALUE,
+                )
+                dirs.forEach { d ->
+                    Row(Modifier.fillMaxWidth().padding(top = m.u * 3), verticalAlignment = Alignment.CenterVertically) {
+                        GbaText(d, OptionColors.label, OptionColors.labelShadow, small, Modifier.weight(1f), maxLines = 2)
+                        Spacer(Modifier.width(m.u * 4))
+                        OptionButton(tk("REMOVE"), small, onClick = { prefs.extraSaveDirs = prefs.extraSaveDirs - d; folderTick++ })
+                    }
+                }
+                Row(modifier = Modifier.padding(vertical = m.u * 4)) {
+                    OptionButton(tk("ADD FOLDER"), small, onClick = onAdd)
+                }
+            }
+        }
+    }
+
     @Composable
     private fun FolderSection(
         title: String,
@@ -1046,7 +1160,9 @@ class SettingsActivity : ComponentActivity() {
     ) {
         val ctx = LocalContext.current
         val files = remember(tick, dir) {
-            dir.walkTopDown().filter { it.isFile }.sortedBy { it.relativeToOrSelf(dir).path }.toList()
+            // Hidden folders skipped: a synced saves folder's .stversions / .stfolder hold every old copy.
+            dir.walkTopDown().onEnter { it == dir || !it.name.startsWith(".") }
+                .filter { it.isFile && !it.name.startsWith(".") }.sortedBy { it.relativeToOrSelf(dir).path }.toList()
         }
         val total = files.sumOf { it.length() }
         OptionListWindow(m, Modifier.fillMaxWidth()) {
@@ -1097,6 +1213,9 @@ class SettingsActivity : ComponentActivity() {
         const val REPO_URL = "https://github.com/lidor30/pokedaisy"
         /** A ROM path: open straight on that game's CHEATS (its library menu). */
         const val EXTRA_CHEATS_ROM = "cheats_rom"
+        /** Opens one page alone ([SCREEN_CONTROLS]: GAME BUTTONS, for setup); BACK finishes. */
+        const val EXTRA_SCREEN = "screen"
+        const val SCREEN_CONTROLS = "CONTROLS"
         /** Cheat files are text; anything bigger isn't one. */
         const val MAX_CHEAT_FILE = 1 shl 20
 

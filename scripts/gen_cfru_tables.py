@@ -6,7 +6,8 @@ owns (nothing is downloaded).
     scripts/gen_cfru_tables.py <game-key> <rom.gba>
 
 Writes app/src/main/kotlin/.../companion/data/{SpeciesNames,SpeciesTypes,
-MoveData,ItemNames,ItemDescriptions}<Suffix>.kt.
+MoveData,ItemNames}<Suffix>.kt. Item descriptions aren't written: the app reads
+them from the player's ROM (RomItemText, NativeConfig.itemDescs = gItems below).
 
 CFRU keeps FireRed's code and repoints its data, so each table is found the
 way NATIVE_GAIA_V3_2's icon tables were: the literal-pool words FireRed 1.0
@@ -112,7 +113,7 @@ def main():
           "".join(f"    {i} to MoveInfo({kstr(n)}, {t}, {p}),\n" for i, (n, t, p) in sorted(moves.items())) + ")\n")
 
     # The array ends where 30 slots in a row aren't items.
-    items, descs = {}, {}
+    items = {}
     misses = 0
     for slot in range(1, g["items_max"]):
         a = g["items"] + 44 * slot
@@ -127,20 +128,12 @@ def main():
         if n.startswith("?"):
             continue
         items[iid] = n
-        p = rom.u32(a + 20)
-        if rom.is_ptr(p):
-            d = rom.text(p, 160)
-            if d:
-                descs[iid] = d
     for i, n in checks["items"].items():
         assert items.get(i) == n, (i, items.get(i), n)
     write(f"ItemNames{sfx}.kt", header(g, "gItems names, keyed by .itemId.\n") +
           f"val itemNames{sfx}: Map<Int, String> = mapOf(\n" +
           "".join(f"    {i} to {kstr(n)},\n" for i, n in sorted(items.items())) + ")\n")
-    write(f"ItemDescriptions{sfx}.kt", header(g, "gItems descriptions, keyed by .itemId.\n") +
-          f"val itemDescriptions{sfx}: Map<Int, String> = mapOf(\n" +
-          "".join(f"    {i} to {kstr(d)},\n" for i, d in sorted(descs.items())) + ")\n")
-    print(f"{len(names)} species, {len(moves)} moves, {len(items)} items ({len(descs)} described)")
+    print(f"{len(names)} species, {len(moves)} moves, {len(items)} items; itemDescs = vanillaItems(0x{g['items']:08X}L)")
 
 
 if __name__ == "__main__":

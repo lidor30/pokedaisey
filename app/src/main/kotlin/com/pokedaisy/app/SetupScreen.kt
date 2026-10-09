@@ -37,7 +37,7 @@ import com.pokedaisy.app.companion.ui.OptionTitleWindow
  * [LibraryActivity] owns the folder pickers and background work and feeds this.
  */
 internal class SetupState {
-    enum class Step { ROMS, SAVES, COVERS }
+    enum class Step { ROMS, SAVES, BUTTONS, COVERS }
 
     var step by mutableStateOf(Step.ROMS)
     /** Opened by Settings' RUN SETUP: BACK on the first step returns there. */
@@ -60,6 +60,9 @@ internal class SetupState {
     var savesDir by mutableStateOf<String?>(null)
     var suggestions by mutableStateOf<List<SavesLocation.Suggestion>>(emptyList())
 
+    /** GAME BUTTONS: (GBA button, its keys) as bound now - read again on every return from the rebind page. */
+    var buttons by mutableStateOf<List<Pair<String, String>>>(emptyList())
+
     var apiKey by mutableStateOf("")
     var raKey by mutableStateOf("")
     var keySaved by mutableStateOf(false)
@@ -78,6 +81,7 @@ internal fun SetupScreen(
     onSaveKey: () -> Unit,
     onBack: () -> Unit,
     onNext: () -> Unit,
+    onChangeButtons: () -> Unit = {},
 ) {
     val steps = SetupState.Step.entries
     Box(Modifier.fillMaxSize()) {
@@ -94,6 +98,7 @@ internal fun SetupScreen(
                     when (s.step) {
                         SetupState.Step.ROMS -> RomsStep(s, m, small, onChooseRoms)
                         SetupState.Step.SAVES -> SavesStep(s, m, small, onChooseSaves, onUseSaves)
+                        SetupState.Step.BUTTONS -> ButtonsStep(s, m, small, onChangeButtons)
                         SetupState.Step.COVERS -> CoversStep(s, m, small, onOpenPage, onSaveKey)
                     }
                 }
@@ -108,6 +113,7 @@ internal fun SetupScreen(
                 val skipping = when (s.step) {
                     SetupState.Step.ROMS -> s.romsFolder == null
                     SetupState.Step.SAVES -> false
+                    SetupState.Step.BUTTONS -> false
                     SetupState.Step.COVERS -> !s.keySaved
                 }
                 OptionButton(
@@ -217,6 +223,22 @@ private fun SavesStep(
         Para(tr("Choosing a folder asks for All files access first, as games and saves are opened by path."), small, muted = true)
     }
     Para(tr("You can change this later in SETTINGS > FOLDERS."), small, muted = true)
+}
+
+/** GAME BUTTONS (key bindings): what each GBA button is now, and the rebind page Settings has. */
+@Composable
+private fun ButtonsStep(s: SetupState, m: GbaTextMetrics, small: GbaTextMetrics, onChange: () -> Unit) {
+    Heading(tr("GAME BUTTONS"), m)
+    Para(
+        tr("Which button on your device presses each GBA button - key bindings, or remapping, in other emulators. Check A and B first: some devices print them the other way round."),
+        small,
+    )
+    OptionLine(tr("CHANGE BUTTONS…"), null, selected = false, m, divider = true, onClick = onChange)
+    s.buttons.forEachIndexed { i, (button, keys) ->
+        OptionLine("GBA $button", keys.ifBlank { "-" }, selected = false, m, labelWeight = 0.5f, divider = i < s.buttons.lastIndex) { onChange() }
+    }
+    Spacer(Modifier.height(m.u * 4))
+    Para(tr("You can change this later in SETTINGS > GAME BUTTONS."), small, muted = true)
 }
 
 @Composable

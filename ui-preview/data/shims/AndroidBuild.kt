@@ -6,5 +6,5 @@ object Build {
     const val BRAND = "desktop"
     const val MODEL = "ui-preview"
     object VERSION { const val SDK_INT = 34; const val RELEASE = "14" }
-    object VERSION_CODES { const val O = 26; const val R = 30 }
+    object VERSION_CODES { const val O = 26; const val P = 28; const val R = 30 }
 }

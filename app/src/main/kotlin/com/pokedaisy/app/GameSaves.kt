@@ -51,8 +51,8 @@ object GameSaves {
      * resuming ([SaveStates.freshBootFile]).
      */
     fun load(context: Context, prefs: Prefs, rom: File, bytes: ByteArray): Result {
-        val dir = SavesLocation.dir(context, prefs)
-        val current = SavesLocation.resolve(dir, rom)
+        val current = SavesLocation.saveFor(context, prefs, rom)
+        val dir = current.parentFile ?: SavesLocation.dir(context, prefs)
         var backup: File? = null
         if (current.exists()) {
             val b = File(dir, backupName(current))

@@ -61,6 +61,43 @@ class RomArtTest {
         assertEquals("54343313", pixels(images.getValue("regionmap/hns.png")))
     }
 
+    /**
+     * Heart and Soul's party menu (smol HNS_PARTY_* / _BALL_* / _STATUS_* / _FONT_SMALL, Emerald's slot
+     * tilemaps). Its slot frames come out pixel for pixel Emerald's; all of it matched the PNGs the app
+     * bundled before.
+     */
+    @Test fun heartAndSoulSuppliesItsPartyArt() {
+        val images = composed(GBA + "Pokémon Heart and Soul (v2.0.6).gba")
+        assertGolden(images.filterKeys { it.startsWith("partyhns/") || it == "partybg/hns.png" }, HEART_AND_SOUL)
+    }
+
+    /**
+     * The CFRU hacks' shared party menu (CFRU_*: 112x40 slots + the grid backdrop's cell) and each
+     * one's status icons; Unbound's Poke Ball is FireRed's (partyfr/pokeball.png). All of it matched
+     * the PNGs the app bundled before. Some ROMs also carry another hack's status sheet (the same
+     * bytes, so the same image).
+     */
+    @Test fun cfruHacksSupplyTheirPartyArt() {
+        val roms = mapOf(
+            "Pokémon Unbound (v2.1.1.1).gba" to "ub", "Pokemon - Radical Red (v4.1).gba" to "rr",
+            "Pokémon Odyssey (English) (v4.1.1).gba" to "od", "Pokemon Amethyst (v1.3.0).gba" to "am",
+            "Pokemon Amethyst (v1.4.1).gba" to "am",
+        ).filterKeys { File(GBA + it).isFile }
+        assumeTrue("no CFRU ROM here", roms.isNotEmpty())
+        for ((rom, sub) in roms) {
+            val images = composed(GBA + rom)
+            val status = "partycfru/$sub/status_icons.png"
+            assertGolden(images.filterKeys { (it.startsWith("partycfru/slot_") || it == RomArt.CFRU_BACKDROP) || it == status },
+                CFRU + (status to CFRU_STATUS.getValue(sub)))
+            images.filterKeys { it.startsWith("partycfru/") && it.endsWith("/status_icons.png") }.forEach { (path, img) ->
+                assertEquals("$rom $path", CFRU_STATUS.getValue(path.split('/')[1]), pixels(img))
+            }
+        }
+        if ("Pokémon Unbound (v2.1.1.1).gba" in roms) {
+            assertEquals("53f5f1ea", pixels(composed(GBA + "Pokémon Unbound (v2.1.1.1).gba").getValue("partyfr/pokeball.png")))
+        }
+    }
+
     @Test fun romWithoutTheArtGivesNothing() {
         val rom = ByteArray(1 shl 20) { (it * 31 + (it ushr 7)).toByte() }
         assertTrue(RomArt.compose(RomArt.find(rom)).isEmpty())
@@ -80,6 +117,31 @@ class RomArtTest {
     }
 
     private companion object {
+        val GBA = System.getProperty("user.home") + "/Downloads/Game ROMs & Emulation/gba/"
+        val HEART_AND_SOUL = mapOf(
+            "partybg/hns.png" to "aeda6295",
+            "partyhns/font_small.png" to "10b2cfee",
+            "partyhns/pokeball.png" to "53f5f1ea", // FireRed's / Emerald's ball
+            // Emerald's slot frames, pixel for pixel.
+            "partyhns/slot_fainted.png" to "988df89d",
+            "partyhns/slot_nohp_normal.png" to "0402fa82",
+            "partyhns/slot_nohp_selected.png" to "ed6e77fa",
+            "partyhns/slot_normal.png" to "b868b751",
+            "partyhns/slot_selected.png" to "06077c6c",
+            "partyhns/slot_selected_fainted.png" to "b0393f12",
+            "partyhns/status_icons.png" to "b27d09eb",
+        )
+        val CFRU = mapOf(
+            "partybg/cfru_tile.png" to "734c1189",
+            "partycfru/slot_empty.png" to "c2ed34d7",
+            "partycfru/slot_fainted.png" to "2dcf7519",
+            "partycfru/slot_nohp_normal.png" to "99193b63",
+            "partycfru/slot_nohp_selected.png" to "6234b842",
+            "partycfru/slot_normal.png" to "e9603ce2",
+            "partycfru/slot_selected.png" to "ec246dad",
+            "partycfru/slot_selected_fainted.png" to "f83c49af",
+        )
+        val CFRU_STATUS = mapOf("ub" to "2e442add", "rr" to "dddaa119", "od" to "a20e9bf7", "am" to "bc0660eb")
         // CRC32 of each image's ARGB pixels; the images matched the PNGs the app
         // used to bundle (colour rounding aside) when these were recorded.
         val FIRERED = mapOf(

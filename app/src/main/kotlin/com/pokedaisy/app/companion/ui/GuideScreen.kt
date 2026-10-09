@@ -73,6 +73,7 @@ import com.pokedaisy.app.companion.data.speciesName
 import com.pokedaisy.app.companion.data.spriteAsset
 import com.pokedaisy.app.companion.i18n.tk
 import com.pokedaisy.app.companion.i18n.tr
+import com.pokedaisy.app.companion.i18n.trGuide
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -268,8 +269,8 @@ private fun SectionHeading(section: GuideSection, small: GbaTextMetrics) {
     val u = small.u
     Column(Modifier.padding(start = u * 4, end = u * 4, top = u * 6, bottom = u * 1)) {
         // Headings stay English in the page (keys, tests); the app's own ones are translated here.
-        GbaText(tr(section.heading), OptionColors.value, OptionColors.valueShadow, small)
-        section.note?.let { GbaText(it, OptionColors.muted, OptionColors.mutedShadow, small, maxLines = 3) }
+        GbaText(tr(trGuide(section.heading)), OptionColors.value, OptionColors.valueShadow, small)
+        section.note?.let { GbaText(trGuide(it), OptionColors.muted, OptionColors.mutedShadow, small, maxLines = 3) }
     }
 }
 
@@ -298,7 +299,7 @@ private fun EntryRow(e: GuideEntry, level: Int, owned: Boolean, m: GbaTextMetric
                 SpeciesIcon(spriteAsset("pokemon", e.icon), size = u * 24)
                 Spacer(Modifier.width(u * 4))
             }
-            GbaText(e.title, OptionColors.label, OptionColors.labelShadow, m, Modifier.weight(1f), maxLines = 2)
+            GbaText(trGuide(e.title), OptionColors.label, OptionColors.labelShadow, m, Modifier.weight(1f), maxLines = 2)
             e.detail?.let { GbaText(it, OptionColors.value, OptionColors.valueShadow, small, Modifier.padding(start = u * 6)) }
             val next = when {
                 e.steps == 0 || showAnswer -> null
@@ -307,8 +308,8 @@ private fun EntryRow(e: GuideEntry, level: Int, owned: Boolean, m: GbaTextMetric
             }
             next?.let { GbaText(it, OptionColors.muted, OptionColors.mutedShadow, small, Modifier.padding(start = u * 6)) }
         }
-        if (showHint) GbaText(tr("HINT: {0}", e.hint), OptionColors.muted, OptionColors.mutedShadow, small, maxLines = Int.MAX_VALUE)
-        if (showAnswer) GbaText(e.answer, OptionColors.value, OptionColors.valueShadow, small, maxLines = Int.MAX_VALUE)
+        if (showHint) GbaText(tr("HINT: {0}", trGuide(e.hint!!)), OptionColors.muted, OptionColors.mutedShadow, small, maxLines = Int.MAX_VALUE)
+        if (showAnswer) GbaText(trGuide(e.answer), OptionColors.value, OptionColors.valueShadow, small, maxLines = Int.MAX_VALUE)
     }
 }
 
@@ -367,7 +368,7 @@ private fun herePage(
     fun qty(t: AreaThing) = if (t.qty > 1) " x${t.qty}" else ""
     // Place names (and the hint's map names) are game data: only the sentences around them are translated.
     val placeShown = tr(place)
-    fun at(t: AreaThing) = if (t.where.isEmpty()) tr("around {0}", placeShown) else tr("in the {0}", t.where)
+    fun at(t: AreaThing) = if (t.where.isEmpty()) tr("around {0}", placeShown) else tr("in the {0}", trGuide(t.where))
     val people = things.filter { it.kind in PEOPLE_KINDS }.map { t ->
         when (t.kind) {
             AreaKind.MON -> GuideEntry(speciesName(t.id), tr("Someone {0} gives you this POKéMON.", at(t)), icon = t.id, owned = done(t))
@@ -441,14 +442,14 @@ private fun bossPage(
     val best = party.filter { !it.isEgg }.maxOfOrNull { it.level }
     // A boss with variants (a team per difficulty, or a run of battles) gets a section per team.
     val shown = ahead.withIndex().flatMap { (i, boss) ->
-        boss.teams(progress).map { (label, id) -> Triple(i, if (label == null) boss.title else "${boss.title} · $label", id) }
+        boss.teams(progress).map { (label, id) -> Triple(i, if (label == null) trGuide(boss.title) else "${trGuide(boss.title)} · ${trGuide(label)}", id) }
     }
     val sections = shown.mapIndexed { k, (i, title, trainer) ->
         val boss = ahead[i]
         val team = parties[trainer].orEmpty()
         val ace = team.maxOfOrNull { it.level }
         val note = buildString {
-            append(boss.where)
+            append(trGuide(boss.where))
             if (ace != null) append(" · " + tr("{0} POKéMON", team.size) + " · " + tr("UP TO LV {0}", ace))
             if (k == 0 && best != null) append(" · " + tr("YOUR BEST LV {0}", best))
         }

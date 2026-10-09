@@ -61,8 +61,6 @@ import com.pokedaisy.app.companion.data.POCKET_KEY_ITEMS
 import com.pokedaisy.app.companion.data.POCKET_POKE_BALLS
 import com.pokedaisy.app.companion.data.POCKET_TM_HM
 import com.pokedaisy.app.companion.data.activeGame
-import com.pokedaisy.app.companion.data.itemDescriptionsEmeraldGame
-import com.pokedaisy.app.companion.data.itemDescriptionsFireRedGame
 import com.pokedaisy.app.companion.data.itemNamesEmeraldGame
 import com.pokedaisy.app.companion.data.itemNamesFireRedGame
 import com.pokedaisy.app.companion.data.localText
@@ -75,25 +73,21 @@ private enum class ItemSort(val label: String) { DEFAULT(tk("Default")), NAME(tk
 
 /**
  * FireRed and Emerald print item names and pocket titles in ALL CAPS
- * ("POKé BALL", "PARLYZ HEAL") and write "POKéMON" in descriptions, so the bag
- * screen uses each game's own strings (ItemTextGame.kt) rather than the
- * app-wide Title Case tables. Games whose item table was extracted from their
- * own ROM already carry the game's casing.
+ * ("POKé BALL", "PARLYZ HEAL"), so the bag screen uses each game's own names
+ * (ItemTextGame.kt) rather than the app-wide Title Case tables. Games whose item
+ * table was extracted from their own ROM already carry the game's casing, and
+ * descriptions always do: they're read from the ROM (RomItemText).
  */
-private class GameItemText(val names: Map<Int, String>, val descriptions: Map<Int, String>)
-
-private fun gameItemText(game: GameKind): GameItemText? = when (game) {
+private fun gameItemNames(game: GameKind): Map<Int, String>? = when (game) {
     // A localized game's own (GameText), already in its casing.
-    GameKind.FIRERED -> localText?.let { GameItemText(it.items, it.itemDescriptions) }
-        ?: GameItemText(itemNamesFireRedGame, itemDescriptionsFireRedGame)
-    GameKind.EMERALD -> localText?.let { GameItemText(it.items, it.itemDescriptions) }
-        ?: GameItemText(itemNamesEmeraldGame, itemDescriptionsEmeraldGame)
+    GameKind.FIRERED -> localText?.items ?: itemNamesFireRedGame
+    GameKind.EMERALD -> localText?.items ?: itemNamesEmeraldGame
     else -> null
 }
 
 /** Games whose bag prints pocket titles in caps; their item tables already are. */
 private fun capsBagLabels(game: GameKind): Boolean =
-    gameItemText(game) != null || game == GameKind.HEART_AND_SOUL
+    gameItemNames(game) != null || game == GameKind.HEART_AND_SOUL || game == GameKind.ORANGE_ISLANDS
 
 private fun capsPocketLabel(pocket: Int?): String = when (pocket) {
     null -> tr("ALL")
@@ -445,13 +439,8 @@ fun ItemsScreen(
     var selectedItem by remember { mutableStateOf(items.firstOrNull { it.itemId == initialItemId }) }
     var selectedKey by remember { mutableStateOf(selectedItem?.let { "${it.itemId}#0" }) }
     val pal = bagPaletteFor(activeGame)
-    val caps = gameItemText(activeGame)
-    val shown = if (caps == null) items else items.map {
-        it.copy(
-            name = caps.names[it.itemId] ?: it.name,
-            description = caps.descriptions[it.itemId] ?: it.description,
-        )
-    }
+    val caps = gameItemNames(activeGame)
+    val shown = if (caps == null) items else items.map { it.copy(name = caps[it.itemId] ?: it.name) }
     val m = rememberGbaTextMetrics()
     val u = m.u
 

@@ -69,6 +69,11 @@ class Prefs(context: Context) {
         set(v) = p.edit().putString("ff_music_mode", v.name).apply()
 
     /** Where fast-forward applies: SMART (1x on menus and the region map) or NORMAL. */
+    /** REWIND: the last ~20 s kept for the rewind hotkey (memory and a little CPU while on). */
+    var rewind: Boolean
+        get() = p.getBoolean("rewind", false)
+        set(v) = p.edit().putBoolean("rewind", v).apply()
+
     var ffMode: FfMode
         get() = p.getString("ff_mode", null)?.let { n -> FfMode.entries.firstOrNull { it.name == n } } ?: FfMode.SMART
         set(v) = p.edit().putString("ff_mode", v.name).apply()
@@ -251,6 +256,18 @@ class Prefs(context: Context) {
     var savesDirOverride: String?
         get() = p.getString("saves_dir_override", null)
         set(v) = p.edit().putString("saves_dir_override", v).apply()
+
+    /** More folders to look for a game's save in, after [savesDirOverride] (Settings > FOLDERS >
+     * ALSO LOOK IN; see [SavesLocation.saveFor]). New saves still go to the saves folder. */
+    var extraSaveDirs: List<String>
+        get() = p.getString("extra_save_dirs", null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty()
+        set(v) = p.edit().putString("extra_save_dirs", v.distinct().joinToString("\n")).apply()
+
+    /** [file]'s own save folder (the library menu's SAVE FOLDER); null = [SavesLocation.saveFor]'s search. */
+    fun romSaveDir(file: java.io.File): String? = p.getString("romsavedir_${file.name}", null)
+    fun setRomSaveDir(file: java.io.File, path: String?) = p.edit().apply {
+        if (path.isNullOrBlank()) remove("romsavedir_${file.name}") else putString("romsavedir_${file.name}", path)
+    }.apply()
 
     /** The player's own ROMs folder (first-time setup / Settings > Folders): its
      * supported games are listed in the library and played in place, and it is

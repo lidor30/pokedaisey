@@ -50,7 +50,7 @@ private fun cfruPartyStyle(statusAsset: String, pokeballAsset: String?, eggName:
 
 val UnboundPartyStyle = cfruPartyStyle(
     statusAsset = "partycfru/ub/status_icons.png",
-    pokeballAsset = "partycfru/ub/pokeball.png",
+    pokeballAsset = "partyfr/pokeball.png",
     eggName = "Egg",
 )
 

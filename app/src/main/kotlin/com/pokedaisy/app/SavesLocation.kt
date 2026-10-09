@@ -20,6 +20,26 @@ object SavesLocation {
         return dir
     }
 
+    /**
+     * [rom]'s save file. Its own folder if the player set one (the library menu's SAVE FOLDER,
+     * [Prefs.romSaveDir]); else the first of the saves folder and the ALSO LOOK IN folders
+     * ([Prefs.extraSaveDirs], Settings > FOLDERS) that holds a save for it - so a save another
+     * emulator keeps (RetroArch's per-core folders) is played and written where it is; else a
+     * new save in the saves folder. Only the folders themselves are looked in, never below.
+     */
+    fun saveFor(context: Context, prefs: Prefs, rom: File): File =
+        saveIn(prefs.romSaveDir(rom)?.let { File(it).apply { mkdirs() } }, searchDirs(context, prefs), rom)
+
+    /** [saveFor]'s rule: [own] if set, else the first of [dirs] with a save for [rom], else a new one in [dirs]' first. */
+    fun saveIn(own: File?, dirs: List<File>, rom: File): File {
+        own?.let { return resolve(it, rom) }
+        return dirs.asSequence().map { resolve(it, rom) }.firstOrNull { it.exists() } ?: resolve(dirs.first(), rom)
+    }
+
+    /** The saves folder, then the ALSO LOOK IN folders, in [saveFor]'s order. */
+    fun searchDirs(context: Context, prefs: Prefs): List<File> =
+        (listOf(dir(context, prefs)) + prefs.extraSaveDirs.map(::File)).distinctBy { it.absolutePath }
+
     /** A folder that already holds saves, offered by first-time setup. */
     class Suggestion(val dir: File, val saves: Int)
 

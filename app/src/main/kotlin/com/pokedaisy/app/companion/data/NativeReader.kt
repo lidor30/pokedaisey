@@ -119,6 +119,8 @@ data class NativeConfig(
     val pokedex: PokedexTables? = null,
     // The GUIDE's ROM tables + save flag/var offsets (GuideRom.kt); null = no HERE / NEXT BOSS.
     val guideTables: GuideTables? = null,
+    // Where the ROM keeps the item descriptions the ITEMS tab shows (RomItemText.kt); null = none.
+    val itemDescs: ItemDescTable? = null,
     // The species whose icon is the egg's, for games where an egg keeps its own
     // species in the struct (gSpeciesInfo's unnamed entry at the end: SoulGold
     // 1578, Lazarus 1561); 0 = none found (the egg's species icon then).
@@ -160,6 +162,9 @@ data class NativeConfig(
     val altMapSecGroups: IntRange? = null,
     // The game's money cap: Gen 3's 999,999 (Glazed's AddMoney caps at 9,999,999); above it is a wrong read.
     val maxMoney: Long = 999_999L,
+    // Quetzal's IDIOMA options pick each kind of name's language from the save ([readQuetzalNames]);
+    // this is LUGARES' default when unset - its release's language (0 English, 1 Spanish). -1 = no such options.
+    val quetzalPlacesDefault: Int = -1,
 ) {
     val gMainInBattle get() = gMain + inBattleOff
     val gMainVblankCtr get() = gMain + 0x24
@@ -174,6 +179,8 @@ data class NativeConfig(
 // Retail FireRed 1.0 (BPRE rev 0); CFRU/Unbound keeps these. rev 1 uses the
 // IDENTICAL gMain/gSaveBlock1Ptr/gSaveBlock2Ptr — see NATIVE_FIRERED_REV1.
 val NATIVE_FIRERED_REV0 = NativeConfig(
+    // gItems, the struct Item array (RomItemText.kt); every config below has its own.
+    itemDescs = vanillaItems(0x083DB028L),
     playerParty = 0x02024284L,
     playerPartyCount = 0x02024029L,
     battleMons = 0x02023BE4L,
@@ -228,6 +235,7 @@ val NATIVE_FIRERED_REV0 = NativeConfig(
 // gMain+0x439 (inBattle) read garbage too — see the item/battle bugs in
 // PokeDaisy's memory notes.
 val NATIVE_FIRERED_REV1 = NATIVE_FIRERED_REV0.copy(
+    itemDescs = vanillaItems(0x083DB098L),
     monIconTable = 0x083D3810L,
     monIconPaletteIndices = 0x083D3EF0L,
     monIconPaletteTable = 0x083D40A8L,
@@ -286,7 +294,23 @@ val NATIVE_UNBOUND = NATIVE_FIRERED_REV0
 // Unbound's own POKéDEX tables (SHA1-pinned, see POKEDEX_UNBOUND) - kept off
 // NATIVE_UNBOUND itself, which the other CFRU configs reuse as NATIVE_FIRERED_REV0.
 val NATIVE_UNBOUND_WITH_DEX = NATIVE_UNBOUND.copy(
+    // CFRU repointed gItems (FireRed 1.0's literal pools load it from here).
+    itemDescs = vanillaItems(0x08876200L),
     pokedex = POKEDEX_UNBOUND, guideTables = GUIDE_TABLES_UNBOUND, trainerCard = TRAINER_CARD_UNBOUND,
+)
+
+// Pokémon Unbound v2.1.1.1 FR - a French fan translation of the same release (32 MB, sha1
+// 0ce2a880…, its header's revision byte left at 0x9E). Only text changed: every literal pool
+// English's code loads a RAM global or table from holds the same word, and the headless
+// capture of the user's save (`unbound_fr`: LARVITAR / SNORUNT / DELIBIRD on Route 1) decodes
+// with English's config. Names in French (UNBOUND_FR_TEXT, gen_unbound_fr_tables.py); gItems,
+// the dex entries and the map names were translated in place, so the item descriptions, the
+// POKéDEX page and the MAP (RomRegionMap) read French from the ROM by themselves.
+val NATIVE_UNBOUND_FR = NATIVE_UNBOUND_WITH_DEX.copy(
+    language = 'F',
+    gameCode = UNBOUND_FR_TEXT,
+    pokedex = POKEDEX_UNBOUND_FR,
+    guideTables = GUIDE_TABLES_UNBOUND_FR,
 )
 
 // Pokémon Gaia v3.2 - another large (32 MB) BPRE hack, verified 2026-09-20 the
@@ -342,6 +366,7 @@ val NATIVE_UNBOUND_WITH_DEX = NATIVE_UNBOUND.copy(
 // independently since a future hack could easily have this asymmetry the
 // other way around.
 val NATIVE_GAIA_V3_2 = NATIVE_FIRERED_REV0.copy(
+    itemDescs = vanillaItems(0x083DB028L), // retail's address, its own text
     monIconTable = 0x0872A86CL,
     monIconPaletteIndices = 0x0872B870L,
     monIconPaletteTable = 0x0823C500L,
@@ -376,6 +401,8 @@ val NATIVE_GAIA_V3_2 = NATIVE_FIRERED_REV0.copy(
 // still vanilla's. Inheriting rev 0's read species past 411 off the end of
 // vanilla's tables - the broken party / bag sprites.
 val NATIVE_RADICAL_RED_V4_1 = NATIVE_FIRERED_REV0.copy(
+    // Repointed by CFRU; indexed by slot, as the game's ItemId_GetDescription does.
+    itemDescs = vanillaItems(0x093C0000L),
     monIconTable = 0x097FE6CCL,
     monIconPaletteIndices = 0x097FE164L,
     itemIconTable = 0x093C8100L,
@@ -394,7 +421,7 @@ val NATIVE_RADICAL_RED_V4_1 = NATIVE_FIRERED_REV0.copy(
 // wrong live, re-derive the specific broken field the same way Gaia's icon
 // tables were (find a still-byte-identical helper function, read its literal
 // pool) rather than guessing again.
-val NATIVE_ODYSSEY = NATIVE_FIRERED_REV0.copy(pokedex = POKEDEX_ODYSSEY, guideTables = GUIDE_TABLES_ODYSSEY)
+val NATIVE_ODYSSEY = NATIVE_FIRERED_REV0.copy(pokedex = POKEDEX_ODYSSEY, guideTables = GUIDE_TABLES_ODYSSEY, itemDescs = vanillaItems(0x083DB028L))
 
 // Retail Emerald (BPEE). Same struct layouts as FireRed (gMain +0x439 inBattle,
 // +0x24 vblank counter both hold); only the global addresses differ. From
@@ -402,6 +429,7 @@ val NATIVE_ODYSSEY = NATIVE_FIRERED_REV0.copy(pokedex = POKEDEX_ODYSSEY, guideTa
 // cfgEmerald. NOTE: encryptionKey is at SaveBlock2 + 0xAC in Emerald, not 0xF20.
 // Location names still come from the FireRed (Kanto) mapsec table — a known gap.
 val NATIVE_EMERALD = NativeConfig(
+    itemDescs = vanillaItems(0x085839A0L),
     playerParty = 0x020244ECL,
     playerPartyCount = 0x020244E9L,
     battleMons = 0x02024084L,
@@ -454,12 +482,14 @@ val NATIVE_EMERALD_RETAIL = NATIVE_EMERALD.copy(
 // guide tables. German and Italian's battle code sits 4 bytes later. The
 // TRAINER CARD stays off: their cards are localized art, not matched yet.
 val NATIVE_EMERALD_ES = NATIVE_EMERALD_RETAIL.copy(
+    itemDescs = vanillaItems(0x0858639CL),
     language = 'S', gameCode = "BPES", trainerCard = null,
     monIconTable = 0x0857E784L, monIconPaletteIndices = 0x0857EE64L, monIconPaletteTable = 0x0857F01CL,
     itemIconTable = 0x08617250L,
     pokedex = POKEDEX_EMERALD_ES, guideTables = GUIDE_TABLES_EMERALD_ES,
 )
 val NATIVE_EMERALD_DE = NATIVE_EMERALD_RETAIL.copy(
+    itemDescs = vanillaItems(0x085946DCL),
     language = 'D', gameCode = "BPED", trainerCard = null,
     monIconTable = 0x0858CAA8L, monIconPaletteIndices = 0x0858D188L, monIconPaletteTable = 0x0858D340L,
     itemIconTable = 0x086258D8L,
@@ -468,12 +498,14 @@ val NATIVE_EMERALD_DE = NATIVE_EMERALD_RETAIL.copy(
     pokedex = POKEDEX_EMERALD_DE, guideTables = GUIDE_TABLES_EMERALD_DE,
 )
 val NATIVE_EMERALD_FR = NATIVE_EMERALD_RETAIL.copy(
+    itemDescs = vanillaItems(0x08587D6CL),
     language = 'F', gameCode = "BPEF", trainerCard = null,
     monIconTable = 0x08580020L, monIconPaletteIndices = 0x08580700L, monIconPaletteTable = 0x085808B8L,
     itemIconTable = 0x08618798L,
     pokedex = POKEDEX_EMERALD_FR, guideTables = GUIDE_TABLES_EMERALD_FR,
 )
 val NATIVE_EMERALD_IT = NATIVE_EMERALD_RETAIL.copy(
+    itemDescs = vanillaItems(0x0858000CL),
     language = 'I', gameCode = "BPEI", trainerCard = null,
     monIconTable = 0x0857838CL, monIconPaletteIndices = 0x08578A6CL, monIconPaletteTable = 0x08578C24L,
     itemIconTable = 0x08610FACL,
@@ -491,6 +523,7 @@ val NATIVE_EMERALD_IT = NATIVE_EMERALD_RETAIL.copy(
 // Japanese table). No TRAINER CARD, and the party slot is the app's own (its
 // fonts aren't the Western ones the slot art is drawn with).
 val NATIVE_EMERALD_JA = NATIVE_EMERALD_RETAIL.copy(
+    itemDescs = japaneseItems(0x0855CEE8L),
     language = 'J', gameCode = "BPEJ", trainerCard = null,
     playerParty = 0x02024190L, playerPartyCount = 0x0202418DL,
     battleMons = 0x02023D28L, battlerPositions = 0x02023D1AL, battlersCount = 0x02023D10L,
@@ -513,6 +546,7 @@ val NATIVE_EMERALD_JA = NATIVE_EMERALD_RETAIL.copy(
 // only ROM data (icons, dex tables, dex text) moves. sItemIconTable is static
 // (not in the map): found by matching FireRed's item-icon data.
 val NATIVE_LEAFGREEN_REV0 = NATIVE_FIRERED_REV0.copy(
+    itemDescs = vanillaItems(0x083DAE64L),
     monIconTable = 0x083D35DCL,
     monIconPaletteIndices = 0x083D3CBCL,
     monIconPaletteTable = 0x083D3E74L,
@@ -523,6 +557,7 @@ val NATIVE_LEAFGREEN_REV0 = NATIVE_FIRERED_REV0.copy(
 )
 
 val NATIVE_LEAFGREEN_REV1 = NATIVE_FIRERED_REV1.copy(
+    itemDescs = vanillaItems(0x083DAED4L),
     monIconTable = 0x083D364CL,
     monIconPaletteIndices = 0x083D3D2CL,
     monIconPaletteTable = 0x083D3EE4L,
@@ -545,6 +580,7 @@ val NATIVE_LEAFGREEN_REV1 = NATIVE_FIRERED_REV1.copy(
 // as Emerald. No item icons (the R/S bag never draws one), and the battle
 // touch controls stay off (their controller functions weren't mapped).
 val NATIVE_RUBY = NativeConfig(
+    itemDescs = vanillaItems(0x083C5580L, RUBY_SAPPHIRE_ITEMS),
     playerParty = 0x03004360L,
     playerPartyCount = 0x03004350L,
     battleMons = 0x02024A80L,
@@ -579,6 +615,7 @@ val NATIVE_RUBY = NativeConfig(
 )
 
 val NATIVE_SAPPHIRE = NATIVE_RUBY.copy(
+    itemDescs = vanillaItems(0x083C55DCL, RUBY_SAPPHIRE_ITEMS),
     bagPockets = 0x083C1690L,
     monIconTable = 0x083BBD98L,
     monIconPaletteIndices = 0x083BC478L,
@@ -634,6 +671,8 @@ val NATIVE_SAPPHIRE = NATIVE_RUBY.copy(
 // Types use newer expansion ids (Fire = 11), so HnS has its own tables
 // (*Hns.kt, scripts/gen_expansion_tables.py). Touch battle input: not derived.
 val NATIVE_HEART_AND_SOUL = NATIVE_EMERALD.copy(
+    // gItemsInfo: 0x2C-byte entries, the description pointer 8 bytes before the name's.
+    itemDescs = ItemDescTable(0x0878EFD4L, 0x2C, -8),
     playerParty = 0x02034764L,
     playerPartyCount = 0x020342A4L,
     battleMons = 0x02000420L,
@@ -764,6 +803,8 @@ val NATIVE_HEART_AND_SOUL = NATIVE_EMERALD.copy(
 val LAZARUS_BAG_POCKET_ORDER = EMERALD_BAG_POCKET_ORDER
 
 val NATIVE_LAZARUS = NATIVE_EMERALD.copy(
+    // gItemsInfo: 0x50-byte entries, inline names, the description pointer 8 bytes before.
+    itemDescs = ItemDescTable(0x0886855CL, 0x50, -8),
     guideTables = GUIDE_TABLES_LAZARUS,
     playerParty = 0x0201B960L,
     playerPartyCount = 0x0201B95DL,
@@ -847,6 +888,8 @@ val SOULGOLD_BAG_POCKET_ORDER = listOf(
 )
 
 val NATIVE_SOULGOLD = NATIVE_EMERALD.copy(
+    // gItemsInfo: 0x2C-byte entries, the description pointer 8 bytes before the name's.
+    itemDescs = ItemDescTable(0x087520A0L, 0x2C, -8),
     playerParty = 0x0203901CL,
     playerPartyCount = 0x02038DD5L,
     monStride = 96,
@@ -908,6 +951,7 @@ val NATIVE_SOULGOLD = NATIVE_EMERALD.copy(
 // ROM tables shifted a few KB - their contents are v1.1.4's but TM75 (Agility,
 // was Swords Dance; see ActiveTables' soulGoldV12).
 val NATIVE_SOULGOLD_V1_2 = NATIVE_SOULGOLD.copy(
+    itemDescs = ItemDescTable(0x08753834L, 0x2C, -8), // its own TM75 text included
     guideTables = GUIDE_TABLES_SOULGOLD_V1_2,
     playerParty = 0x02039024L,
     playerPartyCount = 0x02038DDDL,
@@ -935,6 +979,7 @@ val NATIVE_SOULGOLD_V1_2 = NATIVE_SOULGOLD.copy(
 // 0x98 bytes (gSpeciesInfo, gItemsInfo) or 0xA4 (the icon palettes). Its tables are byte for byte
 // the first v1.2's, TM75 included.
 val NATIVE_SOULGOLD_V1_2B = NATIVE_SOULGOLD_V1_2.copy(
+    itemDescs = ItemDescTable(0x0875379CL, 0x2C, -8),
     guideTables = GUIDE_TABLES_SOULGOLD_V1_2B,
     monIconTable = 0x087D5CA4L,
     monIconPaletteIndices = 0x087D5CCAL,
@@ -973,6 +1018,8 @@ val ROWE_BAG_POCKET_ORDER = listOf(
 )
 
 val NATIVE_ROWE = NATIVE_EMERALD.copy(
+    // gItems: 0x38-byte entries, description pointer at +0x1C.
+    itemDescs = ItemDescTable(0x08F76D78L, 0x38, 0x1C),
     playerParty = 0x02025128L,
     playerPartyCount = 0x02025125L,
     monStride = 0x4C,
@@ -1055,6 +1102,9 @@ val ROGUE_BAG_POCKET_ORDER = listOf(
 const val ROGUE_HUB_NAME_OFF = 0xEE4L
 
 val NATIVE_EMERALD_ROGUE = NATIVE_EMERALD.copy(
+    // gItems (0x28-byte records, description at +0xC), then Rogue's own items from 827 in
+    // gRogueItems (0x30-byte records, description at +0x10).
+    itemDescs = ItemDescTable(0x08B935ACL, 0x28, 0x0C, count = 827, next = ItemDescTable(0x08B9DD54L, 0x30, 0x10, first = 827, count = 201)),
     playerParty = 0x02036C7CL,
     playerPartyCount = 0x02036C79L,
     monStride = 104,
@@ -1170,6 +1220,8 @@ val NATIVE_EMERALD_ROGUE = NATIVE_EMERALD.copy(
 // HandleInputChooseTarget 0x0805CF85 by code (the move handler's pool; it returns
 // to the move handler on B). gPartyMenu 0x02019964, Emerald's list (DOWN walks it).
 val NATIVE_EMERALD_SEAGLASS = NATIVE_EMERALD.copy(
+    // gItemsInfo: 0x54-byte entries, inline names, the description pointer 8 bytes before.
+    itemDescs = ItemDescTable(0x0867E77CL, 0x54, -8),
     guideTables = GUIDE_TABLES_SEAGLASS,
     playerParty = 0x02019C20L,
     playerPartyCount = 0x02019C1DL,
@@ -1241,6 +1293,7 @@ val NATIVE_EMERALD_SEAGLASS = NATIVE_EMERALD.copy(
 //     user's ETHER, render as the right Pokemon/items.
 // Touch battle control disabled (addresses not derived).
 val NATIVE_CELIA = NATIVE_FIRERED_REV0.copy(
+    itemDescs = vanillaItems(0x08C1D0BCL), // relocated (15 references)
     playerParty = 0x0202433CL,
     playerPartyCount = 0x020240E1L,
     battleMons = 0x02023BF8L,
@@ -1306,6 +1359,8 @@ val TMT2_BAG_POCKET_ORDER = listOf(
 )
 
 val NATIVE_TMT2 = NATIVE_EMERALD.copy(
+    // gItemsInfo: 0x54-byte entries, inline names ("Poké Ball" 0x086B9A04), the description 8 bytes before.
+    itemDescs = ItemDescTable(0x086B99B0L, 0x54, -8),
     guideTables = GUIDE_TABLES_TMT2,
     playerParty = 0x02032C94L,
     playerPartyCount = 0x02032715L,
@@ -1362,6 +1417,7 @@ val NATIVE_TMT2 = NATIVE_EMERALD.copy(
 // holding its own icons, and RomArt rebuilds its region map (GZ_REGION_*). Its
 // POKéDEX is retail's tables rewritten in place (its own 1..386 numbering).
 val NATIVE_GLAZED = NATIVE_EMERALD.copy(
+    itemDescs = vanillaItems(0x085839A0L), // retail's, rewritten in place
     guideTables = GUIDE_TABLES_GLAZED,
     // Retail's dex tables and flags, rewritten in place in its own 1..386 numbering (No.322 is
     // CHIMCHAR); its species 252-276 map past 386, where the game's dex doesn't go either.
@@ -1405,6 +1461,8 @@ val IMPERIUM_BAG_POCKET_ORDER = listOf(
 )
 
 val NATIVE_IMPERIUM = NATIVE_EMERALD.copy(
+    // gItemsInfo: 0x50-byte entries, inline names, the description pointer 8 bytes before.
+    itemDescs = ItemDescTable(0x086C7A78L, 0x50, -8),
     playerParty = 0x020375F8L,
     playerPartyCount = 0x020375F5L,
     gMain = 0x03004218L,
@@ -1479,6 +1537,8 @@ val NATIVE_IMPERIUM = NATIVE_EMERALD.copy(
 //     indices 0x091D1DDC, palettes 0x091D2674; item icons 0x092BD4B8); the egg is 1529.
 //     Tables: scripts/gen_quetzal_tables.py.
 val NATIVE_QUETZAL = NATIVE_EMERALD.copy(
+    // gItems: 0x1C-byte entries, description pointer at +0xC (names are a table of their own).
+    itemDescs = ItemDescTable(0x091E0594L, 0x1C, 0x0C),
     playerParty = 0x020235CCL,
     playerPartyCount = 0x020235C9L,
     monStride = 0x68,
@@ -1518,7 +1578,63 @@ val NATIVE_QUETZAL = NATIVE_EMERALD.copy(
     guideTables = GUIDE_TABLES_QUETZAL,
     // Johto's maps (groups 34-35) name their sections from Johto's own table (ROM 0x0922A7E8).
     altMapSecGroups = 34..35,
+    // Its money goes past Gen 3's 999,999 (a save at 1,048,458, which START shows as such).
+    maxMoney = 9_999_999L,
+    quetzalPlacesDefault = 0,
 )
+
+// Pokémon Quetzal Spanish Alpha 9 v0 (sha1 fe346b5b…): the same engine rebuilt with Spanish
+// dialogue, item descriptions and dex text (its header's GF language word is 7, English's 2).
+// Its RAM is English's - every RAM literal pool maps to the same word (scripts/port_retail.py's
+// literal matching, run English -> Spanish), and the user's save (`quetzal_es`: six Lv42s on
+// Jagged Pass, ₽1,048,458, 3403 Master Balls - its own bag screen shows the same) decodes with
+// it. The ROM side moved: tables by those literal pools, the battle handlers by their code
+// (all 0x24 earlier), gBattleMoves / gSpeciesNames by the GF header at 0x08000100. Its names
+// tables are English's too - the game picks Spanish ones per its IDIOMA options, like English
+// (QuetzalNames); only LUGARES defaults to Spanish here.
+val NATIVE_QUETZAL_ES = NATIVE_QUETZAL.copy(
+    itemDescs = ItemDescTable(0x091E359CL, 0x1C, 0x0C),
+    handleInputChooseAction = 0x0808BD21L,
+    handleInputChooseMove = 0x0808C995L,
+    completeWhenChoseItem = 0x0808EBE1L,
+    waitForMonSelection = 0x0808EB29L,
+    handleInputChooseTarget = 0x0808C169L,
+    monIconTable = 0x091D315CL,
+    monIconPaletteIndices = 0x091D53B8L,
+    monIconPaletteTable = 0x091D5C50L,
+    itemIconTable = 0x092C1A2CL,
+    pokedex = POKEDEX_QUETZAL_ES,
+    guideTables = GUIDE_TABLES_QUETZAL_ES,
+    language = 'S',
+    quetzalPlacesDefault = 1,
+)
+
+/** Quetzal's IDIOMA options: the language each kind of name is shown in ([quetzalNames]):
+ * 0 English, 1 Spanish, 2 Latin American Spanish (3, Portuguese, reads as English). */
+data class QuetzalNames(val species: Int = 0, val moves: Int = 0, val items: Int = 0, val places: Int = 0)
+
+/**
+ * Quetzal's IDIOMA options, from SaveBlock2 - each read the way the game's own getter does
+ * (disassembled in both releases): GetSpeciesName +0x2E0 bits 5-7 (1 or 2: its one Spanish
+ * table), GetMoveName +0x2E1 bits 0-2, ItemId_GetName +0x2E2 bits 3-5 (1 Spanish, 2 Latin
+ * American, 3 Portuguese), the map names +0x2F4 bits 1-3 (1-4 = English .. Portuguese, else
+ * the release's default). Checked on the saves: Spanish everywhere in `quetzal_es`, English in
+ * the English ones.
+ */
+fun readQuetzalNames(c: MemoryReader, cfg: NativeConfig): QuetzalNames {
+    if (cfg.quetzalPlacesDefault < 0) return QuetzalNames()
+    val sb2 = saveBlock2(c, cfg)
+    if (sb2 !in 0x02000000L until 0x04000000L) return QuetzalNames(places = cfg.quetzalPlacesDefault)
+    val b = c.readCoreMemory(sb2 + 0x2E0, 3)
+    val p = (c.readCoreMemory(sb2 + 0x2F4, 1)[0].toInt() ushr 1) and 7
+    fun lang(v: Int) = if (v in 1..2) v else 0
+    return QuetzalNames(
+        species = if (((b[0].toInt() ushr 5) and 7) in 1..2) 1 else 0,
+        moves = lang(b[1].toInt() and 7),
+        items = lang((b[2].toInt() ushr 3) and 7),
+        places = if (p in 1..4) lang(p - 1) else cfg.quetzalPlacesDefault,
+    )
+}
 
 // Pokemon Amethyst v1.3.0 - FireRed-based (BPRE), no source access. Kept
 // vanilla FireRed rev 0's RAM layout entirely unchanged (party/bag/location
@@ -1551,6 +1667,7 @@ val NATIVE_QUETZAL = NATIVE_EMERALD.copy(
 //   (the user's real Potion, LZ77 tiles+palette) and it rendered as a real,
 //   recognizable potion-bottle icon.
 val NATIVE_AMETHYST = NATIVE_FIRERED_REV0.copy(
+    itemDescs = vanillaItems(0x0872DB0CL), // repointed; v1.4.1 keeps the address
     monIconTable = 0x09C018FCL,
     monIconPaletteIndices = 0x09C01408L,
     itemIconTable = 0x083DB028L,
@@ -1580,6 +1697,25 @@ val NATIVE_AMETHYST_V1_4_1 = NATIVE_AMETHYST.copy(
     pokedex = POKEDEX_AMETHYST_V1_4_1,
     guideTables = GUIDE_TABLES_AMETHYST_V1_4_1,
     handleInputChooseTarget = 0x0890BE01L, // its moved target-select handler, found the same way
+)
+
+// Pokémon Orange Islands (BPRE rev 0, 16 MB, sha1 8bac897d…; Beta 5.7 d2e3800e… differs from it
+// in 80 bytes of map text / data and shares this): FireRed 1.0 edited in place, no source. Its
+// code is retail rev 0's byte for byte where the config points (the five battle handlers and
+// their glue, ScriptContext_SetupScript), and so is its RAM - the headless capture of the
+// user's save (`orange_islands`: PIKACHU Lv10 on VALENCIA ISLAND, ₽2000, POTION / ORANGE PASS /
+// OLD ROD) and a scripted wild battle (`orange_islands_battle`) decode with rev 0's addresses
+// plus rev 1's three battle fields (the same RAM in both revisions). Its tables are retail
+// rev 0's edited in place, but for the type names / chart (a 24th type, CRYSTL) and
+// gWildMonHeaders (0x08A1B1B0), which it repointed: scripts/gen_orange_islands_tables.py. Its
+// region map is its own Orange Archipelago on FireRed's region_map.c (RomRegionMap).
+val NATIVE_ORANGE_ISLANDS = NATIVE_FIRERED_REV0.copy(
+    pokedex = POKEDEX_ORANGE_ISLANDS,
+    guideTables = GUIDE_TABLES_ORANGE_ISLANDS,
+    enemyParty = NATIVE_FIRERED_REV1.enemyParty,
+    battlerPartyIndexes = NATIVE_FIRERED_REV1.battlerPartyIndexes,
+    battleStructPtr = NATIVE_FIRERED_REV1.battleStructPtr,
+    monToSwitchIntoOff = NATIVE_FIRERED_REV1.monToSwitchIntoOff,
 )
 
 private const val MAP_HEADER_REGION_MAPSEC_OFF = 0x14L
@@ -1895,6 +2031,7 @@ private fun Mon.withNativeGender(raw: ByteArray, off: Int, layout: PartyMonLayou
         GameKind.IMPERIUM -> genderRatiosImperium
         GameKind.QUETZAL -> genderRatiosQuetzal
         GameKind.ROWE -> genderRatiosRowe
+        GameKind.ORANGE_ISLANDS -> genderRatiosOrangeIslands
         else -> return this
     }
     // BoxPokemon +0x13 flags byte (isBadEgg:1, hasSpecies:1, isEgg:1): an egg

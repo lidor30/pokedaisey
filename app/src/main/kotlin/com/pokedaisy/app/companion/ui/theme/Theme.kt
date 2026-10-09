@@ -392,6 +392,8 @@ private fun backdropColors(game: GameKind): IntArray? = when (game) {
     GameKind.ROWE -> IntArray(3) { 0xFF292929.toInt() }
     // SoulGold's party list: light-blue stripes, a deeper blue edge.
     GameKind.SOULGOLD -> intArrayOf(0xFF84CEEF.toInt(), 0xFF7BC6EF.toInt(), 0xFF429CD6.toInt())
+    // Orange Islands' party menu: FireRed's layout in cream stripes (sampled headless).
+    GameKind.ORANGE_ISLANDS -> intArrayOf(0xFFFFF7CE.toInt(), 0xFFEFEFB5.toInt(), 0xFFE7DE9C.toInt())
     else -> null
 }
 
@@ -446,10 +448,11 @@ private fun buildGameBackground(context: android.content.Context, game: GameKind
         GameKind.UNBOUND, GameKind.RADICAL_RED, GameKind.ODYSSEY, GameKind.AMETHYST -> "partybg/cfru_tile.png" to true
         else -> "partybg/firered.png" to false
     }
-    // FireRed's / Emerald's come from a ROM the player has run (RomArt):
-    // until then, the other one if that one's there.
-    val bmp = sequenceOf(asset, "partybg/firered.png", "partybg/emerald.png").firstNotNullOfOrNull { GameArt.get(context, it) }
-    return bmp?.let { GameBackground(it.asImageBitmap(), tiled) }
+    // Every backdrop comes from a ROM the player has run (RomArt): until the
+    // game's own is there, FireRed's or Emerald's if one of those is (untiled).
+    val bmp = sequenceOf(asset, "partybg/firered.png", "partybg/emerald.png").distinct()
+        .firstNotNullOfOrNull { path -> GameArt.get(context, path)?.let { it to (tiled && path == asset) } }
+    return bmp?.let { (b, tile) -> GameBackground(b.asImageBitmap(), tile) }
 }
 
 /**

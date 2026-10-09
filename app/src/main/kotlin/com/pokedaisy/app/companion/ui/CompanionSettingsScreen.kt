@@ -345,12 +345,14 @@ private fun homeRows(
                 ) { l -> s.setFfMusicMode(modes.first { it.label == l }) },
             )
         },
+        // Keeps the last ~20 s; the REWIND HOLD hotkey plays them backwards.
+        SettingRow(tk("REWIND"), onOff(s.rewind)) { s.setRewind(!s.rewind); changed() },
         groupTitle(tk("CONTROLS")),
         // Takes effect the next time a game is opened.
         SettingRow(tk("TOUCH PAD"), TOUCH_NAMES[s.touchControlsMode]) {
             select(Selector(tk("TOUCH PAD"), TOUCH_NAMES, TOUCH_NAMES[s.touchControlsMode]) { s.setTouchControlsMode(TOUCH_NAMES.indexOf(it)) })
         },
-        SettingRow(tk("GAME BUTTONS"), null) { navigate(Page.BUTTONS) },
+        SettingRow(tk("GAME BUTTONS"), null, subtitle = "Key bindings: which button presses A, B, START...") { navigate(Page.BUTTONS) },
         SettingRow(tk("HOTKEYS"), onOff(s.hotkeysEnabled)) { navigate(Page.HOTKEYS) },
         groupTitle(tk("COMPANION")),
         // AUTO: the ROM's own language. Applies at once, both screens.
@@ -368,7 +370,7 @@ private fun homeRows(
         // The game's menu click on every companion button.
         SettingRow(tk("CLICK SOUND"), onOff(s.clickSound)) { s.setClickSound(!s.clickSound); changed() },
         // Small on / off preferences: the icons' bounce, the map cursor's blink, tab slides, the battle jump.
-        SettingRow(tk("TWEAKS"), null) { navigate(Page.TWEAKS) },
+        SettingRow(tk("TWEAKS"), null, subtitle = "Small touches: icon bounce, cursor blink, animations") { navigate(Page.TWEAKS) },
         groupTitle(tk("SCREEN")),
         // Game, location, money, clock and battery: OFF, over the game, or over these tabs.
         SettingRow(tk("STATUS BAR"), statusBarLabel(s.statusBar, s.statusBarOnCompanion)) {

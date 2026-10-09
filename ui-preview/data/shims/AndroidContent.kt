@@ -5,10 +5,18 @@ import java.io.InputStream
 
 /** Reads from the process's working directory - the render task points it at app/src/main/assets. */
 class AssetManager(private val root: File) {
-    fun open(name: String): InputStream = File(root, name).inputStream()
+    fun open(name: String): InputStream = (File(root, name).takeIf { it.isFile }
+        // Generated at build time (licenses.txt): app/build/generated/licenses, next to the assets' src dir.
+        ?: File(root, "../../../build/generated/licenses/$name")).inputStream()
 }
 
+/** Context.applicationInfo's one field the app reads (RomIntake: the private data directory). */
+class ContextAppInfo(val dataDir: String? = null)
+
 open class Context {
+    val applicationContext: Context get() = this
+    val packageName = "com.pokedaisy.app"
+    val applicationInfo = ContextAppInfo()
     val assets = AssetManager(File(System.getProperty("user.dir")))
     val filesDir = File(System.getProperty("scratch") ?: System.getProperty("java.io.tmpdir"), "files").apply { mkdirs() }
     val cacheDir = File(System.getProperty("scratch") ?: System.getProperty("java.io.tmpdir"), "cache").apply { mkdirs() }

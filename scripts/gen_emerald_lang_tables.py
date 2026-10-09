@@ -7,9 +7,11 @@ so the companion shows a game's names in its own language.
     scripts/gen_emerald_lang_tables.py en <english rom.gba>   (checks only)
 
 Writes app/src/main/kotlin/.../companion/data/EmeraldText<Lang>Gen.kt: species,
-move, item (+ description), nature and map section names, keyed by the same
+move, item, nature and map section names, keyed by the same
 ids as English (Gen 3's ids don't change between languages), plus the small
 font's glyph widths (the party slot's names; a few localized glyphs differ).
+Item descriptions aren't written: the app reads them from the player's ROM
+(NativeConfig.itemDescs = the `items` address below, RomItemText.kt).
 
 Every table sits elsewhere than in English (localized text has other lengths);
 the European ones keep English's layout, Japanese has shorter names (species 5,
@@ -55,10 +57,10 @@ LANGS = {
     "ja": dict(sha1="d7cf8f156ba9c455d164e1ea780a6bf1945465c2", suffix="Ja", label="Emerald (Japan)",
                species=0x082EA31C, moves=0x082EACC4, items=0x0855CEE8, natures=0x085ECE24,
                mapsecs=0x0857CD6C, small_widths=None,
-               species_len=6, move_len=8, item_stride=40, item_name_len=10, item_desc_off=16),
+               species_len=6, move_len=8, item_stride=40, item_name_len=10),
 }
 # English's record layout, where a language doesn't say otherwise.
-LAYOUT = dict(species_len=11, move_len=13, item_stride=44, item_name_len=14, item_desc_off=20)
+LAYOUT = dict(species_len=11, move_len=13, item_stride=44, item_name_len=14)
 
 # pokeemerald's charmap.txt, Western half (Gen3Text in Pokedex.kt decodes the same).
 CHARS = {0x00: " "}
@@ -139,19 +141,16 @@ def tables(rom, v):
     species = {i: rom.text(v["species"] + sl * i, sl) for i in range(1, NUM_SPECIES)}
     species = {i: n for i, n in species.items() if n and n not in ("?", "？")}
     moves = {i: rom.text(v["moves"] + ml * i, ml) for i in range(1, MOVES_COUNT)}
-    items, descs = {}, {}
+    items = {}
     for i in range(1, ITEMS_COUNT):
         a = v["items"] + lay["item_stride"] * i
         n = rom.text(a, lay["item_name_len"])
         if n and set(n) not in ({"?"}, {"？"}):  # "????????" = unused; German has a "?-ÖFFNER"
             items[i] = n
-            d = rom.text(rom.u32(a + lay["item_desc_off"]), 200)
-            if d:
-                descs[i] = d
     natures = [rom.text(rom.u32(v["natures"] + 4 * i), 20) for i in range(NUM_NATURES)]
     mapsecs = {i: rom.text(rom.u32(v["mapsecs"] + 8 * i + 4), 30) for i in range(MAPSEC_COUNT)}
     widths = list(rom.d[v["small_widths"] - 0x08000000:][:512]) if v["small_widths"] else []
-    return species, moves, items, descs, natures, mapsecs, widths
+    return species, moves, items, natures, mapsecs, widths
 
 
 def kstr(s):
@@ -186,7 +185,7 @@ def main():
     data = open(sys.argv[2], "rb").read()
     if hashlib.sha1(data).hexdigest() != v["sha1"]:
         sys.exit(f"{sys.argv[2]} isn't Emerald {lang} (sha1 {v['sha1']})")
-    species, moves, items, descs, natures, mapsecs, widths = tables(Rom(data, lang), v)
+    species, moves, items, natures, mapsecs, widths = tables(Rom(data, lang), v)
     if lang == "en":
         check_english(species, moves, items, natures)
         return
@@ -197,7 +196,6 @@ def main():
           kmap(f"speciesNamesEmerald{sfx}", species) + "\n" +
           kmap(f"moveNamesEmerald{sfx}", moves) + "\n" +
           kmap(f"itemNamesEmerald{sfx}", items) + "\n" +
-          kmap(f"itemDescriptionsEmerald{sfx}", descs) + "\n" +
           f"internal val natureNamesEmerald{sfx}: List<String> = listOf(\n" +
           "".join(f"    {kstr(n)},\n" for n in natures) + ")\n\n" +
           kmap(f"mapSecNamesEmerald{sfx}", mapsecs) + "\n" +
@@ -206,8 +204,8 @@ def main():
     path = os.path.join(OUT_DIR, f"EmeraldText{sfx}Gen.kt")
     with open(path, "w", encoding="utf-8") as f:
         f.write(kt)
-    print(f"wrote {os.path.relpath(path)}: {len(species)} species, {len(moves)} moves, {len(items)} items "
-          f"({len(descs)} described), {len(mapsecs)} map sections; {species[1]}, {moves[1]}, {items[1]}, {mapsecs[0]}")
+    print(f"wrote {os.path.relpath(path)}: {len(species)} species, {len(moves)} moves, {len(items)} items, "
+          f"{len(mapsecs)} map sections; {species[1]}, {moves[1]}, {items[1]}, {mapsecs[0]}")
 
 
 if __name__ == "__main__":

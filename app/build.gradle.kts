@@ -14,6 +14,15 @@ val keystoreProps = rootProject.file("keystore.properties").takeIf { it.isFile }
     Properties().apply { f.inputStream().use(::load) }
 }
 
+// A password left out of keystore.properties comes from the macOS Keychain instead, so it needn't sit
+// in a plain file: `security add-generic-password -a pokedaisy -s pokedaisy-<storePassword|keyPassword> -w`.
+fun signingSecret(name: String): String? =
+    keystoreProps?.getProperty(name)?.takeIf { it.isNotBlank() } ?: runCatching {
+        val p = ProcessBuilder("security", "find-generic-password", "-a", "pokedaisy", "-s", "pokedaisy-$name", "-w")
+            .redirectErrorStream(false).start()
+        p.inputStream.bufferedReader().readText().trim().takeIf { p.waitFor() == 0 && it.isNotEmpty() }
+    }.getOrNull()
+
 android {
     namespace = "com.pokedaisy.app"
     compileSdk = 34
@@ -59,9 +68,9 @@ android {
         if (keystoreProps != null) {
             create("release") {
                 storeFile = file(keystoreProps.getProperty("storeFile"))
-                storePassword = keystoreProps.getProperty("storePassword")
+                storePassword = signingSecret("storePassword")
                 keyAlias = keystoreProps.getProperty("keyAlias")
-                keyPassword = keystoreProps.getProperty("keyPassword")
+                keyPassword = signingSecret("keyPassword")
             }
         }
     }
@@ -90,12 +99,42 @@ android {
     }
 
     sourceSets["main"].java.srcDirs("src/main/kotlin")
+    sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/licenses"))
     sourceSets["test"].java.srcDirs("src/test/kotlin")
 
     testOptions {
         unitTests.isIncludeAndroidResources = false
     }
 }
+
+// Settings > LICENSES: NOTICE, then the license text of everything the APK carries, as one asset
+// (licenses.txt; a line "=== <name>" starts each part).
+val licensesAsset by tasks.registering {
+    val parts = listOf(
+        "PokeDaisy (NOTICE)" to "NOTICE",
+        "GNU General Public License v3 (PokeDaisy)" to "LICENSE",
+        "mGBA - Mozilla Public License 2.0" to "third_party/mgba/LICENSE",
+        "blip_buf (in mGBA) - GNU LGPL 2.1" to "third_party/mgba/src/third-party/blip_buf/license.txt",
+        "inih (in mGBA) - BSD" to "third_party/mgba/src/third-party/inih/LICENSE.txt",
+        "rcheevos - MIT" to "third_party/rcheevos/LICENSE",
+        "LCD and Scanlines shaders - MIT" to "third_party/licenses/mGBA-shaders-MIT.txt",
+        "PixelMplus - M+ FONT LICENSE" to "app/src/main/assets/fonts/LICENSE-PixelMplus.txt",
+        "PokeAPI data - BSD 3-Clause" to "third_party/licenses/PokeAPI-BSD-3-Clause.txt",
+        "AndroidX, Jetpack Compose, Kotlin, Apache Commons Compress / IO / Codec / Lang - Apache License 2.0" to "third_party/licenses/Apache-2.0.txt",
+        "Apache Commons - NOTICE" to "third_party/licenses/Apache-Commons-NOTICE.txt",
+        "XZ for Java - BSD Zero Clause" to "third_party/licenses/XZ-Java-0BSD.txt",
+    ).map { (name, path) -> name to rootProject.file(path) }
+    inputs.files(parts.map { it.second })
+    val out = layout.buildDirectory.file("generated/licenses/licenses.txt")
+    outputs.file(out)
+    doLast {
+        out.get().asFile.apply { parentFile.mkdirs() }.writeText(
+            parts.joinToString("\n\n") { (name, f) -> "=== $name\n\n" + f.readText().trim() } +
+                "\n\n=== Pixel Operator - CC0 1.0\n\nJayvee Enaguas dedicated the font to the public domain (CC0 1.0).\n",
+        )
+    }
+}
+tasks.named("preBuild") { dependsOn(licensesAsset) }
 
 tasks.withType<Test> {
     // readNativeTelemetry's bag-read throttle (NativeReader.kt) caches its

@@ -30,6 +30,8 @@ object SteamGridDbGames {
     val BY_SHA1: Map<String, Game> = mapOf(
         // Pokémon Unbound v2.1.1.1 — SHA1 per Poller.kt's UNBOUND_V2_1_1_1_SHA1.
         "b4776b82a4c7915d0fadeaa27e013523f99dfd94" to Game(5274554, "Pokémon Unbound"),
+        // Its French translation (UNBOUND_V2_1_1_1_FR_SHA1): the same game's art.
+        "0ce2a880aa097f1dce4e1db8ee513d0e82d15859" to Game(5274554, "Pokémon Unbound"),
         // Pokémon Gaia v3.2 — SHA1 per Poller.kt's GAIA_V3_2_SHA1.
         "d5b1e77975fcda831e0e9a7b527906bf3f40ecd0" to Game(5345283, "Pokémon Gaia"),
         // Pokémon Radical Red v4.1 — SHA1 per Poller.kt's RADICAL_RED_V4_1_SHA1.

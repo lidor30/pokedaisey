@@ -69,8 +69,27 @@ object L10n {
      * (Library / Settings) the device's, else English.
      */
     fun apply(setting: String, romCode: String?, device: Locale = Locale.getDefault()) {
-        autoLanguage = AppLanguage.ofRomCode(romCode) ?: AppLanguage.ofLocale(device) ?: AppLanguage.EN
+        if (romCode != lastRomCode) gameLetter = null
+        lastRomCode = romCode
+        lastSetting = setting
+        val game = if (romCode != null) gameLetter?.let { l -> AppLanguage.entries.firstOrNull { it.romLetter == l } } else null
+        autoLanguage = game ?: AppLanguage.ofRomCode(romCode) ?: AppLanguage.ofLocale(device) ?: AppLanguage.EN
         language = AppLanguage.ofCode(setting) ?: autoLanguage
+    }
+
+    @Volatile private var lastRomCode: String? = null
+    @Volatile private var lastSetting = LANGUAGE_AUTO
+    @Volatile private var gameLetter: Char? = null
+
+    /**
+     * The running game's language, once the Poller has told which game it is: a translated hack keeps
+     * its base game's header code (Unbound FR says BPRE, Quetzal Spanish BPEE), so AUTO follows this
+     * instead until another ROM is applied.
+     */
+    fun applyGameLanguage(letter: Char) {
+        if (gameLetter == letter) return
+        gameLetter = letter
+        apply(lastSetting, lastRomCode)
     }
 
     /** The LANGUAGE row's value: "AUTO (ENGLISH)" or the picked language's own name. */

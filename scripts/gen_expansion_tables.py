@@ -101,7 +101,7 @@ GAMES = {
         suffix="Seaglass",
         label="Pokemon Emerald Seaglass v3.0",
         sha1="b9f4d332d30fc88c379f9e037f9eae3b2755ead4",
-        only={"SpeciesTypes", "GenderRatios", "ItemDescriptions", "MoveData"},
+        only={"SpeciesTypes", "GenderRatios", "MoveData"},
         species_name1=0x088F0780 + 0xD0 + 0x2C, species_stride=0xD0, species_max=1489,
         species_types_off=-0x26, species_gender_off=-0x1A,
         items_base=0x0867E77C, items_stride=0x54, items_name_inline=True, items_desc_off=-8,
@@ -384,18 +384,12 @@ def main():
     write(f"ItemNames{sfx}.kt", header(g, "gItemsInfo names, keyed by item id.\n") +
           f"val itemNames{sfx}: Map<Int, String> = mapOf(\n" +
           "".join(f"    {i} to {kstr(n)},\n" for i, n in sorted(items.items())) + ")\n")
-    descs = {}
-    for i in items:
-        # The description pointer sits items_desc_off bytes before the name
-        # (pointer or inline); line breaks come out as spaces.
-        p = rom.u32(g["items_base"] + i * g["items_stride"] + g["items_desc_off"])
-        d = rom.text(p, 200) if rom.is_ptr(p) else None
-        if d:
-            descs[i] = d
-    assert "20 points" in descs.get(28, ""), "item description offset is wrong"
-    write(f"ItemDescriptions{sfx}.kt", header(g, "gItemsInfo descriptions, keyed by item id.\n") +
-          f"val itemDescriptions{sfx}: Map<Int, String> = mapOf(\n" +
-          "".join(f"    {i} to {kstr(n)},\n" for i, n in sorted(descs.items())) + ")\n")
+    # The descriptions aren't bundled: the app reads them from the player's ROM
+    # (RomItemText) through the game's NativeConfig.itemDescs - this table. The
+    # description pointer sits items_desc_off bytes before the name (pointer or inline).
+    p = rom.u32(g["items_base"] + 28 * g["items_stride"] + g["items_desc_off"])
+    assert rom.is_ptr(p) and "20 points" in (rom.text(p, 200) or ""), "item description offset is wrong"
+    print(f"itemDescs = ItemDescTable(0x{g['items_base']:08X}L, 0x{g['items_stride']:X}, {g['items_desc_off']})")
 
     moves = named_table(rom, g["moves_base"], g["moves_stride"])
     rows = []

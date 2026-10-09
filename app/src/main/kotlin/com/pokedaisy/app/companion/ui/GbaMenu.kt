@@ -248,6 +248,8 @@ fun OptionLine(
     valueBadge: String? = null,
     /** False greys the row out and ignores taps (a setting another one has turned off). */
     enabled: Boolean = true,
+    /** A smaller grey line under the label: what the row is for. */
+    subtitle: String? = null,
     onClick: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -262,11 +264,17 @@ fun OptionLine(
             .then(if (enabled) Modifier.soundClickable(interactionSource = interaction, indication = null, onClick = onClick) else Modifier)
             .padding(horizontal = m.u * 8),
     ) {
-        Row(Modifier.weight(labelWeight), verticalAlignment = Alignment.CenterVertically) {
-            labelIcon?.let { Box(Modifier.size(m.lineHeight)) { it() }; Spacer(Modifier.width(m.u * 4)) }
-            if (enabled) GbaText(tr(label), OptionColors.label, OptionColors.labelShadow, m)
-            else GbaText(tr(label), OptionColors.muted, OptionColors.mutedShadow, m)
-            labelBadge?.let { OptionBadge(it, m, Modifier.padding(start = m.u * 6)) }
+        Column(Modifier.weight(labelWeight)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                labelIcon?.let { Box(Modifier.size(m.lineHeight)) { it() }; Spacer(Modifier.width(m.u * 4)) }
+                if (enabled) GbaText(tr(label), OptionColors.label, OptionColors.labelShadow, m)
+                else GbaText(tr(label), OptionColors.muted, OptionColors.mutedShadow, m)
+                labelBadge?.let { OptionBadge(it, m, Modifier.padding(start = m.u * 6)) }
+            }
+            subtitle?.let {
+                val small = rememberGbaTextMetrics(0.8f * m.fontPixel / m.px)
+                GbaText(tr(it), OptionColors.muted, OptionColors.mutedShadow, small)
+            }
         }
         if (value != null) {
             Row(Modifier.weight(1f - labelWeight), verticalAlignment = Alignment.CenterVertically) {
@@ -280,12 +288,12 @@ fun OptionLine(
 
 /** A small tag on a row ("ALPHA" on a mode that isn't finished): white on the value red, pill-shaped. */
 @Composable
-fun OptionBadge(text: String, m: GbaTextMetrics, modifier: Modifier = Modifier) {
+fun OptionBadge(text: String, m: GbaTextMetrics, modifier: Modifier = Modifier, fill: Color = OptionColors.value) {
     // ~2/3 of the row's own text: 0.85 next to the main lists' 1.25, smaller beside denser text.
     val small = rememberGbaTextMetrics(0.68f * m.fontPixel / m.px)
     Box(
         modifier
-            .background(OptionColors.value, PixelPillShape)
+            .background(fill, PixelPillShape)
             .padding(horizontal = m.u * 5, vertical = m.u),
     ) {
         GbaText(tr(text), Color.White, OptionColors.valueShadow.copy(alpha = 0.6f), small)

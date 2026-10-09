@@ -91,8 +91,13 @@ class FakeSlots : StateSlots {
     private val thumbs = File(scratch, "thumbs").apply { mkdirs() }
 
     init {
-        // Any 3:2 picture will do for a thumbnail: a party backdrop, scaled like a real one (160 wide).
-        val src = ImageIO.read(File("partybg/hns.png"))
+        // Any 3:2 picture will do for a thumbnail: a party backdrop RomArt rebuilt (romArt()),
+        // scaled like a real one (160 wide), else plain stripes.
+        val src = sequenceOf("partybg/hns.png", "partybg/firered.png", "partybg/emerald.png")
+            .firstNotNullOfOrNull { RomArt.file(android.content.Context().filesDir, it) }?.let { ImageIO.read(it) }
+            ?: BufferedImage(240, 160, BufferedImage.TYPE_INT_RGB).apply {
+                for (y in 0 until 160) for (x in 0 until 240) setRGB(x, y, if (y / 2 % 2 == 0) 0xB5B5B5 else 0xA5A5A5)
+            }
         val thumb = BufferedImage(160, 106, BufferedImage.TYPE_INT_RGB)
         thumb.createGraphics().apply { drawImage(src, 0, 0, 160, 106, null); dispose() }
         for (i in 0..2) ImageIO.write(thumb, "png", File(thumbs, "ss$i.png"))
@@ -223,7 +228,7 @@ fun snapshot() = SnapshotView(
         )
     },
     items = listOf(
-        ItemView(13, "Potion", 3, null, POCKET_ITEMS, "Restores the HP of a POKéMON by 20 points."),
+        ItemView(13, "Potion", 3, null, POCKET_ITEMS, "A small spray that heals a little HP (preview text)."),
         ItemView(4, "Poké Ball", 10, null, POCKET_POKE_BALLS),
         ItemView(349, "Oak's Parcel", 1, null, POCKET_KEY_ITEMS),
     ),
@@ -405,6 +410,39 @@ fun liveGuide(): ((SnapshotView) -> SnapshotView)? {
             guideTables = tables, progress = progress, mapGroup = pos[4].toInt(), mapNum = pos[5].toInt(),
             location = lookupLocation(mapsec), regionMapSectionId = mapsec,
         )
+    }
+}
+
+/**
+ * The DEX page's sections (INFO / EVOLVE / AREA / MOVES) for retail FireRed / Emerald,
+ * read from -Prom with the save fixture's dex flags; empty without a ROM.
+ */
+fun dexShots(game: GameKind, live: ((SnapshotView) -> SnapshotView)?, w: Int, h: Int, d: Float): List<Shot> {
+    if (live == null) return emptyList()
+    val (cfg, fixture) = if (game == GameKind.EMERALD) NATIVE_EMERALD_RETAIL to "emerald_vanilla" else NATIVE_FIRERED_REV1 to "firered_vanilla"
+    val dex = com.pokedaisy.app.companion.data.readPokedexState(RamFixture(File("../../test/resources/fixtures/$fixture")), cfg, cfg.pokedex!!)
+        ?: return emptyList()
+    val g = game.name.lowercase()
+    // EEVEE's family / INFO, MAGIKARP's rods and routes (Emerald: ZIGZAGOON's), BULBASAUR's moves (Emerald: TREECKO's).
+    val entries = mapOf(
+        com.pokedaisy.app.companion.ui.DexSection.INFO to 133,
+        com.pokedaisy.app.companion.ui.DexSection.EVOLVE to 133,
+        com.pokedaisy.app.companion.ui.DexSection.AREA to if (game == GameKind.EMERALD) 263 else 129,
+        com.pokedaisy.app.companion.ui.DexSection.MOVES to if (game == GameKind.EMERALD) 252 else 1,
+    )
+    return entries.map { (section, entry) ->
+        Shot("$g-dex-${section.name.lowercase()}", w, h, d, {
+            val s = live(snapshot())
+            val content: @Composable () -> Unit = {
+                com.pokedaisy.app.companion.ui.theme.QolTheme {
+                    val ui = androidx.compose.runtime.remember {
+                        com.pokedaisy.app.companion.ui.DexUiState(androidx.compose.foundation.lazy.LazyListState()).apply { open = entry; this.section = section }
+                    }
+                    com.pokedaisy.app.companion.ui.PokedexEntryScreen(dex, ui, entry, guide = s.guideTables)
+                }
+            }
+            content
+        })
     }
 }
 
@@ -730,6 +768,8 @@ fun main(args: Array<String>) {
         }),
         Shot("$g-settings", bw, bh, bd, companion("SETTINGS")),
         Shot("$g-settings-ffspeed", bw, bh, bd, companion("SETTINGS")) { onNodeWithText("FF SPEED").performClick() },
+        // GAME BUTTONS' and TWEAKS' subtitles, further down the list.
+        Shot("$g-settings-subtitles", bw, bh, bd, companion("SETTINGS")) { onNodeWithText("TWEAKS").performScrollTo() },
         Shot("$g-settings-ffmusic", bw, bh, bd, companion("SETTINGS")) { onAllNodesWithText("FF MUSIC").onFirst().performClick() },
         Shot("$g-settings-hotkeys", bw, bh, bd, companion("SETTINGS")) {
             onNodeWithText("HOTKEYS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
@@ -765,6 +805,7 @@ fun main(args: Array<String>) {
             onNodeWithText("TAB BAR").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
             onNodeWithText("STATES").performSemanticsAction(SemanticsActions.OnClick)
         },
+        *dexShots(game, live, bw, bh, bd).toTypedArray(),
         Shot("$g-guide", bw, bh, bd, companion("GUIDE") { live?.invoke(snapshot()) ?: snapshot() }),
         // HERE in a town (FireRed: CELADON CITY, Emerald: RUSTBORO CITY), with the save's flags.
         Shot("$g-guide-town", bw, bh, bd, companion("GUIDE") {
@@ -830,6 +871,24 @@ fun main(args: Array<String>) {
             }
         }),
         Shot("library-list", tw, th, td, activity { LibraryActivity() }),
+        // A ROM imported with "add anyway?": the library tags what the second screen can't read.
+        Shot("library-tag-unsupported", tw, th * 2, td, activity {
+            val ctx = android.content.Context()
+            val qol = File(ctx.filesDir, "roms/firered-qol.gba").absolutePath
+            File(ctx.filesDir, "rom-folder-scan.tsv").writeText("$qol\t1\t1700000000000\t0\n")
+            LibraryActivity().apply {
+                unsupportedRoms = setOf(qol)
+                partialRoms = setOf(File(ctx.filesDir, "roms/Pokemon - Gaia (v3.2).gba").absolutePath)
+            }
+        }),
+        Shot("library-tag-unsupported-grid", tw, th * 2, td, activity {
+            val ctx = android.content.Context()
+            val qol = File(ctx.filesDir, "roms/firered-qol.gba").absolutePath
+            File(ctx.filesDir, "rom-folder-scan.tsv").writeText("$qol\t1\t1700000000000\t0\n")
+            LibraryActivity().apply { unsupportedRoms = setOf(qol) }
+        }) {
+            onNodeWithContentDescription("Toggle view").performClick()
+        },
         // A phone held upright (1080x2400 @ 2.625, a Pixel 6): the library before a game opens.
         Shot("library-list-phone", 1080, 2400, 2.625f, activity { LibraryActivity() }),
         Shot("library-grid-phone", 1080, 2400, 2.625f, activity { LibraryActivity() }) {
@@ -921,6 +980,14 @@ fun main(args: Array<String>) {
             }
         }),
         Shot("setup-saves-none", tw, th, td, activity { LibraryActivity().apply { setup = SetupState().apply { step = SetupState.Step.SAVES } } }),
+        Shot("setup-buttons", tw, th, td, activity {
+            LibraryActivity().apply {
+                setup = SetupState().apply {
+                    step = SetupState.Step.BUTTONS
+                    buttons = listOf("A" to "A / Z", "B" to "B / X", "L" to "L1 / A", "R" to "R1 / S", "START" to "START / ENTER", "SELECT" to "SELECT", "TURBO A" to "")
+                }
+            }
+        }),
         Shot("setup-covers", tw, th, td, activity { LibraryActivity().apply { setup = SetupState().apply { step = SetupState.Step.COVERS } } }),
         // SAVE runs the real sync over the fake library (matches nothing - no network).
         Shot("setup-covers-saved", tw, th, td, activity {
@@ -951,14 +1018,18 @@ fun main(args: Array<String>) {
             Prefs(android.content.Context()).appTheme = com.pokedaisy.app.companion.ui.theme.FIRERED_THEME_ID
             LibraryActivity()
         }),
-        Shot("settings-hotkeys", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("HOTKEYS").performClick() },
+        Shot("settings-hotkeys", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("HOTKEYS").performScrollTo().performClick() },
         // The list's end: LIBRARY / ONLINE (RetroAchievements' BETA tag) / APP.
         Shot("settings-home-bottom", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("RUN SETUP").performScrollTo() },
-        Shot("settings-buttons", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("GAME BUTTONS").performClick() },
+        Shot("settings-buttons", tw, th * 2, td, activity { SettingsActivity() }) { onNodeWithText("GAME BUTTONS").performScrollTo().performClick() },
         Shot("settings-hotkeys-off", tw, th, td, activity { SettingsActivity() }) {
             onNodeWithText("HOTKEYS").performClick(); onNodeWithText("ON").performClick()
         },
-        Shot("settings-folders", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("FOLDERS").performClick() },
+        // Search: "rebind" isn't a row's name - its keywords find GAME BUTTONS.
+        Shot("settings-search", tw, th, td, activity { SettingsActivity() }) {
+            onNode(hasSetTextAction()).performTextInput("rebind")
+        },
+        Shot("settings-folders", tw, th * 2, td, activity { SettingsActivity() }) { onNodeWithText("FOLDERS").performScrollTo().performClick() },
         // CHEATS from the hub (no cheats yet), then as a game's library menu opens it.
         Shot("settings-cheats-empty", tw, th, td, activity { SettingsActivity() }) {
             onNodeWithText("CHEATS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
@@ -986,6 +1057,7 @@ fun main(args: Array<String>) {
             onNodeWithText("TYPE").performClick()
         },
         Shot("settings-coverart", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("COVER ART").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) },
+        Shot("settings-licenses", tw, th, td, activity { SettingsActivity() }) { onNodeWithText("LICENSES").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) },
         Shot("settings-retroachievements", tw, th, td, activity { SettingsActivity() }) {
             onNodeWithText("RetroAchievements").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         },

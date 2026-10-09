@@ -7,8 +7,16 @@ per-ROM support details, how each game was mapped, frontend setup and releasing;
 process context that isn't obvious from the code.
 
 **This repo is public.** Never commit ROMs, saves or secrets. The SteamGridDB API key is
-entered by the user at runtime and must stay that way. FireRed / Emerald art is rebuilt
-from the player's own ROM (`RomArt`), not bundled. Keep it that way.
+entered by the user at runtime and must stay that way. Game art (FireRed / Emerald's and the
+hacks') is rebuilt from the player's own ROM (`RomArt`), not bundled. Keep it that way. Write home paths as `~` in
+anything committed (fixture READMEs: `capture_fixture_headless.sh` does). **Commits carry no Claude /
+Anthropic attribution** (no `Co-Authored-By`, no "Generated with" lines, never authored as Claude) - the
+user's firm rule; a local `commit-msg` hook rejects them, never bypass it.
+**Exposed surfaces**: `LaunchActivity` is exported - it refuses the app's own files / provider, copies at
+most 40 MB and plays only what has a cart header (`RomIdentity.looksLikeRom`); the updater installs only
+this package, same signer, newer version (`AppUpdateFlow.isOurUpdate`); the website's release notes are
+escaped (`website/src/lib/releases.js`, `website/test/releases.test.js`); workflow actions are pinned to
+commit SHAs. New bundled code / fonts / data go into NOTICE and the LICENSES page (`licensesAsset`).
 
 ## Relationship to the FireRed QoL repo
 
@@ -198,20 +206,25 @@ path shows the lists unmarked). When adding a guide for another game, generate i
 and tag its hand-written entries with areas. HERE shows whenever a game has area data, even
 without the ROM tables (then no wild list).
 
-**ROM art - nothing of FireRed / Emerald is bundled**: their party-menu art (`partyfr/`,
-`partyem/`: slot frames, Poke Ball, status icons, small font), party backdrops
-(`partybg/firered.png`, `emerald.png`) and region maps (`regionmap/*.png`) are rebuilt from the
+**ROM art - no game art is bundled** (`assets/` holds only fonts): FireRed's / Emerald's party-menu art
+(`partyfr/`, `partyem/`: slot frames, Poke Ball, status icons, small font), Heart and Soul's (`partyhns/`,
+smol: `HNS_PARTY_*` / `_BALL_*` / `_STATUS_*` / `_FONT_SMALL` + Emerald's slot tilemaps) and the CFRU hacks'
+(`partycfru/`: the shared 112x40 slot frames `CFRU_*`, each hack's status icons `UB_` / `RR_` / `OD_` /
+`AM_STATUS_GFX` on FireRed's palette; Unbound's Poke Ball and every CFRU font are FireRed's own bytes,
+so their styles use `partyfr/`), party backdrops (`partybg/firered.png`, `emerald.png`, `hns.png`,
+`cfru_tile.png`) and region maps (`regionmap/*.png`) are rebuilt from the
 player's ROM by `RomArt` (`companion/data/RomArt.kt`): one background scan per ROM on its first
 launch (~0.9 s for 32 MB on the Thor), written to `filesDir/rom-art/` under those same paths and
-shared by every game (CFRU hacks use FireRed's font from there; hacks without a backdrop of their
+shared by every game (hacks without a backdrop of their
 own use FireRed's, else Emerald's). Blobs are found by fingerprint, not address -
 `RomArtSigsGen.kt` from `scripts/gen_rom_art_sigs.py`, hashes/CRCs only - so retail, the QoL
-builds, LeafGreen and hacks that kept the art all match. Load art through `GameArt.get`
-(`AssetImages.kt`; rom-art, then bundled assets) keyed on `rememberArtGeneration()`, so it shows up
+builds, LeafGreen and hacks that kept the art all match. Adding art means new sigs + a bump of
+`RomArt.SCAN_VERSION` (ROMs scanned before get rescanned). Load art through `GameArt.get`
+(`AssetImages.kt`; rom-art, then assets) keyed on `rememberArtGeneration()`, so it shows up
 once a scan lands; with no art the party tab falls back to the `PartyPalette` slot and the map to
-text. `gen_party_assets.py` still generates `PartySlotStylesGen.kt` but writes PNGs only for
-bundled games (Heart and Soul). `RomArtTest` pins the pixels; ui-preview rebuilds the art from
-the decomp builds (or `-PartRoms`), Paparazzi from the retail ROMs.
+text. `gen_party_assets.py` / `gen_cfru_party_assets.py` only generate the `PartySlotStyle`s now (no
+PNGs). `RomArtTest` pins the pixels (the hacks' matched the PNGs once bundled, pixel for pixel);
+ui-preview rebuilds the art from the decomp builds (or `-PartRoms` / `-Prom`), Paparazzi from the ROMs.
 **TRAINER CARD (the CARD tab, off the bar by default, so under SETTINGS > TOOLS)**: retail FireRed /
 LeafGreen / Emerald and both QoL builds only (`NativeConfig.trainerCard`; the hacks copy the retail
 configs, so it is set on the retail ones alone, and on `findStructMoney`'s candidates for the QoL
@@ -337,6 +350,20 @@ button flips Kanto / Sevii maps, ME returns to the player. `MapSecData.kt`'s dun
 "not on the map" sections are 0,0,0,0 (they used to sit at a fake (4,4)); the grid's dungeon
 layer places them (`RegionMapModel.tilesOf`). ui-preview: `-Ponly=map` renders the tapped /
 PLACES / region states too.
+**DEX entry sections (GitHub #28)**: chips over the entry's right column switch INFO / EVOLVE / AREA / MOVES
+(`DexSection`, `ui/DexDetailPages.kt`; `DexUiState.section` sticks while stepping entries), data from
+`DexDetails` (`data/DexDetails.kt`, process-wide caches per ROM, IO only). EVOLVE = the whole family both ways, each
+row decoded into `EvoReq`s by the game's `EvoScheme` - methods past vanilla's 15 are numbered differently in every
+engine (CFRU vs Radical Red, Gaia, expansion before 1.12, Lazarus one lower, Rogue's own 47+, Quetzal / R.O.W.E. to
+42 / 31; expansion 1.12+ is EVO_LEVEL / TRADE / ITEM ... + an `IF_*` condition list ending at `conditionsEnd`, 37 in
+TMT2, 39 in SoulGold / Heart and Soul), each checked against its ROM's own table (`DexDetailsTest`); an unnamed method
+reads "Special condition" and gives way to a named one to the same target. Layouts: `PokedexTables.evolutions` (vanilla)
+or `evoLayout` (a table, or `SpeciesInfoDex.evolutionsOff`). AREA = every wild header's slots (all time-of-day sets) by
+map section via `GuideTables.mapGroups` (gMapGroups; Unbound XORs it, SoulGold's sections are u16; a wrong / missing one
+is found by shape in the first 16 MB), plus gifts / trades from the area data. MOVES = level-up from
+`GuideTables.learnsets` / `SpeciesInfoDex.levelUpOff` / `PokedexTables.levelUpLearnsets`, then TM / HM
+(`tmhmLearnsets` + `tmhmMoves`, retail only, checked on BULBASAUR) or expansion's `teachableOff` list; CFRU / Gaia /
+Glazed / Odyssey say level-up only. Celia has no evolutions or learnsets located; Rogue no learnsets (its baked profiles).
 **IVs / EVs (summary STATS, battle INFO STATS)**: `decodePartyMon` reads them from the BoxPokemon itself
 into `Mon.stats` (`MonStats.kt`): EVs substruct, Misc +4's IV word (plaintext CFRU boxes: +0x38 / +0x48),
 nature = PID % 25 XOR expansion's `hiddenNatureModifier` (+0x12 bits 3-7, 0 elsewhere: Mints), stats from the
@@ -376,6 +403,12 @@ the field's (checked headless on FireRed QoL, Emerald, Rogue). gMain is found by
 apart (vblankCounter1 at +0x20 moving exactly that much; FireRed's is a pointer, so counter2 at +0x24 then); the
 field's callback2 is learned from the player moving (snapshot positions), the battle's from frames in battle,
 both persisted per ROM CRC (`Prefs.ffMenuCallbacks`). Ruby/Sapphire's inBattle byte is +0x43D.
+**Settings search / subtitles / setup buttons**: top-screen Settings HOME has a search box (`filterRows`, SettingRows.kt):
+a row matches on its label (English and translated), value, `subtitle` and its words in `SETTING_KEYWORDS` (by English
+label, shared by both screens: "rebind", "keybinds", "turbo"... - give a new row its words). The companion's SETTINGS has
+no search (the Presentation can't host a keyboard). `SettingRow.subtitle` / `OptionLine(subtitle)` draw a grey line
+under the label (GAME BUTTONS: key bindings; TWEAKS). First-time setup has a GAME BUTTONS step (`SetupState.Step.BUTTONS`)
+listing the bindings; CHANGE BUTTONS opens Settings' rebind page alone (`EXTRA_SCREEN` = CONTROLS, BACK returns).
 **SETTINGS layout**: the options come in titled groups (FAST-FORWARD / CONTROLS / COMPANION / SCREEN) in ONE
 scrolling column at the normal text size (a two-column, denser try was too small to tap - the user's call),
 ending in CLOSE GAME / RESTART GAME (under a `Separator`). The top-screen Settings uses the same
@@ -575,7 +608,7 @@ captures of the user's save (pulled from the Thor's SD card: `/storage/XXXX-XXXX
 the ROM. 104-byte party mons (`NativeConfig.monStride`); one sorted 450-slot bag behind 9 `gBagPockets` views;
 SaveBlock2 key `+0x4C`; the hub (mapsec 0) is named by `SaveBlock2.pokemonHubName` (`hubNameOff` ->
 `Telemetry.mapSecName`); icons from `gSpeciesInfo` / `gItemIconTable` plus `gRogueItems` for its own items
-(`IconTables.extraItemIconTable`); item names/descriptions and Rogue's mapsec table + grid on Emerald's Hoenn
+(`IconTables.extraItemIconTable`); item names and Rogue's mapsec table + grid on Emerald's Hoenn
 map from `scripts/gen_rogue_tables.py`, which also writes Rogue's moves (Mainline table - its Revised mode's
 isn't read), species types and Gen 6+ type chart (vanilla type ids + Fairy 18). Battle globals came from live
 `dumpFixture` dumps mid-battle on the Thor (`emerald_rogue_battle` fixture): battle_main.c's EWRAM_DATA keep
@@ -615,10 +648,33 @@ Guides for the three (live pages only, no area data): Glazed's Tunod gyms; Imper
 by map group, NORMAL / HARD variants, Johto / Kanto trainers in `altTrainers`, `GuideTables.flagBanks` / `varBanks` for
 its 0x1000+ flags and 0x5000+ vars). Quetzal's Johto maps (groups 34-35) name their sections from a
 table of their own (0x0922A7E8): `NativeConfig.altMapSecGroups` reads them as 0x100 + id, where the generator puts them.
+**Orange Islands / Unbound FR / Quetzal ES (2026-10-09)**: **Orange Islands** (`GameKind.ORANGE_ISLANDS`,
+`NATIVE_ORANGE_ISLANDS`) is retail FireRed rev 0 edited in place at 16 MB - the size of retail, so detect() now hashes a
+small BPRE ROM once too (like Seaglass's BPEE check; an unknown hash falls through to QoL / retail). Its two builds (Beta 5.7
+and an unversioned one, `*_UNVERSIONED_SHA1` -> no version on the site) share every address. Retail rev 0's RAM and battle
+code; its own names, CRYSTL type 23 + chart, repointed wild headers (`gen_orange_islands_tables.py`); its archipelago map
+comes from `RomRegionMap`; FireRed's party art over its cream stripes; no CARD (its card is its own art). **Unbound v2.1.1.1
+FR** is English Unbound's code and RAM with French text: `NATIVE_UNBOUND_FR` (the Poller sets `nativeCfg` for it; English
+Unbound still leaves it null), names via a `GameText` keyed `UNBOUND_FR_TEXT` over Unbound's own moves / map sections
+(`GameText(englishMoves = ...)`), `gen_unbound_fr_tables.py`; its header's revision byte is 0x9E, so `RomRegionMap` turns
+away only rev 1 now. **Quetzal Spanish** (`NATIVE_QUETZAL_ES`) is English's RAM with every ROM address moved (mapped
+through English's literal pools). Both Quetzal releases carry English / Spanish / Latin American / Portuguese names and
+pick them per kind from the save's IDIOMA options: `readQuetzalNames` -> `quetzalNames` (set by the Poller every sample),
+overlays in `QuetzalNamesGen.kt` (`gen_quetzal_tables.py --languages`; Portuguese not generated). Quetzal's money passes
+999,999 (`maxMoney`). Headless saves: `orange_islands(_battle)`, `unbound_fr`, `quetzal_es(_battle)`, `quetzal_johto` (a
+second English save, in Johto's map groups). Orange Islands' battle POKéMON switch would need a `switchAddrsFor` entry
+(FireRed's list menu, gPartyMenu 0x0203B0A0) - not added (PokeDaisyActivity).
 **USE on the ITEMS tab** (`FieldItems.kt`, retail FireRed rev 1 / Emerald): a Repel is used by calling the game's own
 VarGet / VarSet / CheckBagHasItem / RemoveBagItem between frames (`MgbaCore.pkCall`, the main core's pk_call returning r0),
 only while ArePlayerFieldControlsLocked is 0 and no battle / menu screen is up; the functions' code is CRC-checked first
 (FireRed's QoL build moved them). The game's own step counter then runs it out. mgba_dump's `call` prints r0 to test such calls.
+**Item descriptions are read from the player's ROM, never bundled** (they're the games' prose; names stay bundled):
+`itemDescription(id)` -> `RomItemText` (through `PokedexSource.reader`, cached per ROM) with the game's
+`NativeConfig.itemDescs` (`ItemDescTable`: base / stride / description-pointer offset, `vanillaItems` / `japaneseItems`
+for struct Item; expansion's gItemsInfo has it 8 bytes before the name; Rogue chains gRogueItems via `next`). The Poller
+picks it on detect (`matchesRom` checks vanilla ones); the QoL builds have no config (gItems moves every rebuild), so
+`findVanillaItems` finds it by shape. No ROM = "". Yellow keeps our own hand-written text (`ItemDescriptionsYellow.kt`).
+The generators no longer write descriptions; `RomItemTextTest` pins a few per game. A new game needs its `itemDescs`.
 **1x frames follow the game screen's vsync** (`EmulatorEngine.onVsync`, ticked from `EmulatorView`'s GL thread): one game
 frame per refresh (60 Hz) or per two (120 Hz), audio resampled to match (`pkSetAudioRate`) with RetroArch-style dynamic
 rate control on the AudioTrack's fill, written non-blocking; no usable vsync (or another speed) falls back to the timer +
@@ -677,6 +733,53 @@ from the file (a real report: a resume state from a blank first boot wiped an Un
 0xFF). Every start also copies the save to `<saves>/pokedaisy-backups/` first (`SaveBackups`, newest
 10 distinct), which the library's RESTORE BACKUP lists. Never add a path that writes the save
 without both.
+**Where a save is** (`SavesLocation.saveFor`, every save path goes through it): the game's own folder (library
+menu > SAVE FOLDER, `Prefs.romSaveDir`, by file name; setting it copies the current save over if the folder has
+none - never moves it), else the first of the saves folder and Settings > FOLDERS > ALSO LOOK IN (`Prefs.extraSaveDirs`)
+holding one - played and written where it is, so RetroArch's per-core folders keep their saves - else a new one in the
+saves folder. Only the folders themselves, never below (a user's synced RetroArch/saves pulled in Syncthing's
+`.stversions` when FOLDERS listed recursively; that list now skips hidden folders). `SavesLocationTest` pins the order.
+**REWIND** (Settings, `Prefs.rewind`, off by default; REWIND HOLD hotkey, R on a keyboard): `pk_rewind.c` - mGBA's own
+diff ring (`mCoreRewindContext`, 600 entries, one every 2 frames: ~20 s, rewinds at 2x) but with states taken / loaded
+WITHOUT `SAVESTATE_SAVEDATA`: mGBA's `mCoreRewindRestore` would write the state's save over the save file every
+rewound frame. Muted and 1x while held; at the oldest entry the frame stands still. Our native target must get
+mGBA's own `USE_PTHREADS` (CMakeLists.txt): without it mGBA's headers fall back to `DISABLE_THREADING`, our
+`mCoreRewindContext` came out ~100 bytes short of libmgba's, and REWIND OFF ran Deinit on garbage thread / mutex fields
+past `g` - the game froze and the core lock deadlocked the next close (an ANR on Glazed); `pk_rewind.c` `#error`s on it now. Verified on the API 32 emulator
+(`Pixel_3a_API_32_arm64-v8a`, arm64 like the Thor: `adb root`, push a ROM and `chown` it to the app's uid, prefs via
+`run-as`, hold keys with `sendevent` on the `qwerty2` device).
+**TURBO A / B** (issue #32, GAME BUTTONS, unbound by default): `GbaControls.TURBO` marks them in the key map,
+`GbaInput.turboMask` holds them, the engine presses them 2 frames on / 2 off in game frames (so FF mashes faster too);
+none while a battle script steers. Binding a key to a button takes it off every other button (it used to stay on the
+later one).
+**NOT SUPPORTED / ASK FOR SUPPORT**: the library tags ROMs whose cached verdict is unsupported (`RomFolder.unsupported`;
+imported ROMs are checked into the same cache by `checkImported`, linked ones by the scan); the companion's NOT SUPPORTED
+page and the library INFO of such a ROM open `RomSupportRequest.url` - rom_request.yml prefilled by field id with the
+file name, game code, size and SHA-1, like the website's ROM check.
+**BEST EFFORT** (`BestEffort.kt`): an unsupported ROM of a Gen 3 base game (header code BPR/BPG/BPE/AXV/AXP) gets
+TRY BEST EFFORT on NOT SUPPORTED; the sampler then reads the running game through every `BestEffort.candidates`
+config of that family (the decoders' globals set per try, put back after). A config fits when its party is real
+(1-6 mons, encrypted boxes pass their checksum, species / level / HP plausible) - so the player must be in game with
+a Pokémon; each ROM-side `Part` (DEX via `pokedexMatchesRom` or gSpeciesInfo's BULBASAUR, GUIDE's probe trainer, item
+text) that doesn't hold is switched off (`Match.config`). All holding = FULL (a re-hashed supported build, like the
+SoulGold v1.2 reports): treated as supported, no tag. Kept by SHA-1 in `filesDir/best-effort.tsv` (`BestEffortStore`,
+candidate ids are stable - never rename one) and applied by `detect()` next launch (`unsupportedRom`); the version
+globals compare `baseCfg` by identity. Library: `CompanionSupport.verdict` (SUPPORTED / MATCHED / PARTIAL / TRYABLE /
+UNSUPPORTED) cached by `RomFolder` as 1/M/P/T/U (old "0" rows are re-checked once); linked-folder TRYABLE ROMs are
+listed with NOT SUPPORTED so best effort is reachable, PARTIAL ones tagged PARTIALLY SUPPORTED; INFO's FORGET MATCH.
+`BestEffortTest` matches 7 games' real saves to their own configs (all FULL) and a party-less game to nothing.
+**Sharing a BEST EFFORT match** (opt-in, `BestEffortShare.kt`): the fresh-match notice asks (`BestEffortShareNotice`,
+listing `BestEffortShare.fields` value by value); only SHARE sends - one Firestore REST create into project `pokedaisy`,
+collection `bestEffortReports`, no SDK / API key / ids: sha1, size, gameCode, revision, matchedAs, full, off,
+appVersion (`BestEffortReport`), values regex-checked before sending (`BestEffortShareTest`). Offline: queued in
+`filesDir/best-effort-share-queue.jsonl`, sent on the next activity start; a 4xx drops it. `website/firestore.rules`
+accepts exactly that shape and nothing can read it back - change the three together. Firestore must be enabled in the
+Firebase console and the rules deployed (`cd website && firebase deploy --only firestore:rules`) for sends to land.
+**Issue #31 (STATUS BAR over a portrait game crashed)**: `PortraitPanel` sized itself in `onResume`, measuring the bar's
+ComposeView before it had a window ("Cannot locate windowRecomposer") - `gameHeightFor` counts an unattached bar as 0
+now. The relayout that follows resized the GLSurfaceView twice before its first frame, and GLSurfaceView keeps only the
+latest `surfaceRedrawNeededAsync` callback, so the window never reported drawn and Android 12's splash stayed over the
+game: `EmulatorView` runs every pending one with the next frame.
 **Library menu: LOAD SAVE / INFO / HIDE**: LOAD SAVE (`GameSaves.load`) renames the current save to
 `<rom>.backup-<yyyyMMdd-HHmmss>.<ext>` beside it and writes the picked file under the name the game reads,
 then drops `SaveStates.freshBootFile` so the next start boots from the save instead of resuming (a resume
@@ -766,7 +869,14 @@ Sapphire config. `GameText` (EmeraldLanguages.kt) is keyed by game code (`Native
 ones (`firered_ja` / `leafgreen_ja`) and checks them absolutely.
 
 **Languages** (`companion/i18n/`): the app's own text in EN / JA / FR / DE / IT / ES - not game
-data (species / moves / items / types / statuses) or GUIDE content (the user's scope call).
+data (species / moves / items / types / statuses, which come from each ROM in its own language).
+**GUIDE text** (issue #35: a French game's guide was half English) is translated for the games that come in
+other languages - FireRed / LeafGreen, Emerald, Ruby / Sapphire, Unbound (FR), Quetzal (ES): `trGuide()`
+(`i18n/GuideText.kt`) looks a whole hand-written line (entry, hint, answer, note, boss, HERE's building names) up
+in `i18n/guide/GuideText<Game>.kt`, whose names are the localized games' own (from their ROM tables). Separate
+from the app's `Tr*.kt` (not checked by check_translations.py); `GuideTranslationsTest` fails while one of
+those guides has a line without all five languages and lists them in `app/build/guide-missing/`. A new or
+changed line in those guides needs its translations; English-only hacks' guides stay English.
 `tr("ENGLISH")` looks the English up in the `Tr<Area>.kt` tables (one line per entry, parsed by
 `scripts/check_translations.py`; `TranslationsTest` runs the same check), `tr("{0} LEFT", n)` for
 arguments - never a `$template` key. `tk()` marks a string the code compares (selector options,

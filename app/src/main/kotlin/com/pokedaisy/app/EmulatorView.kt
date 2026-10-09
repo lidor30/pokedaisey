@@ -83,6 +83,21 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
         renderMode = RENDERMODE_CONTINUOUSLY
     }
 
+    // The window reports its first draw (and drops Android 12's splash screen) only once every
+    // surfaceRedrawNeededAsync it asked for has called back. GLSurfaceView keeps just the latest
+    // finishDrawing: a view resized twice before its first frame (STATUS BAR over a portrait
+    // game: laid out before the bar had a height, then again with it) lost the first one, and the
+    // splash stayed over the game. Every pending one runs with the next frame instead.
+    private val pendingRedraws = ArrayList<Runnable>()
+
+    override fun surfaceRedrawNeededAsync(holder: android.view.SurfaceHolder, finishDrawing: Runnable) {
+        synchronized(pendingRedraws) { pendingRedraws += finishDrawing }
+        super.surfaceRedrawNeededAsync(holder) {
+            val all = synchronized(pendingRedraws) { pendingRedraws.toList().also { pendingRedraws.clear() } }
+            all.forEach(Runnable::run)
+        }
+    }
+
     // GLSurfaceView composites via its own hardware layer, "punching a hole"
     // in the window - the existing plain-View overlays (touch controls, HUD)
     // coexist with that fine, but a ComposeView sibling (PokeDaisyActivity's

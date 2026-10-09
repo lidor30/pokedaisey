@@ -27,6 +27,7 @@ class RomArchiveTest {
     private val rom: ByteArray = Random(3).nextBytes(1 shl 20).also { b ->
         "POKEMON FIRE".toByteArray().copyInto(b, 0xA0)
         "BPRE".toByteArray().copyInto(b, 0xAC)
+        b[0xB2] = 0x96.toByte()
         b[0xBC] = 1
     }
 
@@ -66,6 +67,24 @@ class RomArchiveTest {
         val out = File(tmp.root, "out.gba")
         assertEquals("FireRed.gba", RomArchive.extract(archive, out)?.name)
         assertArrayEquals(rom, out.readBytes())
+    }
+
+    /** The frontend entry point plays only cart images: a GBA header, in an archive too; not other files. */
+    @Test fun looksLikeRom() {
+        assertTrue(RomIdentity.looksLikeRom(plain()))
+        assertTrue(RomIdentity.looksLikeRom(zip("FireRed.zip", "FireRed.gba" to rom)))
+        assertFalse(RomIdentity.looksLikeRom(tmp.newFile("prefs.xml").apply { writeText("<map><string name=\"token\">x</string></map>") }))
+        assertFalse(RomIdentity.looksLikeRom(tmp.newFile("photo.gba").apply { writeBytes(Random(5).nextBytes(4096).also { it[0xB2] = 0 }) }))
+    }
+
+    /** ASK FOR SUPPORT pre-fills rom_request.yml by field id: name, code, size, SHA-1 - for a zip, the ROM inside. */
+    @Test fun supportRequestUrl() {
+        val url = RomSupportRequest.url(zip("My Hack (v1.0).zip", "My Hack (v1.0).gba" to rom), "abc123")
+        assertTrue(url, url.startsWith("https://github.com/lidor30/pokedaisy/issues/new?template=rom_request.yml&"))
+        assertTrue(url, "title=ROM%20support%3A%20My%20Hack%20%28v1.0%29" in url)
+        assertTrue(url, "game_code=BPRE%20%28rev%201%29" in url)
+        assertTrue(url, "size=${1 shl 20}" in url)
+        assertTrue(url, url.endsWith("sha1=abc123"))
     }
 
     @Test fun zipReadsAsItsRom() = assertReadsAsTheRom(zip("FireRed.zip", "FireRed.gba" to rom))

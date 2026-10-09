@@ -18,6 +18,8 @@ permissions:
   checks: write
   pull-requests: write
 
+# Actions are pinned to commits, not tags: a moved tag can't run new code with the Firebase secret.
+# Bump them by hand (the comment names the release).
 concurrency:
   group: website-${{ github.ref }}
   cancel-in-progress: true
@@ -29,8 +31,8 @@ jobs:
       run:
         working-directory: website
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version-file: website/.nvmrc
           cache: npm
@@ -42,10 +44,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Fork PRs get no secrets: they build and test, but don't deploy a preview.
       - if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        uses: FirebaseExtended/action-hosting-deploy@v0
+        uses: FirebaseExtended/action-hosting-deploy@500ac625ca2dd40cbd15f7659af953801858032a # v0.11.0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_POKEDAISY }}
           projectId: pokedaisy
           entryPoint: website
           channelId: ${{ github.event_name == 'pull_request' && '' || 'live' }}
+          # The action installs firebase-tools when it runs: an exact version, not "latest", while the secret is in scope.
+          firebaseToolsVersion: 15.31.0

@@ -26,7 +26,7 @@ class Hotkeys private constructor(
         SAVE_STATE(tk("SAVE STATE")), LOAD_STATE(tk("LOAD STATE")), UNDO_SAVE(tk("UNDO SAVE")),
         UNDO_LOAD(tk("UNDO LOAD")), SLOT_NEXT(tk("SLOT NEXT")), SLOT_PREV(tk("SLOT PREV")),
         FF_HOLD(tk("FF HOLD")), FF_TOGGLE(tk("FF TOGGLE")), SPEED_CYCLE(tk("SPEED CYCLE")),
-        SLOWMO_HOLD(tk("SLOWMO HOLD")), EXIT_GAME(tk("EXIT GAME"));
+        SLOWMO_HOLD(tk("SLOWMO HOLD")), REWIND_HOLD(tk("REWIND HOLD")), EXIT_GAME(tk("EXIT GAME"));
 
         val prop get() = name.lowercase()
         val label get() = name.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
@@ -78,6 +78,8 @@ class Hotkeys private constructor(
             "ff_toggle" to "TAB",
             "speed_cycle" to "BUTTON_L2, EQUALS",
             "slowmo_hold" to "MINUS",
+            // RetroArch's keyboard default; a pad button is the player's pick (HOTKEYS).
+            "rewind_hold" to "R",
             "exit_game" to "BUTTON_SELECT+BUTTON_START, ESCAPE",
         )
 

@@ -112,7 +112,7 @@ data class Boss(
  * map sections - but their guides differ, so each game's [GuideTables] names
  * its own.
  */
-enum class GuideId { FIRERED, LEAFGREEN, EMERALD, RUBY, SAPPHIRE, HEART_AND_SOUL, UNBOUND, RADICAL_RED, ODYSSEY, GAIA, AMETHYST, AMETHYST_V141, CELIA, GLAZED, IMPERIUM, QUETZAL, LAZARUS, SEAGLASS, TMT2, SOULGOLD }
+enum class GuideId { FIRERED, LEAFGREEN, EMERALD, RUBY, SAPPHIRE, HEART_AND_SOUL, UNBOUND, RADICAL_RED, ODYSSEY, GAIA, AMETHYST, AMETHYST_V141, CELIA, GLAZED, IMPERIUM, QUETZAL, LAZARUS, SEAGLASS, TMT2, SOULGOLD, ORANGE_ISLANDS }
 
 /** [live]'s guide on the native path; else by [game] (the QoL builds have no live tables). */
 fun guideId(game: GameKind?, live: GuideTables?): GuideId? = live?.guide ?: when (game) {
@@ -142,6 +142,7 @@ fun gameGuide(id: GuideId?): GameGuide? = when (id) {
     GuideId.SEAGLASS -> GUIDE_SEAGLASS
     GuideId.TMT2 -> GUIDE_TMT2
     GuideId.SOULGOLD -> GUIDE_SOULGOLD
+    GuideId.ORANGE_ISLANDS -> GUIDE_ORANGE_ISLANDS
     null -> null
 }
 

@@ -3,9 +3,23 @@
 (closed hack of Emerald by TenmaRH, no source; nothing is downloaded).
 
     scripts/gen_quetzal_tables.py <rom.gba> [out_dir]
+    scripts/gen_quetzal_tables.py <rom.gba> --languages [<spanish rom.gba>]
 
-Writes {SpeciesNames,SpeciesTypes,GenderRatios,ItemNames,ItemDescriptions,
-ItemPockets,MoveData,TypeChart,MapSecData}Quetzal.kt (default: the app's data package).
+Writes {SpeciesNames,SpeciesTypes,GenderRatios,ItemNames,ItemPockets,MoveData,
+TypeChart,MapSecData}Quetzal.kt (default: the app's data package).
+
+--languages writes QuetzalNamesGen.kt instead: the game's other name languages.
+Quetzal carries English, Spanish, Latin American Spanish and Brazilian Portuguese
+names in every build and picks them per kind with its own options (START >
+OPCIONES > TEXTO > IDIOMA: POKéMON, MOVIMIENTOS, OBJETOS, LUGARES, ...), kept in
+SaveBlock2 (NativeReader's readQuetzalNames). Only the names that differ from
+English are written, as overlays. The Spanish release (Alpha 9 v0, sha1
+fe346b5b...) is the same engine with Spanish dialogue, descriptions and dex text
+and the same name tables (checked when its ROM is given); only its LUGARES default
+differs (Spanish, not English). Portuguese isn't written: its names use glyphs
+past the Western charmap (ã, õ).
+Item descriptions aren't written: the app reads them from the player's ROM
+(RomItemText, NativeConfig.itemDescs).
 
 Quetzal English Alpha 9 v0 (BPEE, 32 MB, header title "PKM QUETZAL") keeps
 vanilla pokeemerald's table *shapes* (names in their own arrays, not inline in
@@ -142,8 +156,111 @@ def write(name, body):
     print("wrote", os.path.relpath(path))
 
 
+# The per-language name tables (English ROM), from the code that picks them by option:
+# GetSpeciesName (0x080A3464: SaveBlock2+0x2E0 bits 5-7, 1 or 2 -> the Spanish table),
+# GetMoveName (0x080A34B8: +0x2E1 bits 0-2, 1 / 2 / 3), ItemId_GetName (0x0813EE74:
+# +0x2E2 bits 3-5, 1 / 2 / 3); map sections: gRegionMapEntries' names** [EN, ES, LA, PT].
+LANG_TABLES = dict(
+    species={"Es": 0x08509415},
+    moves={"Es": 0x08511FE2, "La": 0x08515E0A},
+    items={"Es": 0x091EAC74, "La": 0x091EF1FC},
+)
+# The Spanish release's copies of the same tables (its own addresses).
+ES_SHA1 = "fe346b5b0eb022e3a103f81e7dcefba6f1dc542f"
+ES_TABLES = dict(species={"En": 0x08510080, "Es": 0x08514E25}, moves={"En": 0x08519BCA, "Es": 0x0851D9F2, "La": 0x0852181A},
+                 items={"En": 0x091E96F4, "Es": 0x091EDC7C, "La": 0x091F2204})
+ES_REGION_MAP_ENTRIES = 0x0922C7D4
+ES_JOHTO_MAP_ENTRIES = 0x0922DA64
+
+
+def languages(rom, es_rom):
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from gen_emerald_lang_tables import CHARS as WESTERN
+
+    def ltext(r, a, maxlen):
+        out = []
+        for b in r[a - 0x08000000:a - 0x08000000 + maxlen]:
+            if b == 0xFF:
+                break
+            if b in (0xFA, 0xFB, 0xFE):
+                out.append(" ")
+                continue
+            if b not in WESTERN:
+                return None
+            out.append(WESTERN[b])
+        s = " ".join("".join(out).split())
+        return s if s and set(s) != {"?"} and s != "-" else None
+
+    en_species = {i: text(rom, SPECIES_NAMES + 13 * i, 13) for i in range(1, SPECIES_COUNT)}
+    en_moves = {i: text(rom, MOVE_NAMES + 17 * i, 17) for i in range(1, 1000)}
+    en_items = {i: text(rom, ITEM_NAMES + 20 * i, 20) for i in range(1, ITEM_COUNT)}
+    out = {}
+    for kind, stride, count, en in (("species", 13, SPECIES_COUNT, en_species), ("moves", 17, 1000, en_moves),
+                                    ("items", 20, ITEM_COUNT, en_items)):
+        for lang, base in LANG_TABLES[kind].items():
+            names = {}
+            for i in range(1, count):
+                if not en.get(i):
+                    continue
+                n = ltext(rom, base + stride * i, stride)
+                if n and n != en[i]:
+                    names[i] = n
+            out[(kind, lang)] = names
+            if es_rom is not None:
+                e = ES_TABLES[kind][lang]
+                same = all(rom[base - 0x08000000 + stride * i:base - 0x08000000 + stride * (i + 1)] ==
+                           es_rom[e - 0x08000000 + stride * i:e - 0x08000000 + stride * (i + 1)] for i in range(1, count))
+                assert same, f"the Spanish release's {kind} ({lang}) differ"
+    assert out[("species", "Es")][772] == "Código Cero" and len(out[("species", "Es")]) == 21
+    assert out[("moves", "Es")][33] == "Placaje" and out[("items", "Es")][28] == "Poción"
+    assert out[("items", "La")][1] == "Pokébola" and out[("items", "Es")][120] == "Cuerda Huida"
+
+    def mapsecs(r, kanto, johto, idx):
+        m = {}
+        for base, first, names_at in ((kanto, 0, 0), (johto, JOHTO_MAPSEC_BASE, 4)):
+            for i in range(MAPSEC_COUNT):
+                p = u32(r, base + 8 * i + names_at)
+                if not is_ptr(r, p) or not is_ptr(r, u32(r, p + 4 * idx)):
+                    continue
+                s = ltext(r, u32(r, p + 4 * idx), 30)
+                if s:
+                    m[first + i] = title(s)
+        return m
+
+    en_secs = mapsecs(rom, REGION_MAP_ENTRIES, JOHTO_MAP_ENTRIES, 0)
+    for idx, lang in ((1, "Es"), (2, "La")):
+        secs = mapsecs(rom, REGION_MAP_ENTRIES, JOHTO_MAP_ENTRIES, idx)
+        if es_rom is not None:
+            assert secs == mapsecs(es_rom, ES_REGION_MAP_ENTRIES, ES_JOHTO_MAP_ENTRIES, idx), "map names differ"
+        out[("mapsecs", lang)] = {i: n for i, n in secs.items() if n != en_secs.get(i)}
+    assert out[("mapsecs", "Es")][0x58] == "Pueblo Paleta" and out[("mapsecs", "Es")][JOHTO_MAPSEC_BASE + 2] == "Ciudad Malva"
+
+    def kmap(name, m):
+        return (f"internal val {name}: Map<Int, String> by lazy {{\n    mapOf(\n" +
+                "".join(f"        {i} to {kstr(n)},\n" for i, n in sorted(m.items())) + "    )\n}\n")
+
+    body = header("Quetzal's Spanish and Latin American Spanish names, where\n"
+                  "// they differ from English (overlays on the *Quetzal tables), by the same ids. The game picks\n"
+                  "// them per kind from its IDIOMA options (NativeReader's readQuetzalNames).\n")
+    for (kind, lang), m in out.items():
+        name = {"species": "speciesNames", "moves": "moveNames", "items": "itemNames", "mapsecs": "mapSecNames"}[kind]
+        body += "\n" + kmap(f"{name}Quetzal{lang}", m)
+    write("QuetzalNamesGen.kt", body)
+    print(", ".join(f"{k}/{l} {len(m)}" for (k, l), m in out.items()))
+
+
 def main():
     global OUT_DIR
+    if "--languages" in sys.argv:
+        rom = open(sys.argv[1], "rb").read()
+        if hashlib.sha1(rom).hexdigest() != SHA1:
+            sys.exit(f"not {LABEL} (sha1 {SHA1})")
+        rest = [a for a in sys.argv[2:] if a != "--languages"]
+        es = open(rest[0], "rb").read() if rest else None
+        if es is not None and hashlib.sha1(es).hexdigest() != ES_SHA1:
+            sys.exit(f"{rest[0]} isn't Quetzal Spanish Alpha 9 v0 (sha1 {ES_SHA1})")
+        languages(rom, es)
+        return
     if len(sys.argv) not in (2, 3):
         sys.exit(f"usage: {sys.argv[0]} <rom.gba> [out_dir]")
     if len(sys.argv) == 3:
@@ -194,20 +311,15 @@ def main():
           "val moveDataQuetzal: Map<Int, MoveInfo> = mapOf(\n" +
           "".join(f"    {i} to MoveInfo({kstr(n)}, {t}, {p}),\n" for i, n, t, p in moves) + ")\n")
 
-    items, descs = {}, {}
+    items = {}
     for i in range(1, ITEM_COUNT):
         n = text(rom, ITEM_NAMES + 20 * i, 20)
-        if not n:
-            continue
-        a = ITEMS + 0x1C * i
-        # gItems[i].itemId == i for every named item but Enigma Berry (581 reads 574).
-        items[i] = n
-        p = u32(rom, a + 0xC)
-        d = text(rom, p, 200) if is_ptr(rom, p) else None
-        if d:
-            descs[i] = d
+        if n:
+            # gItems[i].itemId == i for every named item but Enigma Berry (581 reads 574).
+            items[i] = n
     assert all(items.get(i) == n for i, n in CHECKS["items"].items()), "item names are wrong"
-    assert "20 points" in descs.get(28, ""), "item description offset is wrong"
+    p = u32(rom, ITEMS + 0x1C * 28 + 0xC)
+    assert is_ptr(rom, p) and "20 points" in (text(rom, p, 200) or ""), "item description offset is wrong"
     write("ItemNamesQuetzal.kt", header("gItemNames, keyed by item id.\n") +
           "val itemNamesQuetzal: Map<Int, String> = mapOf(\n" +
           "".join(f"    {i} to {kstr(n)},\n" for i, n in sorted(items.items())) + ")\n")
@@ -222,9 +334,6 @@ def main():
           "// under ITEMS (its +0x12 pocket: 3 balls, 4 berries, 11 key items, 100 TMs).\n") +
           "val itemPocketsQuetzal: Map<Int, Int> = mapOf(\n" +
           "".join(f"    {i} to {p},\n" for i, p in sorted(pockets.items())) + ")\n")
-    write("ItemDescriptionsQuetzal.kt", header("gItems descriptions, keyed by item id.\n") +
-          "val itemDescriptionsQuetzal: Map<Int, String> = mapOf(\n" +
-          "".join(f"    {i} to {kstr(d)},\n" for i, d in sorted(descs.items())) + ")\n")
 
     chart = {}
     for atk in TYPE_NAMES:
@@ -269,7 +378,7 @@ def main():
           "val mapSecDataQuetzal: Map<Int, MapSecInfo> = mapOf(\n" +
           "".join(f"    {i} to MapSecInfo({kstr(s)}, -1, 0, 0, 0, 0),\n" for i, s in sorted(mapsecs.items())) + ")\n")
     print(f"{len(names)} species ({len(skipped)} unreadable: {skipped[:20]}), {len(moves)} moves, {len(items)} items, "
-          f"{len(descs)} descriptions, {len(chart)} chart pairs, {len(mapsecs)} map sections")
+          f"{len(chart)} chart pairs, {len(mapsecs)} map sections")
 
 
 if __name__ == "__main__":

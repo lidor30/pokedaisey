@@ -5,7 +5,9 @@
     scripts/gen_glazed_tables.py <rom.gba>
 
 Writes app/src/main/kotlin/.../companion/data/{SpeciesNames,SpeciesTypes,
-GenderRatios,ItemNames,ItemDescriptions,MoveData,TypeChart,MapSecData}Glazed.kt.
+GenderRatios,ItemNames,MoveData,TypeChart,MapSecData}Glazed.kt.
+Item descriptions aren't written: the app reads them from the player's ROM
+(RomItemText, NativeConfig.itemDescs).
 
 Glazed 9.2.0 is an in-place edit of retail Emerald (BPEE rev 0): its code and
 RAM are retail's, and so are almost all of its tables - every literal pool that
@@ -157,24 +159,15 @@ def main():
           "val moveDataGlazed: Map<Int, MoveInfo> = mapOf(\n" +
           "".join(f"    {i} to MoveInfo({kstr(n)}, {t}, {p}),\n" for i, n, t, p in moves) + ")\n")
 
-    items, descs = {}, {}
+    items = {}
     for i in range(1, ITEM_COUNT):
-        a = ITEMS + 44 * i
-        n = text(rom, a, 14)
-        if not n:
-            continue
-        items[i] = n
-        p = u32(rom, a + 0x14)
-        d = text(rom, p, 200) if is_ptr(rom, p) else None
-        if d:
-            descs[i] = d
+        n = text(rom, ITEMS + 44 * i, 14)
+        if n:
+            items[i] = n
     assert all(items.get(i) == n for i, n in CHECKS["items"].items()), "item names are wrong"
     write("ItemNamesGlazed.kt", header("gItems names, keyed by item id.\n") +
           "val itemNamesGlazed: Map<Int, String> = mapOf(\n" +
           "".join(f"    {i} to {kstr(n)},\n" for i, n in sorted(items.items())) + ")\n")
-    write("ItemDescriptionsGlazed.kt", header("gItems descriptions, keyed by item id.\n") +
-          "val itemDescriptionsGlazed: Map<Int, String> = mapOf(\n" +
-          "".join(f"    {i} to {kstr(d)},\n" for i, d in sorted(descs.items())) + ")\n")
 
     chart = {}
     a = TYPE_CHART

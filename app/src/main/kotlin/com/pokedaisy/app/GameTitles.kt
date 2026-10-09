@@ -62,6 +62,10 @@ object GameTitles {
         "e10105d8544469c6a11ca2cf510289981df3c3b0" to "Pokémon Glazed",
         "1d20091c4d936f5eb122db8780554dd0829ffb63" to "Pokémon Emerald Imperium",
         "d0658315da1e8827f66f15c3d3a000fe747e163e" to "Pokémon Quetzal",
+        "fe346b5b0eb022e3a103f81e7dcefba6f1dc542f" to "Pokémon Quetzal",
+        "0ce2a880aa097f1dce4e1db8ee513d0e82d15859" to "Pokémon Unbound",
+        "8bac897de515f88e6ce92d0712ce2c018a394b37" to "Pokémon Orange Islands",
+        "d2e3800e69e44c9649c3d9a15dc1cd12c1d90501" to "Pokémon Orange Islands",
         // Game Boy (pret/pokeyellow's roms.sha1).
         "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1" to "Pokémon Yellow",
     )

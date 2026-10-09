@@ -24,15 +24,20 @@ native-capture/mgba_dump.c's `vdump`):
       the FireRed font asset is reused
 
 Outputs:
-  assets/partycfru/slot_{normal,selected,fainted,selected_fainted,
-      nohp_normal,nohp_selected,empty}.png   112x40 frames
-  assets/partycfru/<game>/status_icons.png  one row of 32x8 icons (PSN, PAR,
-      SLP, FRZ/FRB, BRN, PKRS, FNT)
-  assets/partycfru/<game>/pokeball.png      32x64 closed/open (only when the
-      game's ball sprite isn't blank - Unbound's is the only one drawn)
-  assets/partybg/cfru_tile.png              32x32 tile of the menu's grid backdrop
   app/.../companion/ui/CfruPartyStylesGen.kt     one PartySlotStyle per game
   app/.../companion/data/GenderRatiosCfru.kt     gBaseStats genderRatio per game
+
+The art isn't bundled: the app rebuilds it from the player's ROM
+(companion/data/RomArt.kt, CFRU_* / <game>_STATUS_GFX in
+scripts/gen_rom_art_sigs.py) under the paths the styles name:
+  partycfru/slot_{normal,selected,fainted,selected_fainted,
+      nohp_normal,nohp_selected,empty}.png   112x40 frames
+  partycfru/<game>/status_icons.png  one row of 32x8 icons (PSN, PAR,
+      SLP, FRZ/FRB, BRN, PKRS, FNT)
+  partybg/cfru_tile.png              32x32 tile of the menu's grid backdrop
+Unbound's Poke Ball (the only one drawn - the others' sprite is blank) is
+FireRed's own bytes, so its style uses partyfr/pokeball.png. This script still
+extracts the art to check the layout it writes into the styles.
 
 Checked pixel-for-pixel against headless screenshots of all four games
 (normal / selected / fainted / selected+fainted / egg / status states).
@@ -48,10 +53,24 @@ from PIL import Image
 from decomps import decomp
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ASSETS = os.path.join(HERE, "../app/src/main/assets")
 KT_UI = os.path.join(HERE, "../app/src/main/kotlin/com/pokedaisy/app/companion/ui/CfruPartyStylesGen.kt")
 KT_DATA = os.path.join(HERE, "../app/src/main/kotlin/com/pokedaisy/app/companion/data/GenderRatiosCfru.kt")
 FR_DECOMP = decomp("pokefirered")
+FR_ROM = open(os.path.join(FR_DECOMP, "pokefirered_rev1.gba"), "rb").read()
+
+
+def fr_symbols():
+    import subprocess
+    out = {}
+    for line in subprocess.run(["nm", os.path.join(FR_DECOMP, "pokefirered_rev1.elf")], capture_output=True, text=True,
+                               check=True).stdout.splitlines():
+        p = line.split()
+        if len(p) == 3:
+            out[p[2]] = int(p[0], 16) - 0x08000000
+    return out
+
+
+FR_SYMS = fr_symbols()
 
 # host_roms.conf key -> Kotlin name, asset subdir, sha1, egg nickname as the
 # game prints it, live gBaseStats (the one with literal-pool refs - Radical
@@ -99,7 +118,10 @@ def conf_rom(key):
     for line in open(os.path.join(HERE, "host_roms.conf")):
         f = line.rstrip("\n").split("|")
         if not line.startswith("#") and f[0] == key:
-            return os.path.expanduser(f[2])
+            path = os.path.expanduser(f[2])
+            # Unbound's dump is named "Pokémon Unbound (...)" on some machines.
+            alt = path.replace("/Pokemon - ", "/Pokémon ")
+            return path if os.path.exists(path) or not os.path.exists(alt) else alt
     raise SystemExit(f"{key} missing from host_roms.conf")
 
 
@@ -228,7 +250,11 @@ def extract(key, cfg):
     ball_gfx = lz77(rom, ptr(rom, 0x45A474))
     ball = None
     if any(ball_gfx):
-        ball = sprite_sheet(ball_gfx, 4, 8, colors(lz77(rom, ptr(rom, 0x45A47C))))
+        # FireRed's Poke Ball and palette, byte for byte (what partyfr/pokeball.png is made of).
+        fr_ball = lz77(FR_ROM, FR_SYMS["gPartyMenuPokeball_Gfx"])
+        fr_pal = lz77(FR_ROM, FR_SYMS["gPartyMenuPokeball_Pal"])
+        assert ball_gfx == fr_ball and lz77(rom, ptr(rom, 0x45A47C)) == fr_pal, (key, "Poke Ball isn't FireRed's")
+        ball = "partyfr/pokeball.png"
     st_img = sprite_sheet(lz77(rom, ptr(rom, 0x45A574)), 4 * 7, 1, colors(lz77(rom, ptr(rom, 0x45A57C))))
 
     # Text rects (x, y, w, h): nickname, level, gender, HP, max HP, HP bar.
@@ -304,12 +330,7 @@ def main():
         assert g["dims"] == first["dims"] and g["coords"] == first["coords"] and g["win"] == first["win"], k
         assert g["pal"] == first["pal"], k
 
-    out = os.path.join(ASSETS, "partycfru")
-    os.makedirs(out, exist_ok=True)
     frames = first["frames"]
-    for st, im in frames.items():
-        im.save(os.path.join(out, f"slot_{st}.png"))
-    first["backdrop"].save(os.path.join(ASSETS, "partybg/cfru_tile.png"))
     ucols = uniform_lines(frames.values(), 0)
     assert STRETCH_COL in ucols, sorted(ucols)
     bbox = frames["normal"].getbbox()
@@ -331,15 +352,7 @@ def main():
         if not cfg.get("style", True):
             continue
         g = got[k]
-        sub = os.path.join(out, cfg["sub"])
-        os.makedirs(sub, exist_ok=True)
-        g["status"].save(os.path.join(sub, "status_icons.png"))
-        ball_asset = "null"
-        if g["ball"] is not None:
-            g["ball"].save(os.path.join(sub, "pokeball.png"))
-            ball_asset = f'"partycfru/{cfg["sub"]}/pokeball.png"'
-        elif os.path.exists(os.path.join(sub, "pokeball.png")):
-            os.remove(os.path.join(sub, "pokeball.png"))
+        ball_asset = "null" if g["ball"] is None else f'"{g["ball"]}"'
         styles.append(f'''val {cfg["name"]}PartyStyle = cfruPartyStyle(
     statusAsset = "partycfru/{cfg["sub"]}/status_icons.png",
     pokeballAsset = {ball_asset},
@@ -417,7 +430,7 @@ val genderRatios{cfg["name"]}: IntArray by lazy {{ unhexRatios("{hexs}") }}
 internal fun unhexRatios(s: String) = IntArray(s.length / 2) { s.substring(it * 2, it * 2 + 2).toInt(16) }
 
 """ + "\n".join(parts))
-    print("wrote", out, KT_UI, KT_DATA)
+    print("wrote", KT_UI, KT_DATA)
 
 
 if __name__ == "__main__":

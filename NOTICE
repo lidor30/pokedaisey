@@ -23,8 +23,16 @@ credits, an "About" screen or other Appropriate Legal Notices, there too.
 
 THIRD-PARTY COMPONENTS
 
+The app shows every license below in full under Settings > LICENSES.
+
 - mGBA (third_party/mgba), Copyright (c) 2013-2022 Jeffrey Pfau and
   contributors, Mozilla Public License 2.0 - https://github.com/mgba-emu/mgba
+  (source: https://github.com/mgba-emu/mgba/tree/0.10.5). Built with two of
+  its bundled libraries: blip_buf (GNU LGPL 2.1) and inih (BSD).
+  app/src/main/cpp/pk_rewind.c is adapted from mGBA's src/core/rewind.c and
+  stays under the MPL 2.0 (its header says so).
+- rcheevos (third_party/rcheevos), Copyright (c) 2018 RetroAchievements.org,
+  MIT License - https://github.com/RetroAchievements/rcheevos
 - Shaders (app/src/main/kotlin/com/pokedaisy/app/ScreenShaders.kt): LCD and
   scanlines adapted from mGBA's, Copyright (C) 2017 Dominus Iniquitatis, MIT
   License (the full notice is in third_party/mgba/res/shaders/lcd.shader/lcd.fs);
@@ -33,7 +41,38 @@ THIRD-PARTY COMPONENTS
   curve zfast_lcd (Copyright Greg Hogan (SoltanGris42), GPL-2.0-or-later).
 - Pixel Operator font (app/src/main/assets/fonts), by Jayvee Enaguas,
   CC0 1.0 (public domain dedication).
+- PixelMplus10 (app/src/main/assets/fonts/PixelMplusJP.ttf), by itouhiro,
+  M+ FONT LICENSE (app/src/main/assets/fonts/LICENSE-PixelMplus.txt); cut to
+  Japanese and rescaled by scripts/gen_jp_font.py.
+- PokeAPI (https://pokeapi.co), BSD 3-Clause: the National Dex species list
+  (third_party/licenses/PokeAPI-BSD-3-Clause.txt).
+- AndroidX, Jetpack Compose, Kotlin, kotlinx.coroutines and Apache Commons
+  Compress (with Commons IO, Codec and Lang), Apache License 2.0
+  (third_party/licenses/Apache-2.0.txt; their NOTICE files in
+  third_party/licenses/Apache-Commons-NOTICE.txt); XZ for Java, BSD Zero
+  Clause (third_party/licenses/XZ-Java-0BSD.txt).
+- Some decoders and layouts follow the community decompilations of the games
+  (pret's pokefirered / pokeemerald / pokeruby / pokeyellow and
+  pokeemerald-expansion), which publish no license of their own: the Gen 1
+  picture decompressor, expansion's "smol" decompressor and the trainer card's
+  layout are re-implemented from them in Kotlin.
+
+GAMES AND TRADEMARKS
 
 Pokemon and all related names are trademarks of Nintendo, Game Freak,
-Creatures and The Pokemon Company. PokeDaisy is not affiliated with or
-endorsed by them. No game data is included: players supply their own ROMs.
+Creatures and The Pokemon Company. Game Boy, Game Boy Color and Game Boy
+Advance are trademarks of Nintendo. AYN, Retroid, Anbernic and other device
+names belong to their makers. RetroAchievements and SteamGridDB are separate
+services. PokeDaisy is not affiliated with or endorsed by any of them. ROM
+hacks belong to their creators.
+
+No ROMs, BIOS files, saves or game graphics are included: players supply their
+own legally dumped ROMs, and the pictures and descriptive text the companion
+shows are read from the player's ROM while it runs. To recognise and label what
+it reads, the app carries reference data about the supported games: names of
+Pokemon, moves, items, types and places, numeric tables (stats, type matchups,
+map layouts, memory addresses) and checksums of ROM data, extracted from the
+games, the ROM hacks and the decompilation projects for interoperability.
+The unit tests' fixtures (app/src/test/resources/fixtures) are snapshots of
+the emulated console's RAM while a game ran; like any RAM dump they hold a
+few kilobytes the game copied there from its ROM. They aren't in the app.

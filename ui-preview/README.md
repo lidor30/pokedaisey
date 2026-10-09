@@ -44,7 +44,7 @@ compiled as-is. (The Paparazzi test itself can't be compiled here: Paparazzi's
 Library (list + grid) and Settings pages on the top screen (1920x1080 @ 2.5).
 `CompanionScreen(initialTab = …)` picks the tab; taps go through
 `runSkikoComposeUiTest`'s `performClick()`. Add a `Shot` for a new screen.
-FireRed / Emerald art (party slots, backdrops, region maps) isn't bundled -
+Game art (party slots, backdrops, region maps - FireRed / Emerald's and the hacks') isn't bundled -
 the app rebuilds it from the ROM (`RomArt`) - so the renderer does the same at
 startup from the decomp builds under `$DECOMPS` (`pokefirered/`, `pokeemerald/`),
 `-Prom` or `-PartRoms=a.gba,b.gba`, into `build/scratch/files/rom-art`. The fake

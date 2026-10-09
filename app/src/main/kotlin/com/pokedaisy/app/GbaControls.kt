@@ -14,12 +14,14 @@ import java.util.Properties
 object GbaControls {
 
     /** START2 / SELECT2: a second button for START / SELECT, X / Y by default, like the
-     * DS games' X (menu) and Y (registered item). */
+     * DS games' X (menu) and Y (registered item). TURBO A / B (issue #32, unbound by default)
+     * press A / B on and off while held - [TURBO] marks them in [load]'s map, [GbaInput] pulses them. */
     enum class Btn(val bit: Int, val label: String) {
         A(MgbaCore.Key.A, "A"), B(MgbaCore.Key.B, "B"),
         L(MgbaCore.Key.L, "L"), R(MgbaCore.Key.R, "R"),
         START(MgbaCore.Key.START, "START"), SELECT(MgbaCore.Key.SELECT, "SELECT"),
-        START2(MgbaCore.Key.START, "START 2"), SELECT2(MgbaCore.Key.SELECT, "SELECT 2");
+        START2(MgbaCore.Key.START, "START 2"), SELECT2(MgbaCore.Key.SELECT, "SELECT 2"),
+        TURBO_A(MgbaCore.Key.A or TURBO, "TURBO A"), TURBO_B(MgbaCore.Key.B or TURBO, "TURBO B");
 
         val prop get() = name.lowercase()
     }
@@ -35,7 +37,12 @@ object GbaControls {
         // the printed labels differ (AYN, Retroid: BUTTON_A is the bottom one); GAME BUTTONS remaps.
         "start2" to "BUTTON_X",
         "select2" to "BUTTON_Y",
+        "turbo_a" to "",
+        "turbo_b" to "",
     )
+
+    /** Above every GBA key bit: a [load] value with it is a turbo button for the bits below. */
+    const val TURBO = 1 shl 16
 
     private fun file(dir: File) = File(dir, "controls.properties")
 
@@ -51,7 +58,7 @@ object GbaControls {
         return p
     }
 
-    /** keycode -> GBA key bit. */
+    /** keycode -> GBA key bit ([TURBO] set for TURBO A / B). A key bound twice takes the later button. */
     fun load(dir: File): Map<Int, Int> {
         val props = readProps(dir)
         val out = HashMap<Int, Int>()
@@ -70,9 +77,15 @@ object GbaControls {
         }
     }
 
+    /** [btn] is [keyCode] now - and that key leaves any other button it was on (else the later button kept it). */
     fun setBinding(dir: File, btn: Btn, keyCode: Int) {
         val props = readProps(dir)
-        props.setProperty(btn.prop, Hotkeys.keyName(keyCode))
+        val name = Hotkeys.keyName(keyCode)
+        for (other in Btn.entries) if (other != btn) {
+            val keys = props.getProperty(other.prop).orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }
+            if (name in keys) props.setProperty(other.prop, (keys - name).joinToString(", "))
+        }
+        props.setProperty(btn.prop, name)
         runCatching { file(dir).outputStream().use { props.store(it, "PokeDaisy GBA button map") } }
     }
 

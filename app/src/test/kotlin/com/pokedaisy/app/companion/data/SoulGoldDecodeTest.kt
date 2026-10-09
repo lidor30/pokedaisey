@@ -57,7 +57,6 @@ class SoulGoldDecodeTest {
         assertEquals("Potion", itemName(potion.itemId))
         assertEquals(1, potion.quantity)
         assertEquals(POCKET_ITEMS, potion.pocket) // the Medicine pocket
-        assertTrue(itemDescription(potion.itemId).contains("20 points"))
     }
 
     @Test
@@ -153,7 +152,6 @@ class SoulGoldDecodeTest {
             assertEquals("TM75 Swords Dance", itemName(SOULGOLD_V12_TM75))
             soulGoldV12 = true
             assertEquals("TM75 Agility", itemName(SOULGOLD_V12_TM75))
-            assertTrue(itemDescription(SOULGOLD_V12_TM75).contains("Speed"))
             assertEquals("Potion", itemName(28))
         } finally {
             soulGoldV12 = false

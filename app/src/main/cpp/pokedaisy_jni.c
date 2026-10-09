@@ -23,6 +23,7 @@
 #include <mgba/internal/sm83/sm83.h>
 
 #include "pk_cheats.h"
+#include "pk_rewind.h"
 
 #define LOG_TAG "pokedaisy/jni"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
@@ -64,7 +65,15 @@ static struct {
     bool saveReadOnly;                  // nothing we load can reach the file
     int16_t audio[PK_AUDIO_SCRATCH_SAMPLES * 2];
     int audioAvail;                     // interleaved shorts ready in audio[]
+    // REWIND (pk_rewind.c): a state every PK_REWIND_INTERVAL frames while rewindEntries > 0;
+    // while rewinding, each frame goes back one of them instead.
+    struct mCoreRewindContext rewind;
+    int rewindEntries;
+    int rewindTick;
+    bool rewinding;
 } g;
+
+#define PK_REWIND_INTERVAL 2
 
 // A second, fully independent core used only to prerecord FF background-
 // music clips (see FfMusicRenderer.kt / EmulatorEngine's "FF music"
@@ -103,8 +112,18 @@ static void pkDrainAudio(void) {
 // core pkTeardown had just freed. Readers share it; init / teardown take it alone.
 static pthread_rwlock_t pk_coreLock = PTHREAD_RWLOCK_INITIALIZER;
 
+static void pkRewindOff(void) {
+    if (g.rewindEntries > 0) {
+        pk_rewind_deinit(&g.rewind);
+        memset(&g.rewind, 0, sizeof(g.rewind));
+    }
+    g.rewindEntries = 0;
+    g.rewindTick = 0;
+}
+
 static void pkTeardown(void) {
     pthread_rwlock_wrlock(&pk_coreLock);
+    pkRewindOff();
     if (g.core) {
         pk_cheats_clear(g.core);        // and forgets the ROM bytes it kept
         g.core->deinit(g.core);         // unloads ROM, flushes save VFile
@@ -290,8 +309,38 @@ Java_com_pokedaisy_app_MgbaCore_pkRunFrame(JNIEnv* env, jobject thiz) {
     if (!g.core) {
         return;
     }
+    if (g.rewindEntries > 0) {
+        if (g.rewinding) {
+            // Back one entry, then that frame runs to draw it. At the oldest one, stand still.
+            if (!pk_rewind_restore(&g.rewind, g.core)) {
+                g.audioAvail = 0;
+                return;
+            }
+        } else if (++g.rewindTick >= PK_REWIND_INTERVAL) {
+            g.rewindTick = 0;
+            pk_rewind_append(&g.rewind, g.core);
+        }
+    }
     g.core->runFrame(g.core);
     pkDrainAudio();
+}
+
+// REWIND: keep [entries] states (0 = off, the buffer freed). Emu thread, like pkRunFrame.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkSetRewind(JNIEnv* env, jobject thiz, jint entries) {
+    if (entries < 0) entries = 0;
+    if (entries == g.rewindEntries) return;
+    pkRewindOff();
+    if (entries > 0 && g.core) {
+        pk_rewind_init(&g.rewind, (size_t) entries);
+        g.rewindEntries = entries;
+    }
+}
+
+// While [on], each frame steps back through the REWIND buffer instead of forward.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkSetRewinding(JNIEnv* env, jobject thiz, jboolean on) {
+    g.rewinding = on && g.rewindEntries > 0;
 }
 
 // --- FF-music prerecording: a second, disposable core (see `rg` above) ------

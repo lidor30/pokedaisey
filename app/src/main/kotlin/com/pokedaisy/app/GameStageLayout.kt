@@ -53,9 +53,11 @@ class GameStageLayout(
             requestLayout()
         }
 
-    /** How tall the game (and the bar over it, when shown) comes out at [width] wide, fitted. */
+    /** How tall the game (and the bar over it, when shown) comes out at [width] wide, fitted. A bar not
+     * attached to a window yet counts as 0: measuring a ComposeView then throws ("Cannot locate
+     * windowRecomposer" - issue #31, PortraitPanel enabled from onResume); its first layout corrects it. */
     fun gameHeightFor(width: Int): Int {
-        val b = if (!barShown) 0 else bar.measuredHeight.takeIf { it > 0 } ?: run {
+        val b = if (!barShown || !bar.isAttachedToWindow) 0 else bar.measuredHeight.takeIf { it > 0 } ?: run {
             bar.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
             bar.measuredHeight
         }

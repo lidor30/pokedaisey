@@ -42,7 +42,6 @@ class RadicalRedDecodeTest {
             t.party.flatMap { m -> m.moves.filter { it != 0 }.map { lookupMove(it).name } } +
             t.items.map { itemName(it.itemId) }
         names.forEach { assertTrue("unresolved name $it", '#' !in it) }
-        t.items.forEach { assertTrue("no description for ${it.itemId}", itemDescription(it.itemId).isNotEmpty()) }
         // Crocalor is Fire, Pawmo Electric/Fighting (CFRU type ids).
         assertEquals(SpeciesTypes(10, 10), activeSpeciesTypeData[925])
         assertEquals(SpeciesTypes(13, 1), activeSpeciesTypeData[844])

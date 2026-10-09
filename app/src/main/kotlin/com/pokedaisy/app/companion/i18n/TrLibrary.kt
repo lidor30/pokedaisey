@@ -3,6 +3,16 @@ package com.pokedaisy.app.companion.i18n
 /** The library, first-time setup, INFO, covers, save loading, the update offer and the game screen's toasts. */
 internal val trLibrary: Map<String, Tr> = mapOf(
     // Library screen: header, list, ROM menu
+    "CHANGE BUTTONS…" to Tr(ja = "ボタンを かえる…", fr = "CHANGER LES BOUTONS…", de = "TASTEN ÄNDERN…", it = "CAMBIA PULSANTI…", es = "CAMBIAR BOTONES…"),
+    "Which button on your device presses each GBA button - key bindings, or remapping, in other emulators. Check A and B first: some devices print them the other way round." to Tr(ja = "どの ボタンが GBAの どの ボタンに なるか (ほかの エミュレータの キーせってい)。 まず Aと Bを たしかめてください: ぎゃくに かかれた きかいも あります。", fr = "Quel bouton de l'appareil fait chaque bouton GBA - le mappage des touches des autres émulateurs. Vérifiez d'abord A et B : certains appareils les impriment inversés.", de = "Welche Taste deines Geräts welche GBA-Taste ist - die Tastenbelegung anderer Emulatoren. Prüf zuerst A und B: manche Geräte haben sie andersherum beschriftet.", it = "Quale tasto del dispositivo preme ogni tasto GBA - la mappatura degli altri emulatori. Controlla prima A e B: alcuni dispositivi li hanno invertiti.", es = "Qué botón del dispositivo pulsa cada botón de GBA - el mapeo de teclas de otros emuladores. Comprueba A y B primero: algunos dispositivos los traen al revés."),
+    "You can change this later in SETTINGS > GAME BUTTONS." to Tr(ja = "あとで せってい > ゲームの ボタン で かえられます。", fr = "Modifiable plus tard dans OPTIONS > BOUTONS JEU.", de = "Später änderbar unter OPTIONEN > SPIELTASTEN.", it = "Puoi cambiarlo poi in OPZIONI > TASTI GIOCO.", es = "Puedes cambiarlo luego en AJUSTES > BOTONES JUEGO."),
+    "PARTIALLY SUPPORTED" to Tr(ja = "いちぶ たいおう", fr = "PARTIEL", de = "TEILWEISE", it = "PARZIALE", es = "PARCIAL"),
+    "Supported (best effort, as {0})" to Tr(ja = "たいおう ({0}として)", fr = "Pris en charge (essai, comme {0})", de = "Unterstützt (Versuch, als {0})", it = "Supportato (tentativo, come {0})", es = "Compatible (intento, como {0})"),
+    "Partly (best effort, as {0})" to Tr(ja = "いちぶ ({0}として)", fr = "En partie (essai, comme {0})", de = "Teilweise (Versuch, als {0})", it = "In parte (tentativo, come {0})", es = "En parte (intento, como {0})"),
+    "FORGET MATCH" to Tr(ja = "けっかを わすれる", fr = "OUBLIER", de = "VERGESSEN", it = "DIMENTICA", es = "OLVIDAR"),
+    "SAVE FOLDER" to Tr(ja = "セーブの フォルダ", fr = "DOSSIER DE SAUVEGARDE", de = "SPEICHERORDNER", it = "CARTELLA SALVATAGGI", es = "CARPETA DE GUARDADO"),
+    "DEFAULT SAVE FOLDER" to Tr(ja = "いつもの フォルダに もどす", fr = "DOSSIER PAR DÉFAUT", de = "STANDARDORDNER", it = "CARTELLA PREDEFINITA", es = "CARPETA PREDETERMINADA"),
+    "Save copied to {0}" to Tr(ja = "セーブを {0}に コピーしました", fr = "Sauvegarde copiée dans {0}", de = "Spielstand nach {0} kopiert", it = "Salvataggio copiato in {0}", es = "Partida copiada a {0}"),
     "Toggle view" to Tr(ja = "ひょうじ きりかえ", fr = "Changer d'affichage", de = "Ansicht wechseln", it = "Cambia vista", es = "Cambiar vista"),
     "Import ROM" to Tr(ja = "ROMを インポート", fr = "Importer une ROM", de = "ROM importieren", it = "Importa ROM", es = "Importar ROM"),
     "Refresh" to Tr(ja = "こうしん", fr = "Actualiser", de = "Aktualisieren", it = "Aggiorna", es = "Actualizar"),
@@ -124,6 +134,7 @@ internal val trLibrary: Map<String, Tr> = mapOf(
     "Couldn't load your progress" to Tr(ja = "しんちょくを よみこめません", fr = "Impossible de charger votre progression", de = "Fortschritt konnte nicht geladen werden", it = "Impossibile caricare i tuoi progressi", es = "No se pudo cargar tu progreso"),
     // App update
     "PokéDaisy {0} is the newest version" to Tr(ja = "PokéDaisy {0}は さいしんばんです", fr = "PokéDaisy {0} est la dernière version", de = "PokéDaisy {0} ist die neueste Version", it = "PokéDaisy {0} è la versione più recente", es = "PokéDaisy {0} es la versión más reciente"),
+    "THE DOWNLOAD ISN'T A POKéDAISY UPDATE - NOT INSTALLED" to Tr(ja = "PokéDaisyの アップデートでは ありません - インストールしません", fr = "CE N'EST PAS UNE MISE À JOUR DE POKéDAISY - NON INSTALLÉE", de = "KEIN POKéDAISY-UPDATE - NICHT INSTALLIERT", it = "NON È UN AGGIORNAMENTO DI POKéDAISY - NON INSTALLATO", es = "NO ES UNA ACTUALIZACIÓN DE POKéDAISY - NO SE INSTALA"),
     "THE DOWNLOAD FAILED - CHECK THE CONNECTION AND TRY AGAIN" to Tr(ja = "ダウンロードに しっぱいしました - せつぞくを たしかめて もういちど", fr = "ÉCHEC DU TÉLÉCHARGEMENT - VÉRIFIEZ LA CONNEXION ET RÉESSAYEZ", de = "DOWNLOAD FEHLGESCHLAGEN - VERBINDUNG PRÜFEN UND NOCHMAL VERSUCHEN", it = "DOWNLOAD NON RIUSCITO - CONTROLLA LA CONNESSIONE E RIPROVA", es = "LA DESCARGA FALLÓ - REVISA LA CONEXIÓN E INTÉNTALO DE NUEVO"),
     "Allow PokéDaisy to install apps, then come back" to Tr(ja = "PokéDaisyに アプリの インストールを きょかして もどってください", fr = "Autorisez PokéDaisy à installer des applis, puis revenez", de = "Erlaube PokéDaisy, Apps zu installieren, und komm zurück", it = "Consenti a PokéDaisy di installare app, poi torna qui", es = "Permite que PokéDaisy instale apps y vuelve"),
     "ANDROID'S INSTALLER DIDN'T OPEN - GET THE APK FROM THE RELEASE PAGE" to Tr(ja = "Androidの インストーラーが ひらきません - リリースページから APKを いれてください", fr = "L'INSTALLATEUR D'ANDROID NE S'EST PAS OUVERT - PRENEZ L'APK SUR LA PAGE DE VERSION", de = "ANDROIDS INSTALLER GING NICHT AUF - HOL DIE APK VON DER RELEASE-SEITE", it = "IL PROGRAMMA DI INSTALLAZIONE NON SI È APERTO - SCARICA L'APK DALLA PAGINA DELLA VERSIONE", es = "EL INSTALADOR DE ANDROID NO SE ABRIÓ - DESCARGA EL APK DE LA PÁGINA DE LA VERSIÓN"),
@@ -180,6 +191,8 @@ internal val trLibrary: Map<String, Tr> = mapOf(
     // In-game HUD (EmulatorEngine / PokeDaisyActivity).
     "Game restarted" to Tr(ja = "ゲームを リスタートしました", fr = "Jeu redémarré", de = "Spiel neu gestartet", it = "Gioco riavviato", es = "Juego reiniciado"),
     "Fast-forward" to Tr(ja = "はやおくり", fr = "Avance rapide", de = "Vorspulen", it = "Avanti veloce", es = "Avance rápido"),
+    "Rewinding" to Tr(ja = "まきもどし ちゅう", fr = "Retour arrière", de = "Zurückspulen", it = "Riavvolgimento", es = "Rebobinando"),
+    "Rewind is off - turn it on in SETTINGS" to Tr(ja = "まきもどしは オフです - せっていで オンに", fr = "Retour arrière désactivé - activez-le dans OPTIONS", de = "Zurückspulen ist aus - in OPTIONEN einschalten", it = "Riavvolgimento disattivato - attivalo in OPZIONI", es = "Rebobinar está desactivado - actívalo en AJUSTES"),
     "Slow-motion ½×" to Tr(ja = "スロー ½×", fr = "Ralenti ½×", de = "Zeitlupe ½×", it = "Rallentatore ½×", es = "Cámara lenta ½×"),
     "Normal speed" to Tr(ja = "ふつうの はやさ", fr = "Vitesse normale", de = "Normale Geschwindigkeit", it = "Velocità normale", es = "Velocidad normal"),
     "Speed {0}×" to Tr(ja = "はやさ {0}×", fr = "Vitesse {0}×", de = "Tempo {0}×", it = "Velocità {0}×", es = "Velocidad {0}×"),

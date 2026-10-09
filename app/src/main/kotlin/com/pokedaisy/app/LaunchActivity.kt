@@ -31,6 +31,10 @@ import java.io.RandomAccessFile
  *
  * No UI of its own (translucent theme); it finishes as soon as the game is
  * started.
+ *
+ * It's exported (frontends start it by component), so any app can send it a
+ * path: it never reads this app's own files or provider, copies at most
+ * [RomIntake.MAX_COPY_BYTES], and plays only what has a cart header ([RomIdentity.looksLikeRom]).
  */
 class LaunchActivity : Activity() {
 
@@ -62,12 +66,16 @@ class LaunchActivity : Activity() {
 
     /** The file to play for [uri]: the ROM itself when we can read its path, else a library copy. */
     private fun resolve(uri: Uri): File? {
+        if (RomIntake.isOwn(this, uri)) return null
         RomUris.originalPath(this, uri)?.takeIf { it.startsWith("/") }?.let { path ->
             val f = File(path)
-            if (readable(f)) return f
+            if (RomIntake.isPrivate(this, f)) return null
+            if (readable(f)) return f.takeIf { RomIdentity.looksLikeRom(it) }
         }
         if (uri.scheme == "file") return null   // no path access, and no provider to copy through
-        return copyIntoLibrary(uri)
+        return copyIntoLibrary(uri)?.let { out ->
+            if (RomIdentity.looksLikeRom(out)) out else null.also { out.delete() }
+        }
     }
 
     /**
@@ -90,7 +98,7 @@ class LaunchActivity : Activity() {
         val importDir = File(getExternalFilesDir(null), "import").apply { mkdirs() }
         val tmp = File(importDir, "launch-${System.currentTimeMillis()}.gba")
         try {
-            contentResolver.openInputStream(uri)?.use { input -> tmp.outputStream().use { input.copyTo(it) } }
+            contentResolver.openInputStream(uri)?.use { input -> tmp.outputStream().use { RomIntake.copyCapped(input, it) } }
         } catch (t: Throwable) {
             tmp.delete()
             throw t
@@ -115,7 +123,7 @@ class LaunchActivity : Activity() {
         val unpacked = File(importDir, "${packed.name}.rom")
         runOnUiThread { Toast.makeText(this, tr("Unpacking {0}…", archiveName), Toast.LENGTH_SHORT).show() }
         try {
-            contentResolver.openInputStream(uri)?.use { input -> packed.outputStream().use { input.copyTo(it) } }
+            contentResolver.openInputStream(uri)?.use { input -> packed.outputStream().use { RomIntake.copyCapped(input, it) } }
             val entry = RomArchive.extract(packed, unpacked, RomArchive.sniff(packed)) ?: return null
             val out = File(romsDir, "${archiveName.substringBeforeLast('.')}.${entry.extension}")
             if (out.isFile && out.length() == unpacked.length() && unpacked.inputStream().use { a -> out.inputStream().use { b -> sameStream(a, b) } }) {

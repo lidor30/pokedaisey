@@ -16,6 +16,8 @@ class GbaInput {
         private set
 
     private var buttonBits = 0   // from key events: the bits of every key in heldKeys
+    private var turboBits = 0    // TURBO A / B held: pulsed by the engine ([turboMask])
+    private val turboKeys = HashMap<Int, Int>()
     // Per key, not per bit: START and START 2 (X) are two keys for one bit, and
     // letting go of one mustn't release the other.
     private val heldKeys = HashMap<Int, Int>()
@@ -32,11 +34,19 @@ class GbaInput {
     /** @return true if the event was consumed. */
     fun onKey(keyCode: Int, down: Boolean): Boolean {
         val bit = keyToBit(keyCode) ?: return false
+        if (bit and GbaControls.TURBO != 0) {
+            if (down) turboKeys[keyCode] = bit and GbaControls.TURBO.inv() else turboKeys.remove(keyCode)
+            turboBits = turboKeys.values.fold(0) { acc, b -> acc or b }
+            return true
+        }
         if (down) heldKeys[keyCode] = bit else heldKeys.remove(keyCode)
         buttonBits = heldKeys.values.fold(0) { acc, b -> acc or b }
         recompute()
         return true
     }
+
+    /** The TURBO A / B buttons held, which the engine presses every other 2 frames; none while a script steers. */
+    val turboMask: Int get() = if (scriptExclusive) 0 else turboBits
 
     fun setTouchBits(bits: Int) {
         touchBits = bits

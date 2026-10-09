@@ -24,6 +24,12 @@ object RomIdentity {
     fun isGameBoy(rom: File): Boolean =
         RomArchive.readAt(rom, 0x104L, 4)?.contentEquals(GB_LOGO_START) == true
 
+    /** A GBA cart header (the fixed 0x96 at 0xB2, which the BIOS checks) or, with Game Boy on,
+     * a GB one - for an archive, the ROM inside. What the frontend entry point insists on. */
+    fun looksLikeRom(rom: File): Boolean =
+        RomArchive.readAt(rom, 0xB2L, 1)?.firstOrNull() == 0x96.toByte() ||
+            (com.pokedaisy.app.companion.data.TelemetrySampler.GAME_BOY_SUPPORT && isGameBoy(rom))
+
     private val GB_LOGO_START = byteArrayOf(0xCE.toByte(), 0xED.toByte(), 0x66, 0x66)
 
     /** The header's 12-character internal title at 0x0A0 (`POKEMON FIRE`, …). */

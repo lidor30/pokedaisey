@@ -42,6 +42,29 @@ class QuetzalDecodeTest {
         assertFalse(t.inBattle)
     }
 
+    /** A second save, further on: six Pokémon (Gen 9's TINKATINK among them), standing in Johto. */
+    @Test
+    fun `a Johto save decodes - party, bag, map, money`() {
+        activeGame = GameKind.QUETZAL
+        val t = decodeNative("quetzal_johto", NATIVE_QUETZAL)
+        assertEquals(
+            listOf("Charmander" to 11, "Sneasel" to 12, "Cranidos" to 10, "Spiritomb" to 10, "Rufflet" to 8, "Tinkatink" to 12),
+            t.party.map { speciesNamesQuetzal[it.species] to it.level },
+        )
+        assertEquals(listOf("Torch Song", "Growl", "Ember", "Smokescreen"), t.party[0].moves.map { lookupMove(it).name })
+        assertTrue(t.party.none { it.isEgg })
+        assertEquals(255, t.items.first { itemNamesQuetzal[it.itemId] == "Poké Ball" }.quantity)
+        assertEquals(setOf("Town Map", "Mega Ring", "Z-Power Ring", "Exp. Share", "Dynamax Band", "Tera Orb"),
+            t.items.filter { it.pocket == POCKET_KEY_ITEMS }.map { itemNamesQuetzal[it.itemId] }.toSet())
+        assertPocketsInRange(t)
+        // Map group 35: Johto's own section table (0x100 + 2).
+        assertEquals(35 to 102, t.mapGroup to t.mapNum)
+        assertEquals(0x102, t.regionMapSectionId)
+        assertEquals("Violet City", mapSecDataQuetzal.getValue(t.regionMapSectionId).name)
+        assertEquals(48937L, t.money)
+        assertFalse(t.inBattle)
+    }
+
     /** In Johto's map groups (34-35) the section id is Johto's own table's: 0x100 + id. */
     @Test
     fun `Johto maps name their sections from Johto's table`() {
