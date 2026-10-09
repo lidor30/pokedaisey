@@ -3,7 +3,7 @@ package com.pokedaisy.app.companion.data
 data class SpeciesTypes(val type1: Int, val type2: Int)
 
 val speciesTypeData: Map<Int, SpeciesTypes> = mapOf(
-    0 to SpeciesTypes(12, 3),
+    1 to SpeciesTypes(12, 3),
     2 to SpeciesTypes(12, 3),
     3 to SpeciesTypes(12, 3),
     4 to SpeciesTypes(10, 10),
