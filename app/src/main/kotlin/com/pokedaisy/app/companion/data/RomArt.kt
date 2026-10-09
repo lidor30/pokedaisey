@@ -26,7 +26,7 @@ object RomArt {
     const val DIR = "rom-art"
 
     /** Bump when [OUTPUTS] grows, so ROMs scanned before get scanned again. */
-    private const val SCAN_VERSION = 9
+    private const val SCAN_VERSION = 13
 
     /** Bumped whenever new art lands on disk, so loaders can retry. */
     val updates: StateFlow<Int> get() = _updates
@@ -124,7 +124,8 @@ object RomArt {
             slots.map { "$d/slot_$it.png" } + listOf("$d/status_icons.png", "$d/font_small.png") +
                 listOfNotNull("$d/pokeball.png".takeIf { d == "partyfr" || d == "partyem" })
         } + listOf("partybg/firered.png", "partybg/emerald.png") +
-            listOf("kanto", "sevii123", "sevii45", "sevii67", "hoenn", "seaglass", "lazarus", "soulgold").map { "regionmap/$it.png" } +
+            listOf("kanto", "sevii123", "sevii45", "sevii67", "hoenn", "seaglass", "lazarus", "soulgold", "glazed", "imperium", "hns", "rowe_hoenn", "rowe_kanto", "rowe_sevii",
+                "quetzal_kanto", "quetzal_sevii123", "quetzal_sevii45", "quetzal_sevii67").map { "regionmap/$it.png" } +
             PLAYER_ICONS.map { "regionmap/${it.first}.png" } +
             listOf(BAG_STARS_SOULGOLD) +
             TrainerCardArt.BLOBS.map { rawPath(it) }
@@ -363,13 +364,28 @@ object RomArt {
                 if (has(map)) out["regionmap/$name.png"] = screen(tiles, pal, d(map), 30)
             }
         }
-        // Emerald's region map, and Seaglass's / Lazarus's / SoulGold's own (same region_map.c, their own art).
+        // Emerald's region map, and Seaglass's / Lazarus's / SoulGold's / Glazed's / Imperium's own (same region_map.c, their own art).
         listOf(
             "hoenn" to Triple(RomBlob.EM_REGION_GFX, RomBlob.EM_REGION_PAL, RomBlob.EM_REGION_MAP),
             // Seaglass redrew the tiles, keeping Emerald's tilemap and palette.
             "seaglass" to Triple(RomBlob.SGL_REGION_GFX, RomBlob.EM_REGION_PAL, RomBlob.EM_REGION_MAP),
             "lazarus" to Triple(RomBlob.LZ_REGION_GFX, RomBlob.LZ_REGION_PAL, RomBlob.LZ_REGION_MAP),
             "soulgold" to Triple(RomBlob.SG_REGION_GFX, RomBlob.SG_REGION_PAL, RomBlob.SG_REGION_MAP),
+            // Glazed's Tunod and Johto (a 64x32 tilemap: only its first 20 rows show anyway).
+            "glazed" to Triple(RomBlob.GZ_REGION_GFX, RomBlob.GZ_REGION_PAL, RomBlob.GZ_REGION_MAP),
+            // R.O.W.E.'s three maps (Emerald's code, picked by the map's region), one palette.
+            "rowe_hoenn" to Triple(RomBlob.RW_REGION_GFX, RomBlob.RW_REGION_PAL, RomBlob.RW_REGION_MAP),
+            "rowe_kanto" to Triple(RomBlob.RW_KANTO_GFX, RomBlob.RW_REGION_PAL, RomBlob.RW_KANTO_MAP),
+            "rowe_sevii" to Triple(RomBlob.RW_SEVII_GFX, RomBlob.RW_REGION_PAL, RomBlob.RW_SEVII_MAP),
+            // Heart and Soul's Johto + Kanto map (smol, like SoulGold's), on Emerald's palette.
+            "hns" to Triple(RomBlob.HNS_REGION_GFX, RomBlob.EM_REGION_PAL, RomBlob.HNS_REGION_MAP),
+            // Imperium added markers for its new places, on Emerald's palette.
+            "imperium" to Triple(RomBlob.IMP_REGION_GFX, RomBlob.EM_REGION_PAL, RomBlob.IMP_REGION_MAP),
+            // Quetzal: FireRed's Kanto and Sevii maps, redrawn for this code (MapSecDataQuetzal's note).
+            "quetzal_kanto" to Triple(RomBlob.QTZ_KANTO_GFX, RomBlob.QTZ_REGION_PAL, RomBlob.QTZ_KANTO_MAP),
+            "quetzal_sevii123" to Triple(RomBlob.QTZ_SEVII123_GFX, RomBlob.QTZ_REGION_PAL, RomBlob.QTZ_SEVII123_MAP),
+            "quetzal_sevii45" to Triple(RomBlob.QTZ_SEVII45_GFX, RomBlob.QTZ_REGION_PAL, RomBlob.QTZ_SEVII45_MAP),
+            "quetzal_sevii67" to Triple(RomBlob.QTZ_SEVII67_GFX, RomBlob.QTZ_REGION_PAL, RomBlob.QTZ_SEVII67_MAP),
         ).forEach { (name, blobs) ->
             if (has(blobs.first, blobs.second, blobs.third)) {
                 out["regionmap/$name.png"] = emeraldRegionMap(d(blobs.first), palette(d(blobs.second)), d(blobs.third))

@@ -230,14 +230,42 @@ val SeaglassPartyPalette = FireRedPartyPalette.copy(
     empty = flatSlot(Color.White, Color(0xFF4A4A63)),
 )
 
-/** R.O.W.E.: charcoal boxes, white-outlined, red under the cursor, white text with a grey shadow, a bright green bar. */
+/** Glazed and Quetzal: Emerald's slots over olive stripes; an empty slot is the stripes in a frame (headless, their party menus). */
+val GlazedPartyPalette = FireRedPartyPalette.copy(
+    empty = PartySlotColors(Color(0xFF4A4A63), Color(0xFFE7EF8C), Color(0xFFCED67B), Color(0xFF635A00)),
+)
+
+/**
+ * Emerald Imperium (headless, its party grid): blue boxes in a cyan line with a white edge
+ * inside, light blue in an orange line under the cursor, white text; empty slots are the
+ * dark stripes in a navy line.
+ */
+val ImperiumPartyPalette = FireRedPartyPalette.copy(
+    normal = PartySlotColors(Color(0xFF4AF7FF), Color.White, Color(0xFF187BB5), Color(0xFF187BB5)),
+    selected = PartySlotColors(Color(0xFFFF7331), Color.White, Color(0xFF7BD6EF), Color(0xFF7BD6EF)),
+    empty = flatSlot(Color(0xFF315A73), Color(0xFF101821)),
+)
+
+/**
+ * R.O.W.E. (headless, its party grid with a selected, a poisoned, a fainted, a low-HP and empty
+ * slots): slate boxes in a white line, the cursor's box charcoal in red; a fainted slot looks like
+ * any other (its FNT pill says it); empty slots are the charcoal grid in a white line. Its own
+ * blue / red gender symbols and HP bar colours.
+ */
 val RowePartyPalette = FireRedPartyPalette.copy(
-    normal = flatSlot(Color.White, Color(0xFF292929)),
+    normal = flatSlot(Color(0xFFEFEFEF), Color(0xFF39394A)),
     selected = flatSlot(Color(0xFFC60000), Color(0xFF292929)),
-    fainted = flatSlot(Color(0xFFA5A5A5), Color(0xFF181818)),
+    fainted = flatSlot(Color(0xFFEFEFEF), Color(0xFF39394A)),
+    selectedFainted = flatSlot(Color(0xFFC60000), Color(0xFF292929)),
     empty = flatSlot(Color.White, Color(0xFF292929)),
     text = Color(0xFFEFEFEF), textShadow = Color(0xFFA5A5A5),
+    male = Color(0xFF0000D6), maleShadow = Color(0xFF7394FF),
+    female = Color(0xFFC60000), femaleShadow = Color(0xFFFF8484),
+    hpFrame = Color(0xFF181818), hpLabel = Color(0xFFEFEFEF), hpLabelShade = Color(0xFFA5A5A5),
     hpGreen = HpBarColors(Color(0xFF08FF5A), Color(0xFF08FF5A)),
+    hpYellow = HpBarColors(Color(0xFFFFCE31), Color(0xFFFFCE31)),
+    hpRed = HpBarColors(Color(0xFFFF8484), Color(0xFFFF8484)),
+    hpEmpty = HpBarColors(Color(0xFFD6D6D6), Color(0xFFD6D6D6)),
 )
 
 /**
@@ -305,6 +333,8 @@ fun partyPaletteFor(game: GameKind): PartyPalette = when (game) {
     GameKind.ROWE -> RowePartyPalette
     GameKind.SOULGOLD -> SoulGoldPartyPalette
     GameKind.YELLOW -> YellowPartyPalette
+    GameKind.GLAZED, GameKind.QUETZAL -> GlazedPartyPalette
+    GameKind.IMPERIUM -> ImperiumPartyPalette
     // Celia's and Too Many Types 2's slots are FireRed's own colors (only TMT2's backdrop differs).
     else -> FireRedPartyPalette
 }

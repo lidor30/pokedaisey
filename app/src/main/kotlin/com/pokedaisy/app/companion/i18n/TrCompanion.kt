@@ -96,6 +96,13 @@ internal val trCompanion: Map<String, Tr> = mapOf(
     "Count" to Tr(ja = "かず", fr = "Quantité", de = "Anzahl", it = "Quantità", es = "Cantidad"),
     "No items" to Tr(ja = "どうぐが ありません", fr = "Aucun objet", de = "Keine Items", it = "Nessuno strumento", es = "No hay objetos"),
     "No items in this pocket" to Tr(ja = "この ポケットは からです", fr = "Aucun objet dans cette poche", de = "Keine Items in dieser Tasche", it = "Nessuno strumento in questa tasca", es = "No hay objetos en este bolsillo"),
+    // USE on an item (FieldItems.kt: a Repel on the field), and what it did.
+    "USE" to Tr(ja = "つかう", fr = "UTILISER", de = "EINSETZEN", it = "USA", es = "USAR"),
+    "Used! It lasts {0} steps." to Tr(ja = "つかった! {0}ほ もちます。", fr = "Utilisé ! Effet pendant {0} pas.", de = "Eingesetzt! Wirkt {0} Schritte.", it = "Usato! Dura {0} passi.", es = "¡Usado! Dura {0} pasos."),
+    "The last one is still working." to Tr(ja = "まえの ききめが まだ のこっている。", fr = "Le précédent agit encore.", de = "Der letzte wirkt noch.", it = "Il precedente agisce ancora.", es = "El anterior aún funciona."),
+    "Not now: close the game's menus and battles first." to Tr(ja = "いまは つかえない: ゲームの メニューや バトルを とじてね。", fr = "Pas maintenant : fermez d'abord les menus et combats du jeu.", de = "Nicht jetzt: erst Menüs und Kämpfe im Spiel beenden.", it = "Non ora: chiudi prima menu e lotte del gioco.", es = "Ahora no: cierra antes los menús y combates del juego."),
+    "None left in the bag." to Tr(ja = "バッグに もう ない。", fr = "Il n'y en a plus dans le sac.", de = "Keins mehr im Beutel.", it = "Non ce ne sono più nella borsa.", es = "No quedan en la mochila."),
+    "It can't be used here." to Tr(ja = "ここでは つかえない。", fr = "Impossible de l'utiliser ici.", de = "Kann hier nicht eingesetzt werden.", it = "Non si può usare qui.", es = "No se puede usar aquí."),
 
     // Map.
     "MAP {0}" to Tr(ja = "マップ {0}", fr = "CARTE {0}", de = "KARTE {0}", it = "MAPPA {0}", es = "MAPA {0}"),

@@ -37,7 +37,8 @@ private fun u16(b: ByteArray, off: Int): Int =
  * struct. Vanilla: 100 bytes, status at +0x50. SoulGold's is 96 bytes: a
  * 12-character nickname pushes the flags to +0x15, and the box ends at +0x4C
  * with status, then level / HP / max HP from +0x50 (headless: a poisoned copy
- * at +0x4C showed PSN, copies 96 bytes apart showed as party mons).
+ * at +0x4C showed PSN, copies 96 bytes apart showed as party mons). Quetzal's is
+ * its own too ([QUETZAL_PARTY_MON]).
  */
 data class PartyMonLayout(
     val size: Int = MON_STRUCT_SIZE,
@@ -48,9 +49,77 @@ data class PartyMonLayout(
     val flags: Int = 0x13,
     /** The species bits of a plaintext (unencrypted) box: SoulGold packs teraType above its 11. */
     val plainSpeciesMask: Int = 0xFFFF,
+    /** Where a plaintext box's substructs start (growth, attacks, EVs, misc, in that order). */
+    val plainBox: Int = 0x20,
+    /** A plaintext box's experience is read (growth +4); the older plaintext games' never was. */
+    val plainExp: Boolean = false,
+    /** HP's bits in the u16 at [hp] (Quetzal: 10, packed with other fields); 16 = all of it. */
+    val hpBits: Int = 16,
+    /** status1 is the u32 at [status] shifted down this far, then masked. */
+    val statusShift: Int = 0,
+    val statusMask: Long = 0xFFFFFFFFL,
+    /** The egg flag is the IV word's bit 30 (vanilla's isEgg bit), not [flags]' bit 2. */
+    val eggInIvWord: Boolean = false,
+    /** IVs / EVs / nature / stats come out right from these offsets (checked by recomputing the stats). */
+    val hasStats: Boolean = size == MON_STRUCT_SIZE,
+    /** The egg bit in the [flags] byte (vanilla's isEgg is 0x04). */
+    val eggMask: Int = 0x04,
+    /** R.O.W.E.'s bit-packed struct ([ROWE_PARTY_MON], [decodeRoweMon]) rather than a box of substructs. */
+    val rowe: Boolean = false,
 )
 
 val VANILLA_PARTY_MON = PartyMonLayout()
+
+/**
+ * R.O.W.E. v2.x's 0x4C-byte struct Pokemon: plaintext and bit-packed, no substructs, checksum or
+ * IVs (stats recompute with IV 0). Read off its GetBoxMonData / GetMonData (a jump table over every
+ * field) and checked headless by poking each one: personality, otId, a 12-byte nickname; u32 +0x14
+ * = move 1 (10 bits) | experience (21) << 10; u32 +0x18 = moves 2 and 3 (10 bits each); u32 +0x1C =
+ * species (12 bits, National Dex ids; a 5-bit formId above) with move 4 in the u16 at +0x1E (bits
+ * 1-10); EVs +0x20; +0x27 = nature (bits 2-6, what the summary shows - not PID % 25) | isEgg (bit 7);
+ * PP +0x34; status +0x38, level +0x3C, HP / max HP +0x3E / +0x40, the stats after.
+ */
+val ROWE_PARTY_MON = PartyMonLayout(
+    size = 0x4C, status = 0x38, level = 0x3C, hp = 0x3E, maxHp = 0x40, flags = 0x27, eggMask = 0x80, hasStats = true, rowe = true,
+)
+
+private fun decodeRoweMon(raw: ByteArray, off: Int): Mon? {
+    val w14 = u32(raw, off + 0x14)
+    val w18 = u32(raw, off + 0x18)
+    val species = (u32(raw, off + 0x1C) and 0xFFF).toInt()
+    if (species == 0) return null
+    return Mon(
+        species = species,
+        level = raw[off + 0x3C].toInt() and 0xFF,
+        hp = u16(raw, off + 0x3E),
+        maxHp = u16(raw, off + 0x40),
+        status = u32(raw, off + 0x38),
+        moves = intArrayOf((w14 and 0x3FF).toInt(), (w18 and 0x3FF).toInt(), ((w18 shr 10) and 0x3FF).toInt(), (u16(raw, off + 0x1E) shr 1) and 0x3FF),
+        pp = IntArray(NUM_MOVES) { raw[off + 0x34 + it].toInt() and 0xFF },
+        exp = (w14 shr 10) and 0x1FFFFF,
+        personality = u32(raw, off),
+        stats = MonStats(
+            ivs = List(6) { 0 },
+            evs = List(6) { raw[off + 0x20 + it].toInt() and 0xFF },
+            nature = ((raw[off + 0x27].toInt() and 0xFF) shr 2) and 0x1F,
+            stats = List(6) { u16(raw, off + 0x40 + 2 * it) },
+        ),
+    )
+}
+
+/**
+ * Pokémon Quetzal's 104-byte plaintext struct Pokemon (checksum 0): vanilla's box
+ * header, then the growth / attacks / EVs / misc substructs from +0x28 (species,
+ * item, exp; moves +0x34, PP +0x3C (3 PP Ups on everything: Tackle 56); EVs +0x40;
+ * the IV word +0x50, whose bit 30 is the egg flag), level +0x58, max HP and the
+ * stats from +0x5A. Current HP is 10 bits at +0x23 and status1 the u32 at +0x24
+ * shifted down 2, its low 12 bits (+0x26 is 0x80 on every Pokémon: not status). Each checked headless by poking it and looking at the party
+ * menu / summary (gen_quetzal_tables.py; NATIVE_QUETZAL).
+ */
+val QUETZAL_PARTY_MON = PartyMonLayout(
+    size = 0x68, status = 0x24, level = 0x58, hp = 0x23, maxHp = 0x5A,
+    plainBox = 0x28, plainExp = true, hpBits = 10, statusShift = 2, statusMask = 0xFFF, eggInIvWord = true, hasStats = true,
+)
 val SOULGOLD_PARTY_MON = PartyMonLayout(
     size = 96, status = 0x4C, level = 0x50, hp = 0x52, maxHp = 0x54, flags = 0x15, plainSpeciesMask = 0x07FF,
 )
@@ -63,6 +132,7 @@ val SOULGOLD_PARTY_MON = PartyMonLayout(
  */
 fun decodePartyMon(raw: ByteArray, off: Int, layout: PartyMonLayout = VANILLA_PARTY_MON): Mon? {
     if (raw.size < off + layout.size) return null
+    if (layout.rowe) return decodeRoweMon(raw, off)
 
     var species: Int
     val moves: IntArray
@@ -80,27 +150,29 @@ fun decodePartyMon(raw: ByteArray, off: Int, layout: PartyMonLayout = VANILLA_PA
         evs = dec.evs
         ivWord = dec.ivWord
     } else {
-        species = u16(raw, off + 0x20) and layout.plainSpeciesMask
+        val box = off + layout.plainBox
+        species = u16(raw, box) and layout.plainSpeciesMask
         if (species == 0 || species > 4000) return null
-        moves = IntArray(NUM_MOVES) { u16(raw, off + 0x2C + it * 2) }
-        pp = IntArray(NUM_MOVES) { raw[off + 0x2C + 8 + it].toInt() and 0xFF }
-        // Plaintext boxes keep the substructs in G-A-E-M order: EVs at +0x38, IVs at Misc +4.
-        evs = List(6) { raw[off + 0x38 + it].toInt() and 0xFF }
-        ivWord = u32(raw, off + 0x48)
+        moves = IntArray(NUM_MOVES) { u16(raw, box + 0x0C + it * 2) }
+        pp = IntArray(NUM_MOVES) { raw[box + 0x0C + 8 + it].toInt() and 0xFF }
+        // Plaintext boxes keep the substructs in G-A-E-M order: EVs at +0x18, IVs at Misc +4.
+        evs = List(6) { raw[box + 0x18 + it].toInt() and 0xFF }
+        ivWord = u32(raw, box + 0x28)
+        if (layout.plainExp) exp = u32(raw, box + 4)
     }
     if (species == 0) return null
 
     return Mon(
         species = species,
         level = raw[off + layout.level].toInt() and 0xFF,
-        hp = u16(raw, off + layout.hp),
+        hp = u16(raw, off + layout.hp) and ((1 shl layout.hpBits) - 1),
         maxHp = u16(raw, off + layout.maxHp),
-        status = u32(raw, off + layout.status),
+        status = (u32(raw, off + layout.status) shr layout.statusShift) and layout.statusMask,
         moves = moves,
         pp = pp,
         exp = exp,
         personality = u32(raw, off),
-        stats = if (layout.size == MON_STRUCT_SIZE) monStats(raw, off, layout, evs, ivWord) else null,
+        stats = if (layout.hasStats) monStats(raw, off, layout, evs, ivWord) else null,
     )
 }
 
@@ -184,6 +256,8 @@ data class BattleMonLayout(
     val level: Int,
     val maxHp: Int,
     val status1: Int,
+    /** Species bits: R.O.W.E. keeps a 5-bit formId above its 11. */
+    val speciesMask: Int = 0xFFFF,
 )
 
 val VANILLA_BATTLE_MON = BattleMonLayout(
@@ -200,6 +274,12 @@ val EXPANSION_BATTLE_MON = BattleMonLayout(
     hp = 0x2A, level = 0x2C, maxHp = 0x2E, status1 = 0x50,
 )
 
+/** Too Many Types 2's: expansion's, but PP a byte later (a third type byte at +0x24). */
+val TMT2_BATTLE_MON = EXPANSION_BATTLE_MON.copy(pp = 0x26)
+
+/** R.O.W.E.'s: expansion's layout, the species' form id in its top 5 bits. */
+val ROWE_BATTLE_MON = EXPANSION_BATTLE_MON.copy(speciesMask = 0x7FF)
+
 /**
  * SoulGold's 0x98-byte struct BattlePokemon: expansion's fields up to max HP
  * where [EXPANSION_BATTLE_MON] has them, then a longer nickname (+0x34) that
@@ -211,7 +291,7 @@ val SOULGOLD_BATTLE_MON = EXPANSION_BATTLE_MON.copy(size = 0x98, status1 = 0x54)
 /** Decodes one struct BattlePokemon (a gBattleMons entry) at [off]. */
 fun decodeBattleMon(raw: ByteArray, off: Int, layout: BattleMonLayout = VANILLA_BATTLE_MON): BattleMon? {
     if (raw.size < off + layout.size) return null
-    val species = u16(raw, off + 0x00)
+    val species = u16(raw, off + 0x00) and layout.speciesMask
     if (species == 0) return null
     return BattleMon(
         species = species,

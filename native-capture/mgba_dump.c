@@ -313,6 +313,8 @@ static void gb_loop(struct mCore* core, int frames) {
     free(states);
 }
 
+static uint32_t pk_call_r0; // what the last pk_call returned in r0
+
 static bool pk_call(struct mCore* core, uint32_t fn, uint32_t arg0, uint32_t arg1) {
     struct ARMCore* cpu = (struct ARMCore*) core->cpu;
     struct ARMRegisterFile saved = cpu->regs;
@@ -335,6 +337,7 @@ static bool pk_call(struct mCore* core, uint32_t fn, uint32_t arg0, uint32_t arg
         }
         core->step(core);
     }
+    pk_call_r0 = (uint32_t) cpu->gprs[0];
     cpu->regs = saved;
     cpu->executionMode = exec == MODE_ARM ? MODE_THUMB : MODE_ARM; // force _ARMSetMode to apply
     _ARMSetMode(cpu, exec);
@@ -581,7 +584,8 @@ int main(int argc, char** argv) {
             char a[64] = {0}, v[64] = {0}, w[64] = {0};
             sscanf(line, "%*s %63s %63s %63s", a, v, w);
             bool ok = pk_call(core, (uint32_t) strtoul(a, NULL, 0), (uint32_t) strtoul(v, NULL, 0), (uint32_t) strtoul(w, NULL, 0));
-            printf("call %s(%s): %s\n", a, v, ok ? "returned" : "DID NOT RETURN");
+            if (ok) printf("call %s(%s): returned 0x%X\n", a, v, pk_call_r0);
+            else printf("call %s(%s): DID NOT RETURN\n", a, v);
         } else if (!strcmp(cmd, "park")) {
             char a[64] = {0};
             sscanf(line, "%*s %63s", a);

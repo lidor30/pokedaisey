@@ -106,6 +106,8 @@ fun CompanionScreen(
     initialPopup: com.pokedaisy.app.companion.AchievementPopup? = null,
     /** The game's status bar ([GameStatusBar]), drawn over the tabs while [CompanionStatusBar.shown]. */
     statusBar: (@Composable () -> Unit)? = null,
+    /** USE on the ITEMS tab (a Repel on the field); null = no such button. */
+    itemUse: com.pokedaisy.app.companion.ItemUse? = null,
 ) {
     // Everything below is keyed on the snapshot's game: the per-game look
     // (backdrops, party slots, bag) reads the plain `activeGame` global, which
@@ -424,7 +426,7 @@ fun CompanionScreen(
                         } else if (tab == "ITEMS") {
                             // Draws its own bag-screen panels (folder tabs + list
                             // window) straight over the game backdrop, like PARTY.
-                            ItemsScreen(snapshot.items, modifier = Modifier.fillMaxSize())
+                            ItemsScreen(snapshot.items, modifier = Modifier.fillMaxSize(), itemUse = itemUse)
                         } else if (tab == "BATTLE") {
                             // Three full-tab panes: the touch controls, and the
                             // INFO / SUGGESTIONS summaries they open (each with

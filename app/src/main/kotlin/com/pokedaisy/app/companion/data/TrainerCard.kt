@@ -2,7 +2,8 @@ package com.pokedaisy.app.companion.data
 
 /** Which card a game draws: FireRed / LeafGreen's Kanto card, Emerald's Hoenn one, or the Kanto
  * card in Unbound's colours (see [TrainerCardArt]). */
-enum class CardStyle { KANTO, HOENN, UNBOUND }
+/** Which card a game draws: FireRed's (Kanto, Unbound's purple one) or Emerald's (Hoenn and its hacks'). */
+enum class CardStyle(val hoenn: Boolean) { KANTO(false), HOENN(true), UNBOUND(false), GLAZED(true), IMPERIUM(true) }
 
 /**
  * Where a game keeps what its TRAINER CARD shows - both decomps'
@@ -92,6 +93,62 @@ val TRAINER_CARD_EMERALD = TrainerCardSave(
     frontierBpOff = 0xEBA,
 )
 
+/** Glazed's regional dex (its "HOENN": Tunod), national numbers in its order (ROM 0x0831DFB8). */
+val GLAZED_REGIONAL_TO_NATIONAL = intArrayOf(
+    247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 357, 358, 359, 146, 200, 319, 320,
+    321, 322, 323, 324, 260, 261, 262, 263, 264, 265, 266, 380, 381, 268, 269, 360, 361, 362, 62, 63,
+    64, 270, 271, 272, 346, 329, 330, 354, 147, 120, 121, 136, 137, 344, 190, 191, 73, 74, 75, 368,
+    337, 338, 44, 45, 46, 71, 72, 273, 385, 275, 276, 277, 65, 66, 67, 214, 228, 278, 279, 384,
+    383, 81, 82, 350, 348, 204, 221, 377, 378, 379, 372, 364, 365, 345, 341, 342, 334, 335, 382, 386,
+    130, 133, 224, 225, 369, 86, 87, 107, 108, 328, 347, 28, 29, 280, 231, 336, 351, 353, 327, 343,
+    150, 267, 284, 285, 356, 97, 106, 111, 333, 83, 198, 186, 286, 287, 288, 289, 41, 42, 43, 290,
+    291, 292, 122, 123, 293, 294, 295, 349, 299, 115, 318, 296, 39, 40, 25, 26, 27, 53, 54, 208,
+    209, 373, 374, 274, 234, 235, 134, 219, 109, 110, 297, 298, 98, 325, 326, 300, 301, 302, 206, 281,
+    182, 183, 332, 117, 118, 119, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316,
+    317, 355,
+)
+
+/** Imperium's Hoenn dex (ROM 0x08715890, 214), national numbers in its order. */
+val IMPERIUM_HOENN_TO_NATIONAL = intArrayOf(
+    252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 862, 265, 266, 267, 268, 269, 270,
+    271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 475, 283, 284, 285, 286, 287, 288, 289,
+    63, 64, 65, 290, 291, 292, 293, 294, 295, 296, 297, 118, 119, 129, 130, 298, 183, 184, 74, 75,
+    76, 299, 476, 300, 301, 41, 42, 169, 72, 73, 302, 303, 304, 305, 306, 66, 67, 68, 307, 308,
+    309, 310, 311, 312, 81, 82, 462, 100, 101, 313, 314, 43, 44, 45, 182, 84, 85, 406, 315, 407,
+    316, 317, 318, 319, 320, 321, 322, 323, 218, 219, 324, 88, 89, 109, 110, 325, 326, 27, 28, 327,
+    227, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346,
+    347, 348, 174, 39, 40, 349, 350, 351, 120, 121, 352, 353, 354, 355, 356, 477, 357, 433, 358, 359,
+    37, 38, 172, 25, 26, 54, 55, 360, 202, 177, 178, 203, 981, 231, 232, 127, 214, 111, 112, 464,
+    361, 362, 478, 363, 364, 365, 366, 367, 368, 369, 222, 864, 170, 171, 370, 116, 117, 230, 371, 372,
+    373, 374, 375, 376, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386,
+)
+
+/**
+ * Pokémon Glazed: retail Emerald's SetPlayerCardData byte for byte, so retail's offsets, with its
+ * own regional order (ROM 0x0831DFB8, rewritten in place) and its own card art (CardStyle.GLAZED).
+ */
+val TRAINER_CARD_GLAZED = TRAINER_CARD_EMERALD.copy(style = CardStyle.GLAZED, regionalDex = GLAZED_REGIONAL_TO_NATIONAL)
+
+/**
+ * Emerald Imperium (expansion 1.10): the GF header names SaveBlock1's flags (+0x19C4) and vars
+ * (+0x1AF0); gameStats follow the vars (+0x1CF0: steps and battles counted up in the fixtures);
+ * the card code's literals give the frontier symbols (0x8C4), FLAG_SYS_POKEDEX_GET (0x861) and
+ * the badges (0x867); the museum's winners sit at +0x2AA4 (the default winners' data), battle
+ * points at SB2+0x98E. Each checked headless by poking it and opening the game's card.
+ */
+val TRAINER_CARD_IMPERIUM = TrainerCardSave(
+    style = CardStyle.IMPERIUM,
+    gameStatsOff = 0x1CF0, flagsOff = 0x19C4, varsOff = 0x1AF0,
+    badgeFlag = 0x867, pokedexFlag = 0x861,
+    nationalMagicOff = 0x18 + 2, nationalMagic = 0xDA, nationalVar = 0x4046, nationalVarValue = 0x302, nationalFlag = 0x896,
+    dexFlags = DexFlags(DexFlagBlock.SAVE_BLOCK_1, 0x2F58, 0x2FD9, 129),
+    nationalCount = 1025,
+    regionalDex = IMPERIUM_HOENN_TO_NATIONAL,
+    frontierSymbolFlag = 0x8C4,
+    museumWinnersOff = 0x2AA4 + 8 * 32,
+    frontierBpOff = 0x98E,
+)
+
 /** What the card prints, as the game's SetPlayerCardData gathers it. */
 data class TrainerCardInfo(
     val style: CardStyle,
@@ -157,8 +214,8 @@ fun readTrainerCard(c: MemoryReader, cfg: NativeConfig): TrainerCardInfo? = runC
     // GAME_STAT_FIRST_HOF_PLAY_TIME counts only once ENTERED_HOF is set; hours cap at 999:59:59.
     var hof = if (stat(STAT_ENTERED_HOF) != 0L) stat(STAT_FIRST_HOF_PLAY_TIME).toInt() else 0
     if ((hof ushr 16) > 999) hof = (999 shl 16) or (59 shl 8) or 59
-    // HasAllHoennMons: the Hoenn dex minus Jirachi and Deoxys.
-    val allHoenn = HOENN_TO_NATIONAL.take(HOENN_TO_NATIONAL.size - 2).all { caught(it) }
+    // HasAllHoennMons: the game's own Hoenn dex minus its last two (Jirachi and Deoxys in retail).
+    val allHoenn = s.regionalDex.take(s.regionalDex.size - 2).all { caught(it) }
     var stars = (if (hof != 0) 1 else 0) + (if (allHoenn) 1 else 0)
     if (s.museumWinnersOff >= 0) {
         val winners = c.readCoreMemory(sb1 + s.museumWinnersOff, 5 * 32)
@@ -182,10 +239,10 @@ fun readTrainerCard(c: MemoryReader, cfg: NativeConfig): TrainerCardInfo? = runC
         linkWins = capped(STAT_LINK_BATTLE_WINS, 9999),
         linkLosses = capped(STAT_LINK_BATTLE_LOSSES, 9999),
         trades = capped(STAT_POKEMON_TRADES, 0xFFFF),
-        unionRoom = if (s.style != CardStyle.HOENN) capped(STAT_UNION_ROOM_BATTLES, 0xFFFF) else 0,
-        berryCrush = if (s.style != CardStyle.HOENN) capped(STAT_BERRY_CRUSH_POINTS, 0xFFFF) else 0,
-        linkContests = if (s.style == CardStyle.HOENN) capped(STAT_WON_LINK_CONTEST, 999) else 0,
-        linkPokeblocks = if (s.style == CardStyle.HOENN) capped(STAT_POKEBLOCKS_WITH_FRIENDS, 0xFFFF) else 0,
+        unionRoom = if (!s.style.hoenn) capped(STAT_UNION_ROOM_BATTLES, 0xFFFF) else 0,
+        berryCrush = if (!s.style.hoenn) capped(STAT_BERRY_CRUSH_POINTS, 0xFFFF) else 0,
+        linkContests = if (s.style.hoenn) capped(STAT_WON_LINK_CONTEST, 999) else 0,
+        linkPokeblocks = if (s.style.hoenn) capped(STAT_POKEBLOCKS_WITH_FRIENDS, 0xFFFF) else 0,
         battlePoints = if (s.frontierBpOff >= 0) u16le(c.readCoreMemory(sb2 + s.frontierBpOff, 2), 0) else 0,
         stickers = if (s.stickerVar >= 0) (0 until 3).map { variable(s.stickerVar + it) } else emptyList(),
     )

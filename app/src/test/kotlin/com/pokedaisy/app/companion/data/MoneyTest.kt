@@ -27,6 +27,10 @@ class MoneyTest {
         assertEquals(3000L, money("lazarus", NATIVE_LAZARUS))
         // Rogue's SaveBlock1 grew (104-byte party mons): money at +0x4A8; this save has none.
         assertEquals(0L, money("emerald_rogue", NATIVE_EMERALD_ROGUE))
+        assertEquals(3000L, money("glazed", NATIVE_GLAZED))
+        assertEquals(3000L, money("imperium", NATIVE_IMPERIUM))
+        // Quetzal's SaveBlock1 is its own: money at +0x918, the key at SB2+0x2C.
+        assertEquals(7450L, money("quetzal", NATIVE_QUETZAL))
     }
 
     @Test

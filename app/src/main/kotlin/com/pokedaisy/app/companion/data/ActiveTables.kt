@@ -27,7 +27,7 @@ package com.pokedaisy.app.companion.data
 // hacks above, via NATIVE_HEART_AND_SOUL/NATIVE_LAZARUS/NATIVE_ROWE in
 // NativeReader.kt. Heart and Soul and Lazarus now have their own
 // ROM-extracted tables (*Hns.kt / *Lazarus.kt, scripts/gen_expansion_tables.py).
-enum class GameKind { FIRERED, EMERALD, UNBOUND, GAIA, RADICAL_RED, ODYSSEY, HEART_AND_SOUL, LAZARUS, ROWE, EMERALD_ROGUE, AMETHYST, EMERALD_SEAGLASS, CELIA, TMT2, SOULGOLD, YELLOW }
+enum class GameKind { FIRERED, EMERALD, UNBOUND, GAIA, RADICAL_RED, ODYSSEY, HEART_AND_SOUL, LAZARUS, ROWE, EMERALD_ROGUE, AMETHYST, EMERALD_SEAGLASS, CELIA, TMT2, SOULGOLD, YELLOW, GLAZED, IMPERIUM, QUETZAL }
 
 @Volatile
 var activeGame: GameKind = GameKind.FIRERED
@@ -54,6 +54,11 @@ private inline val tmt2 get() = activeGame == GameKind.TMT2
 private inline val hns get() = activeGame == GameKind.HEART_AND_SOUL
 private inline val lazarus get() = activeGame == GameKind.LAZARUS
 private inline val soulGold get() = activeGame == GameKind.SOULGOLD
+// Pokémon Glazed: retail Emerald's engine and ids, its own names in them (gen_glazed_tables.py).
+private inline val glazed get() = activeGame == GameKind.GLAZED
+private inline val imperium get() = activeGame == GameKind.IMPERIUM
+private inline val quetzal get() = activeGame == GameKind.QUETZAL
+private inline val rowe get() = activeGame == GameKind.ROWE
 // Pokémon Yellow (Game Boy): Gen 1's own tables (gen_gen1_tables.py), keyed by National Dex number.
 private inline val yellow get() = activeGame == GameKind.YELLOW
 
@@ -94,6 +99,8 @@ val activeSpeciesNames: Map<Int, String> get() = localText?.species ?: when {
     gaia -> speciesNamesGaia
     radicalRed -> speciesNamesRadicalRed
     odyssey -> speciesNamesOdysseyMerged
+    // Rogue's ids are National Dex numbers only up to 905 (forms, then Gen 9 from 1289): its own names.
+    rogue -> speciesNamesRogue
     nationalDexSpecies -> speciesNamesNationalDex
     amethyst -> if (amethystV141) speciesNamesAmethystV141 else speciesNamesAmethyst
     celia -> speciesNamesCelia
@@ -101,6 +108,10 @@ val activeSpeciesNames: Map<Int, String> get() = localText?.species ?: when {
     hns -> speciesNamesHns
     lazarus -> speciesNamesLazarus
     soulGold -> speciesNamesSoulGold
+    glazed -> speciesNamesGlazed
+    imperium -> speciesNamesImperium
+    quetzal -> speciesNamesQuetzal
+    rowe -> speciesNamesRowe
     else -> speciesNames
 }
 val activeMoveData: Map<Int, MoveInfo> get() = localText?.moveData ?: when {
@@ -114,6 +125,10 @@ val activeMoveData: Map<Int, MoveInfo> get() = localText?.moveData ?: when {
     soulGold -> moveDataSoulGold
     rogue -> moveDataRogue
     radicalRed -> moveDataRadicalRed
+    glazed -> moveDataGlazed
+    imperium -> moveDataImperium
+    quetzal -> moveDataQuetzal
+    rowe -> moveDataRowe
     else -> moveData
 }
 val activeItemNames: Map<Int, String> get() = localText?.items ?: when {
@@ -128,6 +143,10 @@ val activeItemNames: Map<Int, String> get() = localText?.items ?: when {
     soulGold -> if (soulGoldV12) itemNamesSoulGoldV12 else itemNamesSoulGold
     rogue -> itemNamesRogue
     radicalRed -> itemNamesRadicalRed
+    glazed -> itemNamesGlazed
+    imperium -> itemNamesImperium
+    quetzal -> itemNamesQuetzal
+    rowe -> itemNamesRowe
     else -> itemNames
 }
 val activeSpeciesTypeData: Map<Int, SpeciesTypes> get() = when {
@@ -141,6 +160,10 @@ val activeSpeciesTypeData: Map<Int, SpeciesTypes> get() = when {
     celia -> speciesTypeDataCelia
     rogue -> speciesTypeDataRogue
     radicalRed -> speciesTypeDataRadicalRed
+    glazed -> speciesTypeDataGlazed
+    imperium -> speciesTypeDataImperium
+    quetzal -> speciesTypeDataQuetzal
+    rowe -> speciesTypeDataRowe
     else -> speciesTypeData
 }
 val activeTypeEffectiveness: Map<Int, Int> get() = when {
@@ -154,6 +177,10 @@ val activeTypeEffectiveness: Map<Int, Int> get() = when {
     soulGold -> typeEffectivenessSoulGold
     celia -> typeEffectivenessCelia
     rogue -> typeEffectivenessRogue
+    glazed -> typeEffectivenessGlazed
+    imperium -> typeEffectivenessImperium
+    quetzal -> typeEffectivenessQuetzal
+    rowe -> typeEffectivenessRowe
     else -> typeEffectiveness
 }
 val activeTypeNames: Map<Int, String> get() = when {
@@ -167,6 +194,10 @@ val activeTypeNames: Map<Int, String> get() = when {
     soulGold -> typeNamesSoulGold
     celia -> typeNamesCelia
     rogue -> typeNamesRogue
+    glazed -> typeNamesGlazed
+    imperium -> typeNamesImperium
+    quetzal -> typeNamesQuetzal
+    rowe -> typeNamesRowe
     else -> typeNames
 }
 val activeMapSecData: Map<Int, MapSecInfo> get() = localText?.mapSecData ?: when {
@@ -179,8 +210,32 @@ val activeMapSecData: Map<Int, MapSecInfo> get() = localText?.mapSecData ?: when
     lazarus -> mapSecDataLazarus
     soulGold -> mapSecDataSoulGold
     rogue -> mapSecDataRogue
+    glazed -> mapSecDataGlazed
+    imperium -> mapSecDataImperium
+    quetzal -> mapSecDataQuetzalOnMap
+    rowe -> mapSecDataRowe
     else -> mapSecData
 }
+/**
+ * Quetzal's Kanto and Sevii maps are FireRed's, pixel for pixel, drawn 3 tiles left and 2 up of
+ * FireRed's screen (RomArt's QTZ_*: regionmap/quetzal_*.png), and its map sections keep FireRed's
+ * ids: FireRed's rects and cursor grids, shifted, under Quetzal's own names.
+ */
+private const val QUETZAL_MAP_DX = -3
+private const val QUETZAL_MAP_DY = -2
+private val regionMapImagesQuetzalOnMap = arrayOf("quetzal_kanto", "quetzal_sevii123", "quetzal_sevii45", "quetzal_sevii67")
+private val mapSecDataQuetzalOnMap: Map<Int, MapSecInfo> by lazy {
+    mapSecDataQuetzal.mapValues { (id, q) ->
+        val fr = mapSecData[id] ?: return@mapValues q
+        if (fr.region < 0) q
+        else if (fr.w == 0) q.copy(region = fr.region)  // placed by the grid alone
+        else q.copy(region = fr.region, x = fr.x + QUETZAL_MAP_DX, y = fr.y + QUETZAL_MAP_DY, w = fr.w, h = fr.h)
+    }
+}
+internal val regionLayoutsQuetzal: List<RegionLayout> by lazy {
+    regionLayoutsFireRed.map { RegionLayout(it.offX + QUETZAL_MAP_DX, it.offY + QUETZAL_MAP_DY, it.w, it.h, it.none, it.layers, it.cellBytes) }
+}
+
 // Seaglass's own Hoenn art (RomArt's regionmap/seaglass.png) on Emerald's tilemap and grid.
 private val regionMapImagesSeaglass = arrayOf("seaglass")
 
@@ -193,6 +248,10 @@ val activeRegionMapImages: Array<String> get() = when {
     lazarus -> regionMapImagesLazarus
     soulGold -> regionMapImagesSoulGold
     rogue -> regionMapImagesRogue
+    glazed -> regionMapImagesGlazed
+    imperium -> regionMapImagesImperium
+    quetzal -> regionMapImagesQuetzalOnMap
+    rowe -> regionMapImagesRowe
     else -> regionMapImages
 }
 
@@ -234,4 +293,7 @@ fun GameKind.displayName(): String = when (this) {
     GameKind.TMT2 -> "Too Many Types 2"
     GameKind.SOULGOLD -> "Pokémon SoulGold"
     GameKind.YELLOW -> "Pokémon Yellow"
+    GameKind.GLAZED -> "Pokémon Glazed"
+    GameKind.IMPERIUM -> "Emerald Imperium"
+    GameKind.QUETZAL -> "Pokémon Quetzal"
 }

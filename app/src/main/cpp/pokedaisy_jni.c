@@ -267,6 +267,17 @@ Java_com_pokedaisy_app_MgbaCore_pkSampleRate(JNIEnv* env, jobject thiz) {
     return PK_SAMPLE_RATE;
 }
 
+// The rate the core's audio is resampled to, in samples per emulated second: PK_SAMPLE_RATE
+// normally; a little off it while frames are paced by the display (EmulatorEngine's vsync
+// pacing), so the audio device still gets PK_SAMPLE_RATE per real second.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkSetAudioRate(JNIEnv* env, jobject thiz, jdouble rate) {
+    if (g.core && rate > 0) {
+        blip_set_rates(g.core->getAudioChannel(g.core, 0), g.core->frequency(g.core), rate);
+        blip_set_rates(g.core->getAudioChannel(g.core, 1), g.core->frequency(g.core), rate);
+    }
+}
+
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkSetKeys(JNIEnv* env, jobject thiz, jint mask) {
     if (g.core) {
@@ -388,6 +399,7 @@ Java_com_pokedaisy_app_MgbaCore_pkRenderReadAudio(JNIEnv* env, jobject thiz, jsh
 // PK_CALL_SENTINEL (an address in the ROM header, never executed), then put
 // everything back. Tested headless with native-capture/mgba_dump's `call`.
 #define PK_CALL_SENTINEL 0x080000C0u
+static __thread uint32_t pk_call_r0; // what this thread's last pk_call returned in r0 (the render core calls on another thread)
 static int pk_call(struct mCore* core, uint32_t fn, uint32_t arg0, uint32_t arg1) {
     if (!pk_is_gba(core)) {
         return 0;   // an ARM-only trick: the GB core's CPU is an SM83
@@ -413,6 +425,7 @@ static int pk_call(struct mCore* core, uint32_t fn, uint32_t arg0, uint32_t arg1
         }
         core->step(core);
     }
+    pk_call_r0 = (uint32_t) cpu->gprs[0];
     cpu->regs = saved;
     cpu->executionMode = exec == MODE_ARM ? MODE_THUMB : MODE_ARM; // so _ARMSetMode applies
     _ARMSetMode(cpu, exec);
@@ -420,6 +433,18 @@ static int pk_call(struct mCore* core, uint32_t fn, uint32_t arg0, uint32_t arg1
     cpu->prefetch[1] = prefetch1;
     cpu->halted = halted;
     return ok;
+}
+
+// Calls the game's own function `fn` (r0 = a0, r1 = a1) on the player's core, between
+// frames (the emu thread), and returns what it returned in r0 - or -1 if it never did.
+// FieldItems uses it to use an item from the companion the way the game does
+// (VarSet / RemoveBagItem) instead of steering the game's menus.
+JNIEXPORT jlong JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCall(JNIEnv* env, jobject thiz, jlong fn, jint a0, jint a1) {
+    if (!g.core || !pk_call(g.core, (uint32_t) fn, (uint32_t) a0, (uint32_t) a1)) {
+        return -1;
+    }
+    return (jlong) pk_call_r0;
 }
 
 // Calls the ROM's own m4aSongNumStart(songId, alt) at `addr` (FfMusicRenderer

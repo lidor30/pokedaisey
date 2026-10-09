@@ -18,8 +18,9 @@ Retail, QoL builds and hacks that kept the art all match, wherever the linker
 put it. Source: the pinned decomp builds (see CLAUDE.md) and their ELFs.
 
 Usage: scripts/gen_rom_art_sigs.py   (needs $DECOMPS/pokefirered and
-$DECOMPS/pokeemerald built once, and the Unbound / Lazarus / Seaglass / SoulGold
-ROMs at UNBOUND_ROM / LAZARUS_ROM / SEAGLASS_ROM / SOULGOLD_ROM; re-run only
+$DECOMPS/pokeemerald built once, and the Unbound / Lazarus / Seaglass / SoulGold / Glazed /
+Imperium / Quetzal ROMs at UNBOUND_ROM / LAZARUS_ROM / SEAGLASS_ROM / SOULGOLD_ROM / GLAZED_ROM / IMPERIUM_ROM /
+QUETZAL_ROM; re-run only
 if a pin changes)
 """
 import os
@@ -132,6 +133,70 @@ SEAGLASS_ROM = os.path.expanduser("~/Downloads/Game ROMs & Emulation/gba/Pokemon
 
 def seaglass_symbols(rom):
     return {"RegionGfx": (0x9534A0, 0)}
+
+
+# Pokemon Glazed 9.2.0 (sha1 e10105d8...), an in-place edit of retail Emerald: its own
+# region map (Tunod and Johto side by side) written over retail's own blobs, so
+# LoadRegionMapGfx's literal pool still names retail's addresses - the 8bpp tiles
+# (LZ77), the 64x32 one-byte tilemap (LZ77; retail's is 64x64) and the palette
+# (two palettes' worth: its tiles use colours 1-24 at BG palette 7).
+GLAZED_ROM = os.path.expanduser("~/Downloads/Game ROMs & Emulation/gba/Glazed (9.2.0).gba")
+
+
+# Pokemon Emerald Imperium v1.3.1 (sha1 1d20091c...), pokeemerald-expansion 1.10: Emerald's
+# region map with markers for its five new places - 7 tiles added to the 8bpp tiles (LZ77) and
+# 4 cells changed in the 64x64 tilemap (LZ77); the palette is Emerald's own (EM_REGION_PAL).
+IMPERIUM_ROM = os.path.expanduser("~/Downloads/Game ROMs & Emulation/gba/Emerald Imperium (v1.3.1).gba")
+
+
+def imperium_symbols(rom):
+    # Its trainer card is Emerald's in its own FONT_NORMAL (glyphs 0x38 / 0x39 redrawn) and widths.
+    return {"RegionGfx": (0xDD84CC, 0), "RegionMap": (0xDD92D0, 0), "FontNormal": (0x664350, 32768),
+            "FontNormalWidths": (0x66C350, 512)}
+
+
+# Pokemon Quetzal English Alpha 9 v0 (sha1 d0658315...): FireRed's Kanto / Sevii maps (pixel for
+# pixel, 3 tiles left and 2 up of FireRed's screen) redrawn for Emerald's region_map.c - 8bpp
+# tiles and a 64x64 affine tilemap per map (LZ77), FireRed's palette loaded at BG palette 7. Its
+# map code's literal pool (ROM 0x1221B54) lists the four tile blobs, then the four tilemaps.
+QUETZAL_ROM = os.path.expanduser("~/Downloads/Game ROMs & Emulation/gba/PokemonQuetzalEnglishAlpha9v0.gba")
+
+
+def quetzal_symbols(rom):
+    return {"RegionPal": (0x121EA1C, 0x40),
+            "KantoGfx": (0x121EA5C, 0), "Sevii123Gfx": (0x121F84C, 0), "Sevii45Gfx": (0x1220428, 0), "Sevii67Gfx": (0x1220F38, 0),
+            "KantoMap": (0x121F51C, 0), "Sevii123Map": (0x12201EC, 0), "Sevii45Map": (0x1220D14, 0), "Sevii67Map": (0x1221920, 0)}
+
+
+# Pokemon Heart and Soul v2.0.6 (sha1 79ee6df0...): Emerald's region_map.c with smol art and seven
+# maps (gRegionMapInfos 0x08D4D330); the Johto + Kanto one ([6], REGION_MAP_JK): mode-5 tiles and a
+# mode-8 tilemap (equal to VRAM with the Pokegear map up, byte for byte), Emerald's palette.
+HNS_ROM = os.path.expanduser("~/Downloads/Game ROMs & Emulation/gba/Pokémon Heart and Soul (v2.0.6).gba")
+
+
+def hns_symbols(rom):
+    return {"RegionGfx": (0xD4D630, 0), "RegionMap": (0xD4D3F4, 0)}
+
+
+# Pokemon R.O.W.E. v2.1.9.1 Experimental (sha1 81bd0f4b...): Emerald's region_map.c with three maps
+# picked by gMapHeader.region - Hoenn, Kanto, Sevii: 8bpp tiles and a 64x64 affine tilemap each
+# (LZ77), one palette (sRegionMapBg_Pal, at BG palette 7). Its own symbol table names them.
+ROWE_ROM = os.path.expanduser("~/Downloads/Game ROMs & Emulation/gba/Pokémon R.O.W.E. (v2.1.9.1 Experimental).gba")
+
+
+def rowe_symbols(rom):
+    return {"RegionPal": (0xFCE754, 0x40), "RegionGfx": (0xFCE794, 0), "RegionMap": (0xFCF604, 0),
+            "KantoGfx": (0xFCFB34, 0), "KantoMap": (0xFD069C, 0), "SeviiGfx": (0xFD0B9C, 0), "SeviiMap": (0xFD17C4, 0)}
+
+
+def glazed_symbols(rom):
+    # Its trainer card: Tunod badges (tiles repointed, the palette edited in place), its player
+    # pics (front-pic table entries 71 / 72 repointed, palettes edited in place) and FONT_NORMAL
+    # edited in place - each found through retail's tables and literal pools, rendered and checked.
+    return {"RegionGfx": (0x59F77C, 0), "RegionMap": (0x5A04E0, 0), "RegionPal": (0x59F73C, 0x40),
+            "BadgesPal": (0x56F4EC, 32), "BadgesGfx": (0x452334, 0), "PicMale": (0x1202798, 0),
+            "PicMalePal": (0xD61A30, 0), "PicFemale": (0x12045DC, 0), "PicFemalePal": (0xD61D58, 0),
+            "FontNormal": (0x64C2E4, 32768)}
 
 
 # The European Emeralds (Spanish, German, French, Italian) redrew three party-menu
@@ -262,6 +327,48 @@ GAMES = {
     "SGL": (SEAGLASS_ROM, None, [
         ("SGL_REGION_GFX", "RegionGfx", True),
     ]),
+    "IMP": (IMPERIUM_ROM, None, [
+        ("IMP_REGION_GFX", "RegionGfx", True),
+        ("IMP_REGION_MAP", "RegionMap", True),
+        ("IMP_FONT_NORMAL", "FontNormal", False),
+        ("IMP_FONT_NORMAL_WIDTHS", "FontNormalWidths", False),
+    ]),
+    "RW": (ROWE_ROM, None, [
+        ("RW_REGION_PAL", "RegionPal", False),
+        ("RW_REGION_GFX", "RegionGfx", True),
+        ("RW_REGION_MAP", "RegionMap", True),
+        ("RW_KANTO_GFX", "KantoGfx", True),
+        ("RW_KANTO_MAP", "KantoMap", True),
+        ("RW_SEVII_GFX", "SeviiGfx", True),
+        ("RW_SEVII_MAP", "SeviiMap", True),
+    ]),
+    "HNS": (HNS_ROM, None, [
+        ("HNS_REGION_GFX", "RegionGfx", "smol"),
+        ("HNS_REGION_MAP", "RegionMap", "smol"),
+    ]),
+    "QTZ": (QUETZAL_ROM, None, [
+        ("QTZ_REGION_PAL", "RegionPal", False),
+        ("QTZ_KANTO_GFX", "KantoGfx", True),
+        ("QTZ_KANTO_MAP", "KantoMap", True),
+        ("QTZ_SEVII123_GFX", "Sevii123Gfx", True),
+        ("QTZ_SEVII123_MAP", "Sevii123Map", True),
+        ("QTZ_SEVII45_GFX", "Sevii45Gfx", True),
+        ("QTZ_SEVII45_MAP", "Sevii45Map", True),
+        ("QTZ_SEVII67_GFX", "Sevii67Gfx", True),
+        ("QTZ_SEVII67_MAP", "Sevii67Map", True),
+    ]),
+    "GZ": (GLAZED_ROM, None, [
+        ("GZ_REGION_GFX", "RegionGfx", True),
+        ("GZ_REGION_PAL", "RegionPal", False),
+        ("GZ_REGION_MAP", "RegionMap", True),
+        ("GZ_CARD_BADGES_PAL", "BadgesPal", False),
+        ("GZ_CARD_BADGES_GFX", "BadgesGfx", True),
+        ("GZ_PIC_MALE", "PicMale", True),
+        ("GZ_PIC_MALE_PAL", "PicMalePal", True),
+        ("GZ_PIC_FEMALE", "PicFemale", True),
+        ("GZ_PIC_FEMALE_PAL", "PicFemalePal", True),
+        ("GZ_FONT_NORMAL", "FontNormal", False),
+    ]),
     "SG": (SOULGOLD_ROM, None, [
         ("SG_BAG_STARS_GFX", "BagStarsGfx", "smol"),
         ("SG_BAG_STARS_MAP", "BagStarsMap", "smol"),
@@ -313,6 +420,7 @@ def fireRed_symbols(p):
 
 # The binary hacks' made-up symbols (no ELF).
 ROM_SYMBOLS = {"UB": unbound_symbols, "LZ": lazarus_symbols, "SGL": seaglass_symbols, "SG": soulgold_symbols,
+               "GZ": glazed_symbols, "IMP": imperium_symbols, "QTZ": quetzal_symbols, "HNS": hns_symbols, "RW": rowe_symbols,
                **{"EM" + lang: emerald_eu_symbols(lang) for lang in EMERALD_EU_ROMS},
                **{"FR" + lang: fireRed_symbols(p) for lang, p in fireRed_ports().items()}}
 

@@ -427,17 +427,23 @@ private fun bagPaletteFor(game: GameKind): BagPalette = when (game) {
     GameKind.ROWE -> RoweBag
     GameKind.SOULGOLD -> SoulGoldBag
     GameKind.YELLOW -> YellowBag
-    // Too Many Types 2's bag is Emerald's; Gaia's and Celia's are FireRed's.
-    GameKind.TMT2 -> EmeraldBag
+    // Too Many Types 2's, Glazed's, Imperium's and Quetzal's bags are Emerald's; Gaia's and Celia's are FireRed's.
+    GameKind.TMT2, GameKind.GLAZED, GameKind.IMPERIUM, GameKind.QUETZAL -> EmeraldBag
     else -> FireRedBag
 }
 
 @Composable
-fun ItemsScreen(items: List<ItemView>, modifier: Modifier = Modifier) {
+fun ItemsScreen(
+    items: List<ItemView>,
+    modifier: Modifier = Modifier,
+    itemUse: com.pokedaisy.app.companion.ItemUse? = null,
+    /** The item whose description is open first - for screenshot tests, which can't tap. */
+    initialItemId: Int? = null,
+) {
     var selectedCategory by remember { mutableStateOf<Int?>(null) } // null = All
     var sort by remember { mutableStateOf(ItemSort.DEFAULT) }
-    var selectedItem by remember { mutableStateOf<ItemView?>(null) }
-    var selectedKey by remember { mutableStateOf<String?>(null) }
+    var selectedItem by remember { mutableStateOf(items.firstOrNull { it.itemId == initialItemId }) }
+    var selectedKey by remember { mutableStateOf(selectedItem?.let { "${it.itemId}#0" }) }
     val pal = bagPaletteFor(activeGame)
     val caps = gameItemText(activeGame)
     val shown = if (caps == null) items else items.map {
@@ -595,6 +601,7 @@ fun ItemsScreen(items: List<ItemView>, modifier: Modifier = Modifier) {
             ItemDescriptionBar(
                 item, pal, m,
                 onDismiss = { selectedItem = null },
+                itemUse = itemUse,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .onSizeChanged { descHeight = with(density) { it.height.toDp() } },
@@ -783,9 +790,14 @@ private fun BagCursor(pal: BagPalette, m: GbaTextMetrics) {
  * Tapping it (like tapping the row again) dismisses it.
  */
 @Composable
-private fun ItemDescriptionBar(item: ItemView, pal: BagPalette, m: GbaTextMetrics, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+private fun ItemDescriptionBar(
+    item: ItemView, pal: BagPalette, m: GbaTextMetrics, onDismiss: () -> Unit, modifier: Modifier = Modifier,
+    itemUse: com.pokedaisy.app.companion.ItemUse? = null,
+) {
     val u = m.u
     val noRipple = remember { MutableInteractionSource() }
+    // What the last USE did, shown in place of the description until another item is picked.
+    var used by remember(item.itemId) { mutableStateOf<String?>(null) }
     Row(
         verticalAlignment = Alignment.Top,
         modifier = modifier
@@ -814,10 +826,26 @@ private fun ItemDescriptionBar(item: ItemView, pal: BagPalette, m: GbaTextMetric
             ItemIcon(item.iconAsset, size = u * 24)
         }
         GbaText(
-            item.description.ifEmpty { item.name },
+            used ?: item.description.ifEmpty { item.name },
             pal.descText, pal.descTextShadow, m,
             maxLines = Int.MAX_VALUE,
             modifier = Modifier.padding(start = if (hasIcon) u * 8 else 0.dp).weight(1f),
         )
+        if (itemUse != null && itemUse.canUse(item.itemId)) {
+            OptionButton(
+                "USE", m,
+                onClick = { itemUse.use(item.itemId) { used = itemUseMessage(it) } },
+                modifier = Modifier.padding(start = u * 6),
+            )
+        }
     }
+}
+
+/** What a USE did, in the companion's words. */
+private fun itemUseMessage(o: com.pokedaisy.app.companion.data.ItemUseOutcome): String = when (o.result) {
+    com.pokedaisy.app.companion.data.ItemUseResult.USED -> tr("Used! It lasts {0} steps.", o.steps)
+    com.pokedaisy.app.companion.data.ItemUseResult.STILL_ACTIVE -> tr("The last one is still working.")
+    com.pokedaisy.app.companion.data.ItemUseResult.NOT_NOW -> tr("Not now: close the game's menus and battles first.")
+    com.pokedaisy.app.companion.data.ItemUseResult.NONE_LEFT -> tr("None left in the bag.")
+    com.pokedaisy.app.companion.data.ItemUseResult.FAILED -> tr("It can't be used here.")
 }

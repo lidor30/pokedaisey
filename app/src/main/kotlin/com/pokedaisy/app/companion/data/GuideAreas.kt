@@ -43,6 +43,8 @@ private fun rawAreas(guide: GuideId): List<String> = when (guide) {
     GuideId.AMETHYST -> GUIDE_AREAS_AMETHYST_RAW
     GuideId.AMETHYST_V141 -> GUIDE_AREAS_AMETHYST_V141_RAW
     GuideId.CELIA -> GUIDE_AREAS_CELIA_RAW
+    // No area data yet: HERE lists the wild Pokémon alone.
+    GuideId.GLAZED, GuideId.IMPERIUM, GuideId.QUETZAL, GuideId.LAZARUS, GuideId.SEAGLASS, GuideId.TMT2, GuideId.SOULGOLD -> emptyList()
 }
 
 /** Whether [guide] has area data at all (then HERE shows even without the ROM tables). */

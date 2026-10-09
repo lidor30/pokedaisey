@@ -5,7 +5,7 @@ the user owns (nothing is downloaded):
     scripts/gen_rogue_tables.py <Pokemon Emerald Rogue (v2.2.1-EX).gba>
 
 Writes ItemNamesRogue.kt, ItemDescriptionsRogue.kt, MapSecDataRogue.kt,
-MoveDataRogue.kt, SpeciesTypesRogue.kt and TypeChartRogue.kt under
+MoveDataRogue.kt, SpeciesNamesRogue.kt, SpeciesTypesRogue.kt and TypeChartRogue.kt under
 app/src/main/kotlin/.../companion/data.
 
 Rogue (Pokabbie/pokeemerald-rogue, `expansion` branch = v2.2.1) mixes vanilla
@@ -156,7 +156,7 @@ def main():
           "val moveDataRogue: Map<Int, MoveInfo> = mapOf(\n" +
           "".join(f"    {i} to MoveInfo({kstr(n)}, {t}, {p}),\n" for i, (n, t, p) in sorted(moves.items())) + ")\n")
 
-    types = {}
+    types, names = {}, {}
     for sp in range(1, 3000):
         a = SPECIES_NAME1 + (sp - 1) * SPECIES_STRIDE
         if rom.off(a) + SPECIES_STRIDE > len(data):
@@ -165,7 +165,14 @@ def main():
         if not n or n.startswith("?"):
             continue
         types[sp] = (rom.u8(a + SPECIES_TYPES_OFF), rom.u8(a + SPECIES_TYPES_OFF + 1))
+        names[sp] = n
     assert types[1] == (12, 3) and types[744] == (5, 5) and types[316] == (3, 3), "species types are wrong"
+    # Its ids are National Dex numbers only up to 905: forms (906 = Mega VENUSAUR) and Gen 9 (1289+) follow.
+    assert names[1] == "Bulbasaur" and names[744] == "Rockruff" and names[1305] == "Pawmi", "species names are wrong"
+    write("SpeciesNamesRogue.kt", header("gSpeciesInfo names by species id (National Dex up to 905, then forms,\n"
+          "// Gen 9 from 1289).\n") +
+          "val speciesNamesRogue: Map<Int, String> = mapOf(\n" +
+          "".join(f"    {i} to {kstr(n)},\n" for i, n in sorted(names.items())) + ")\n")
     write("SpeciesTypesRogue.kt", header("gSpeciesInfo types[2] by species id (National Dex), ids per typeNamesRogue.\n") +
           "val speciesTypeDataRogue: Map<Int, SpeciesTypes> = mapOf(\n" +
           "".join(f"    {i} to SpeciesTypes({a}, {b}),\n" for i, (a, b) in sorted(types.items())) + ")\n")

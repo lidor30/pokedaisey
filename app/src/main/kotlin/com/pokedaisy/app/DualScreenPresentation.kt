@@ -120,12 +120,14 @@ class DualScreenPresentation(
             achievements: com.pokedaisy.app.companion.CompanionAchievements?,
             initialTab: String = "PARTY",
             statusBar: (@androidx.compose.runtime.Composable () -> Unit)? = null,
+            itemUse: com.pokedaisy.app.companion.ItemUse? = null,
         ): View = CompanionColors.track(ComposeView(context)).apply {
             setContent {
                 val snap by store.snapshot.collectAsState()
                 CompanionScreen(
                     snap, slots, settings, battleInput, initialTab = initialTab,
                     back = back, clickSound = clickSound, achievements = achievements, statusBar = statusBar,
+                    itemUse = itemUse,
                 )
             }
         }

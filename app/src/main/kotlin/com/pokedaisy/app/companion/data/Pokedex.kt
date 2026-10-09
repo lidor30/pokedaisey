@@ -24,6 +24,17 @@ data class DexFlags(
      */
     val seenCopies: List<Long> = emptyList(),
     val firstBit: Int = 1,
+    /** Quetzal: `seen` holds a 3-bit level per species (0 unseen, 1 seen, 2 caught), 8 to a u32
+     * (bits 0-23), so [bytes] * 4 of them. */
+    val seenLevels: Boolean = false,
+    /** Quetzal: caught is one bit array per region ([bytes] each, at these offsets) and counts in
+     * any of them - what its card and continue screen count; [caught] is then unused. */
+    val caughtRegions: List<Long> = emptyList(),
+    /** Emerald Rogue: the arrays are indexed by species id, not dex number (No. n reads its species' bit). */
+    val bySpecies: Boolean = false,
+    /** Emerald Rogue's 2-bit state per species: [seen] holds bit 0 and [caught] bit 1 (1 seen, 2 caught,
+     * 3 caught shiny), so a caught species is seen even with its [seen] bit clear. */
+    val seenOrCaught: Boolean = false,
 )
 
 /** struct Pokedex in SaveBlock2 (+0x18: owned[52] at +0x10, seen[52] at +0x44) + SaveBlock1's copies. */
@@ -146,6 +157,10 @@ data class PokedexTables(
     val probeCategory: String = "SEED",
     /** Japanese Emerald's 0x1C-byte entries: categoryName[6], height at +6, weight +8, the text at +0x0C. */
     val entryCategoryLen: Int = 12,
+    /** The entry starts with a pointer to its category's text, not the text (Quetzal's 12-byte entries). */
+    val entryCategoryPtr: Boolean = false,
+    /** gBaseStats' shape, where it isn't vanilla's 28-byte one. */
+    val baseStats: BaseStatsLayout = VANILLA_BASE_STATS,
     val entryHeightOff: Int = 0x0C,
     val entryDescOff: Int = 0x10,
     /** Between the category and [categorySuffix]: none in Japanese ("ひよこポケモン"). */
@@ -156,6 +171,22 @@ data class PokedexTables(
 ) {
     val hasRegional: Boolean get() = regionName != null
 }
+
+/** gBaseStats (vanilla) / gSpeciesInfo (vanilla-shaped hacks): its stride and the fields that move. */
+data class BaseStatsLayout(
+    val stride: Int = 28,
+    val genderOff: Int = 0x10,
+    val eggGroupsOff: Int = 0x14,
+    val abilitiesOff: Int = 0x16,
+    /** Ability ids are u16 (Quetzal), not bytes. */
+    val abilityU16: Boolean = false,
+    /** Base stats are u16s (R.O.W.E.), types and catch rate then sit at [typesOff] / [catchRateOff]. */
+    val statsU16: Boolean = false,
+    val typesOff: Int = 6,
+    val catchRateOff: Int = 8,
+)
+
+val VANILLA_BASE_STATS = BaseStatsLayout()
 
 val POKEDEX_FIRERED_REV1 = PokedexTables(
     entries = 0x0844E8B0L,
@@ -588,6 +619,146 @@ val POKEDEX_TMT2 = PokedexTables(
     nationalMagic = 0xDA,
 )
 
+/**
+ * R.O.W.E. v2.1.9.1 Experimental: vanilla-shaped tables, grown - 0x24-byte entries by dex number
+ * (category[14], height +0xE, weight +0x10, text +0x14; valid through No. 1019), gBaseStats 0x40-byte
+ * entries with u16 stats (types +0xC, catch rate +0xE, gender +0x18, egg groups +0x1C, u16 abilities
+ * +0x1E / +0x20, hidden +0x24), 21-byte ability names; no footprints. Flags in SaveBlock1 (DURALUDON
+ * in both arrays on the user's save; a wild WURMPLE marked seen only). Its START menu has no POKéDEX
+ * yet on this save, so not compared with the game's own screen.
+ */
+val POKEDEX_ROWE = PokedexTables(
+    entries = 0x08F592C8L,
+    frontPics = 0x083E0AA4L,
+    palettes = 0x083D35DCL,
+    speciesInfo = 0x08502C54L,
+    speciesToNational = 0x084F708EL,
+    abilityNames = 0x08422C58L,
+    footprints = 0,
+    abilityNameLength = 21,
+    hiddenAbilityOff = 0x24,
+    entryStride = 0x24,
+    entryCategoryLen = 14,
+    entryHeightOff = 0x0E,
+    entryDescOff = 0x14,
+    baseStats = BaseStatsLayout(
+        stride = 0x40, genderOff = 0x18, eggGroupsOff = 0x1C, abilitiesOff = 0x1E, abilityU16 = true,
+        statsU16 = true, typesOff = 0x0C, catchRateOff = 0x0E,
+    ),
+    categorySuffix = "Pokémon",
+    probeCategory = "Seed",
+    speciesCount = 1960,
+    nationalCount = 1019,
+    regionalCount = 1019,
+    regionName = null,
+    flags = DexFlags(DexFlagBlock.SAVE_BLOCK_1, seen = 0x3320, caught = 0x33DC, bytes = 0xBC),
+    nationalMagicOff = -1,
+)
+
+/**
+ * Emerald Rogue v2.2.1-EX: an expansion-shaped 0x98-byte gSpeciesInfo (natDexNum +0x3A, text +0x48,
+ * front pic +0x54, palette +0x64, footprint +0x7C); species are national numbers up to 905, then
+ * forms (906-1288), Gen 9 from 1289. SaveBlock1 keeps a 2-bit state per species id in
+ * pokedexBitFlags1 (+0x30B4, bit 0) and pokedexBitFlags2 (+0x3179, bit 1) - 1 seen, 2 caught,
+ * 3 caught shiny (src/pokedex.c GetSetPokedexSpeciesFlag; the offsets from the literal pools beside
+ * gSaveBlock1Ptr). Its dex shows one "variant" at a time: the default MODERN list (400 species ids,
+ * gPokedexVariants[0]) is the regional order. Matched to the game's own dex: Seen 2 / Caught 1 on
+ * the user's save, Seen 4 / Caught 2 after poking MAREEP caught and PAWMI (1305) seen.
+ */
+val POKEDEX_EMERALD_ROGUE = PokedexTables(
+    entries = 0,
+    frontPics = 0,
+    palettes = 0,
+    speciesInfo = 0x0905BC40L,
+    speciesToNational = 0,
+    abilityNames = 0x08466A68L,
+    footprints = 0,
+    abilityNameLength = 17,
+    categorySuffix = "Pokémon",
+    speciesCount = 1574,
+    nationalCount = 1025,
+    regionalCount = 400,
+    regionName = "MODERN",
+    regionalOrder = 0x084A96D8L,
+    regionalOrderIsSpecies = true,
+    expansion = SpeciesInfoDex(
+        stride = 0x98, natDexOff = 0x3A, descriptionOff = 0x48, frontPicOff = 0x54, paletteOff = 0x64, footprintOff = 0x7C,
+    ),
+    flags = DexFlags(
+        DexFlagBlock.SAVE_BLOCK_1, seen = 0x30B4, caught = 0x3179, bytes = 197, firstBit = 0,
+        bySpecies = true, seenOrCaught = true,
+    ),
+    nationalMagicOff = -1,
+    probeCategory = "Seed",
+)
+
+/**
+ * Emerald Imperium v1.3.1 (expansion 1.10): the page from gSpeciesInfo (0x104-byte entries, the
+ * default field offsets; palette +0x60, footprint +0x80), 1025 national + its 214-entry Hoenn
+ * order, flags in SaveBlock1. Checked field by field on CHARMANDER / PIKACHU and against its own
+ * dex screen ("No0004 Charmander, Lizard Pokémon", NATIONAL 1 / 1).
+ */
+val POKEDEX_IMPERIUM = PokedexTables(
+    entries = 0,
+    frontPics = 0,
+    palettes = 0,
+    speciesInfo = 0x08D5D9D8L,
+    speciesToNational = 0,
+    abilityNames = 0x087134A0L,
+    footprints = 0,
+    abilityNameLength = 17,
+    abilityNameStride = 0x1C,
+    categorySuffix = "Pokémon",
+    speciesCount = 1536,
+    nationalCount = 1025,
+    regionalCount = 214,
+    regionName = "HOENN",
+    regionalOrder = 0x08715890L,
+    expansion = SpeciesInfoDex(stride = 0x104, paletteOff = 0x60, footprintOff = 0x80),
+    flags = DexFlags(DexFlagBlock.SAVE_BLOCK_1, 0x2F58, 0x2FD9, 129),
+    nationalMagicOff = 2,
+    nationalMagic = 0xDA,
+)
+
+/**
+ * Pokémon Quetzal English Alpha 9 v0: vanilla's table shapes, grown. Entries are 12 bytes
+ * {category*, height, weight, text*} by species (Mega forms have their own); front pics are
+ * smol; gSpeciesInfo is 0x24-byte entries with u16 abilities (hidden at +0x1C); species map to
+ * dex numbers up to 1034 (Gen 9, then its own three starter lines). Its dex is one National
+ * list (no SaveBlock2 nationalMagic). The save keeps a 3-bit seen level per species and a
+ * caught bit array per region (Hoenn / Johto / Kanto) - counted in any, as its card and
+ * continue screen do; its dex screen counts the current region's alone. Checked against the
+ * game's own dex: SEEN 6 / OWN 1 on the user's save, CHARMANDER "Lizard", 0.6 m, 8.5 kg.
+ */
+val POKEDEX_QUETZAL = PokedexTables(
+    entries = 0x091BC4F0L,
+    frontPics = 0x084ED8A8L,
+    palettes = 0x084D8EB4L,
+    speciesInfo = 0x0853E560L,
+    speciesToNational = 0x08536A52L,
+    abilityNames = 0x0852766DL,
+    footprints = 0x091C0D2CL,
+    abilityNameLength = 17,
+    hiddenAbilityOff = 0x1C,
+    categorySuffix = "POKéMON",
+    entryStride = 12,
+    entriesBySpecies = true,
+    entryCategoryPtr = true,
+    entryHeightOff = 4,
+    entryDescOff = 8,
+    baseStats = BaseStatsLayout(stride = 0x24, genderOff = 0x12, eggGroupsOff = 0x16, abilitiesOff = 0x18, abilityU16 = true),
+    speciesCount = 1529,
+    nationalCount = 1034,
+    regionalCount = 1034,
+    regionName = null,
+    flags = DexFlags(
+        DexFlagBlock.SAVE_BLOCK_1, seen = 0x2560, caught = 0, bytes = 150,
+        seenLevels = true, caughtRegions = listOf(0x3850L, 0x304CL, 0x3254L),
+    ),
+    nationalMagicOff = -1,
+    probeCategory = "Seed",
+)
+
 /** Pokémon SoulGold v1.1.4: national 1-1025, 323 of them disabled (no species),
  * so its JOHTO dex is the other 702 in national order - a u32 list the game's own
  * national -> Johto lookup (0x081F0D84) scans: PIKACHU is its 023, CHIKORITA 133,
@@ -648,7 +819,8 @@ val POKEDEX_SOULGOLD_V1_2B = POKEDEX_SOULGOLD_V1_2.copy(
  */
 fun pokedexMatchesRom(c: MemoryReader, t: PokedexTables): Boolean = runCatching {
     val e = c.readCoreMemory(t.entries + t.entryStride, 0x10)
-    Gen3Text.decode(e, 0, t.entryCategoryLen).equals(t.probeCategory, ignoreCase = true) &&
+    val category = if (t.entryCategoryPtr) Gen3Text.decode(c.readCoreMemory(u32le(e, 0), 13)) else Gen3Text.decode(e, 0, t.entryCategoryLen)
+    category.equals(t.probeCategory, ignoreCase = true) &&
         u16le(e, t.entryHeightOff) == 7 && u16le(e, t.entryHeightOff + 2) == 69 &&
         u16le(c.readCoreMemory(t.speciesToNational, 2), 0) == 1 &&
         u16le(c.readCoreMemory(t.frontPics + 8 + 6, 2), 0) == 1
@@ -679,23 +851,31 @@ fun readPokedexState(c: MemoryReader, cfg: NativeConfig, t: PokedexTables): Poke
         DexFlagBlock.SAVE_BLOCK_2 -> sb2
         DexFlagBlock.FIXED -> 0L
     }
-    val seenBits = c.readCoreMemory(base + f.seen, f.bytes)
-    val caughtBits = c.readCoreMemory(base + f.caught, f.bytes)
+    val seenBits = c.readCoreMemory(base + f.seen, if (f.seenLevels) f.bytes * 4 else f.bytes)
+    val caughtBits = if (f.caughtRegions.isEmpty()) c.readCoreMemory(base + f.caught, f.bytes)
+        else f.caughtRegions.map { c.readCoreMemory(base + it, f.bytes) }.reduce { a, b -> ByteArray(a.size) { (a[it].toInt() or b[it].toInt()).toByte() } }
     val copies = f.seenCopies.map { c.readCoreMemory(sb1 + it, f.bytes) }
     fun bit(b: ByteArray, n: Int): Boolean {
         val i = n - f.firstBit
+        if (f.seenLevels && b === seenBits) {
+            // 8 three-bit levels per u32 word; any level but 0 is seen.
+            val w = i / 8
+            return i >= 0 && w * 4 + 3 < b.size && ((u32le(b, w * 4) ushr (3 * (i % 8))) and 7L) != 0L
+        }
         return i >= 0 && i / 8 < b.size && (b[i / 8].toInt() shr (i % 8)) and 1 != 0
     }
     val seen = mutableSetOf<Int>()
     val caught = mutableSetOf<Int>()
     for (n in 1..t.nationalCount) {
-        val s = bit(seenBits, n)
+        val i = if (f.bySpecies) PokedexSource.speciesFor(t, n).takeIf { it > 0 } ?: continue else n
+        val c = bit(caughtBits, i)
+        val s = bit(seenBits, i) || (f.seenOrCaught && c)
         if (copies.isEmpty()) {
             if (s) seen.add(n)
-            if (bit(caughtBits, n)) caught.add(n)
-        } else if (s && copies.all { bit(it, n) }) {
+            if (c) caught.add(n)
+        } else if (s && copies.all { bit(it, i) }) {
             seen.add(n)
-            if (bit(caughtBits, n)) caught.add(n)
+            if (c) caught.add(n)
         }
     }
     val national = t.nationalMagicOff < 0 ||
@@ -911,28 +1091,33 @@ object PokedexSource {
         t.expansion?.let { return readExpansionEntry(t, it, national, species) }
         val e = rd(t.entries + (if (t.entriesBySpecies) species else national).toLong() * t.entryStride, t.entryStride)
         val descPtr = Gfx.u32(e, t.entryDescOff)
-        val info = rd(t.speciesInfo + species * 28L, 28)
+        val bs = t.baseStats
+        val info = rd(t.speciesInfo + species.toLong() * bs.stride, bs.stride)
         fun b(i: Int) = info[i].toInt() and 0xFF
-        val abilities = listOf(b(0x16), b(0x17)).filter { it != 0 }.distinct().map { ability(t, it) }
-        val hidden = t.hiddenAbilityOff.takeIf { it >= 0 }?.let { b(it) }?.takeIf { it != 0 }?.let { ability(t, it) }
+        fun abilityAt(off: Int) = if (bs.abilityU16) u16le(info, off) else b(off)
+        val abilities = listOf(abilityAt(bs.abilitiesOff), abilityAt(bs.abilitiesOff + if (bs.abilityU16) 2 else 1))
+            .filter { it != 0 }.distinct().map { ability(t, it) }
+        val hidden = t.hiddenAbilityOff.takeIf { it >= 0 }?.let { abilityAt(it) }?.takeIf { it != 0 }?.let { ability(t, it) }
+        val category = if (t.entryCategoryPtr) Gfx.u32(e, 0).takeIf(Gfx::inRom)?.let { Gen3Text.decode(rd(it, 13)) }.orEmpty()
+            else Gen3Text.decode(e, 0, t.entryCategoryLen)
         return DexEntry(
             national = national,
             species = species,
-            category = Gen3Text.decode(e, 0, t.entryCategoryLen),
+            category = category,
             heightDm = u16le(e, t.entryHeightOff),
             weightHg = u16le(e, t.entryHeightOff + 2),
             description = listOfNotNull(
                 descPtr.takeIf(Gfx::inRom),
                 t.descriptionPage2Off.takeIf { it >= 0 }?.let { Gfx.u32(e, it) }?.takeIf(Gfx::inRom),
             ).joinToString(" ") { Gen3Text.decode(rd(it, 200)) },
-            type1 = b(6),
-            type2 = b(7),
-            baseStats = listOf(b(0), b(1), b(2), b(4), b(5), b(3)),
+            type1 = b(bs.typesOff),
+            type2 = b(bs.typesOff + 1),
+            baseStats = listOf(0, 1, 2, 4, 5, 3).map { if (bs.statsU16) u16le(info, it * 2) else b(it) },
             abilities = abilities,
             hiddenAbility = hidden,
-            catchRate = b(8),
-            genderRatio = b(0x10),
-            eggGroups = listOf(b(0x14), b(0x15)).distinct().mapNotNull { EGG_GROUP_NAMES.getOrNull(it) },
+            catchRate = b(bs.catchRateOff),
+            genderRatio = b(bs.genderOff),
+            eggGroups = listOf(b(bs.eggGroupsOff), b(bs.eggGroupsOff + 1)).distinct().mapNotNull { EGG_GROUP_NAMES.getOrNull(it) },
         )
     }
 

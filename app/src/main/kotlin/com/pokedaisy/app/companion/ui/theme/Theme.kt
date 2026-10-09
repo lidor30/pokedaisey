@@ -383,9 +383,12 @@ private val FIRERED_BACKDROP = intArrayOf(0xFF4AADA5.toInt(), 0xFF398C8C.toInt()
 private fun backdropColors(game: GameKind): IntArray? = when (game) {
     GameKind.EMERALD_ROGUE -> intArrayOf(0xFF080029.toInt(), 0xFF100042.toInt(), 0xFF080029.toInt())
     GameKind.GAIA -> intArrayOf(0xFF63BD7B.toInt(), 0xFF529C6B.toInt(), 0xFF42845A.toInt())
-    GameKind.TMT2 -> intArrayOf(0xFFCED67B.toInt(), 0xFFB5B55A.toInt(), 0xFF8C9C29.toInt())
+    // Glazed's and Quetzal's party menus have the same olive stripes.
+    GameKind.TMT2, GameKind.GLAZED, GameKind.QUETZAL -> intArrayOf(0xFFCED67B.toInt(), 0xFFB5B55A.toInt(), 0xFF8C9C29.toInt())
     GameKind.EMERALD_SEAGLASS -> IntArray(3) { 0xFF4A4A63.toInt() }
     GameKind.LAZARUS -> IntArray(3) { 0xFFFFFFFF.toInt() }
+    // Imperium's party grid: grey / near-black rows.
+    GameKind.IMPERIUM -> intArrayOf(0xFF424242.toInt(), 0xFF101821.toInt(), 0xFF101821.toInt())
     GameKind.ROWE -> IntArray(3) { 0xFF292929.toInt() }
     // SoulGold's party list: light-blue stripes, a deeper blue edge.
     GameKind.SOULGOLD -> intArrayOf(0xFF84CEEF.toInt(), 0xFF7BC6EF.toInt(), 0xFF429CD6.toInt())

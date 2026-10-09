@@ -60,6 +60,27 @@ class TrainerCardTest {
         assertEquals(CardStyle.UNBOUND, c.style)
     }
 
+    @Test fun `Glazed - retail Emerald's card, its own art`() {
+        // What its card shows for this save (headless): LIDOR, IDNo.03800, ₽3000, 0:15; no POKéDEX yet.
+        val c = card("glazed", NATIVE_GLAZED)
+        assertEquals("LIDOR", c.nameText)
+        assertEquals(3800, c.trainerId)
+        assertEquals(3000L, c.money)
+        assertEquals(0 to 15, c.hours to c.minutes)
+        assertNull(c.dexCaught)
+        assertEquals(CardStyle.GLAZED, c.style)
+    }
+
+    @Test fun `Imperium - its own save offsets`() {
+        // Its card for this save (headless): Lidor, IDNo.48238, ₽3000, 0:22.
+        val c = card("imperium", NATIVE_IMPERIUM)
+        assertEquals("Lidor", c.nameText)
+        assertEquals(48238, c.trainerId)
+        assertEquals(3000L, c.money)
+        assertEquals(0 to 22, c.hours to c.minutes)
+        assertEquals(CardStyle.IMPERIUM, c.style)
+    }
+
     @Test fun `other hacks get no card`() {
         assertNull(readTrainerCard(FixtureMemoryReader.load("unbound"), NATIVE_UNBOUND))
         assertNull(readTrainerCard(FixtureMemoryReader.load("emerald_rogue"), NATIVE_EMERALD_ROGUE))

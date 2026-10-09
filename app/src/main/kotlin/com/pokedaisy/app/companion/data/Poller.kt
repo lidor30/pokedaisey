@@ -230,6 +230,9 @@ class TelemetrySampler {
                 SOULGOLD_V1_1_4_SHA1 -> { kind = GameKind.SOULGOLD; nativeCfg = NATIVE_SOULGOLD }
                 SOULGOLD_V1_2_SHA1 -> { kind = GameKind.SOULGOLD; nativeCfg = NATIVE_SOULGOLD_V1_2 }
                 SOULGOLD_V1_2B_SHA1 -> { kind = GameKind.SOULGOLD; nativeCfg = NATIVE_SOULGOLD_V1_2B }
+                GLAZED_V9_2_0_SHA1 -> { kind = GameKind.GLAZED; nativeCfg = NATIVE_GLAZED }
+                IMPERIUM_V1_3_1_SHA1 -> { kind = GameKind.IMPERIUM; nativeCfg = NATIVE_IMPERIUM }
+                QUETZAL_V9_0_ALPHA_SHA1 -> { kind = GameKind.QUETZAL; nativeCfg = NATIVE_QUETZAL }
                 else -> {
                     kind = GameKind.EMERALD
                     unsupportedHackLabel = "unrecognized Emerald-based ROM hack " +
@@ -446,6 +449,12 @@ class TelemetrySampler {
         // A second build released as SoulGold v1.2 (its title screen says v1.2 too) - masked hash
         // (GPIO bytes zero).
         const val SOULGOLD_V1_2B_SHA1 = "5d6a036260fdbde96f85b5c1b92d0256d3aebafb"
+        // Pokémon Glazed 9.2.0 (BPEE, 32 MB) - host-side masked hash (GPIO bytes zero).
+        const val GLAZED_V9_2_0_SHA1 = "e10105d8544469c6a11ca2cf510289981df3c3b0"
+        // Pokémon Emerald Imperium v1.3.1 (BPEE, 32 MB) - host-side masked hash (GPIO bytes zero).
+        const val IMPERIUM_V1_3_1_SHA1 = "1d20091c4d936f5eb122db8780554dd0829ffb63"
+        // Pokémon Quetzal English Alpha 9 v0 (BPEE, 32 MB) - host-side masked hash (GPIO bytes zero).
+        const val QUETZAL_V9_0_ALPHA_SHA1 = "d0658315da1e8827f66f15c3d3a000fe747e163e"
 
         // Pokémon Yellow (USA, Europe) - the Game Boy cart (pret/pokeyellow builds it byte for byte).
         const val YELLOW_SHA1 = "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1"
@@ -467,7 +476,8 @@ class TelemetrySampler {
             UNBOUND_V2_1_1_1_SHA1, GAIA_V3_2_SHA1, RADICAL_RED_V4_1_SHA1, ODYSSEY_V4_1_1_SHA1,
             AMETHYST_V1_3_0_SHA1, AMETHYST_V1_4_1_SHA1, CELIA_V1_1_4_SHA1, HEART_AND_SOUL_V2_0_6_SHA1, LAZARUS_V2_0_SHA1,
             ROWE_V2_1_9_1_SHA1, EMERALD_ROGUE_V2_2_1_EX_SHA1, TMT2_V1_5_2_SHA1, EMERALD_SEAGLASS_V3_0_SHA1,
-            SOULGOLD_V1_1_4_SHA1, SOULGOLD_V1_2_SHA1, SOULGOLD_V1_2B_SHA1,
+            SOULGOLD_V1_1_4_SHA1, SOULGOLD_V1_2_SHA1, SOULGOLD_V1_2B_SHA1, GLAZED_V9_2_0_SHA1, IMPERIUM_V1_3_1_SHA1,
+            QUETZAL_V9_0_ALPHA_SHA1,
         )
     }
 }

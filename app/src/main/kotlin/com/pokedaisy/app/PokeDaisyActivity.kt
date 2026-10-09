@@ -186,6 +186,30 @@ class PokeDaisyActivity : Activity() {
         override fun switchTo(personality: Long) { if (::engine.isInitialized) engine.battleSwitchTo(personality) }
     }
 
+    /** USE on the ITEMS tab: a Repel used the way the game does (FieldItems.kt), retail FireRed rev 1 / Emerald. */
+    private fun fieldItemsFor(game: com.pokedaisy.app.companion.data.GameKind?): com.pokedaisy.app.companion.data.FieldItemFns? = when {
+        game == com.pokedaisy.app.companion.data.GameKind.FIRERED && romCode == "BPRE" && romRev == 1 ->
+            com.pokedaisy.app.companion.data.FIELD_ITEMS_FIRERED_REV1
+        game == com.pokedaisy.app.companion.data.GameKind.EMERALD && romCode == "BPEE" ->
+            com.pokedaisy.app.companion.data.FIELD_ITEMS_EMERALD
+        else -> null
+    }
+
+    private val itemUse = object : com.pokedaisy.app.companion.ItemUse {
+        override fun canUse(itemId: Int) =
+            itemId in com.pokedaisy.app.companion.data.REPEL_ITEMS && fieldItemsFor(telemetry.snapshot.value.game) != null
+
+        override fun use(itemId: Int, done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit) {
+            val snap = telemetry.snapshot.value
+            val fns = fieldItemsFor(snap.game)
+            if (fns == null || !::engine.isInitialized || !engine.running) {
+                done(com.pokedaisy.app.companion.data.ItemUseOutcome(com.pokedaisy.app.companion.data.ItemUseResult.FAILED))
+                return
+            }
+            engine.requestItemUse(fns, itemId, snap.inBattle) { out -> runOnUiThread { done(out) } }
+        }
+    }
+
     /** The loaded ROM is a Game Boy / Color cart (no GBA header, no L/R). */
     @Volatile private var romIsGameBoy = false
 
@@ -209,6 +233,19 @@ class PokeDaisyActivity : Activity() {
             BattleInputController.SwitchAddrs(partyMenu = 0x0203CB94L, party = 0x02024190L)
         game == com.pokedaisy.app.companion.data.GameKind.EMERALD &&
             (romCode == "BPEE" || romCode in com.pokedaisy.app.companion.data.EMERALD_EUROPEAN_CODES) ->
+            BattleInputController.SwitchAddrs(partyMenu = 0x0203CEC8L, party = 0x020244ECL)
+        game == com.pokedaisy.app.companion.data.GameKind.TMT2 ->
+            BattleInputController.SwitchAddrs(partyMenu = 0x0203242CL, party = 0x02032C94L)
+        game == com.pokedaisy.app.companion.data.GameKind.AMETHYST ->
+            BattleInputController.SwitchAddrs(partyMenu = 0x0203B0A0L, party = 0x02024284L, grid = true)
+        game == com.pokedaisy.app.companion.data.GameKind.ROWE ->
+            BattleInputController.SwitchAddrs(partyMenu = 0x0203E774L, party = 0x02025128L, monStride = 0x4C, grid = true)
+        game == com.pokedaisy.app.companion.data.GameKind.QUETZAL ->
+            BattleInputController.SwitchAddrs(partyMenu = 0x0203E9FCL, party = 0x020235CCL, monStride = 0x68)
+        game == com.pokedaisy.app.companion.data.GameKind.IMPERIUM ->
+            BattleInputController.SwitchAddrs(partyMenu = 0x020370E0L, party = 0x020375F8L, grid = true)
+        // Glazed is retail Emerald's RAM and party menu code (NATIVE_GLAZED).
+        game == com.pokedaisy.app.companion.data.GameKind.GLAZED ->
             BattleInputController.SwitchAddrs(partyMenu = 0x0203CEC8L, party = 0x020244ECL)
         game == com.pokedaisy.app.companion.data.GameKind.LAZARUS ->
             BattleInputController.SwitchAddrs(partyMenu = 0x0201B67CL, party = 0x0201B960L, grid = true)
@@ -437,6 +474,8 @@ class PokeDaisyActivity : Activity() {
 
         view = EmulatorView(this)
         view.holdFrame = { ::engine.isInitialized && engine.holdFrame }
+        // 1x frames follow the game screen's refresh (EmulatorEngine.onVsync).
+        view.onVsync = { if (::engine.isInitialized) engine.onVsync() }
         // SHADERS on the companion: its grid at the game's own pixel size, so both screens match.
         view.onGamePixel = CompanionColors::setCell
         if (debugMirror) view.setZOrderMediaOverlay(true) // see EmulatorView's z-order note
@@ -504,11 +543,11 @@ class PokeDaisyActivity : Activity() {
         root.setViewTreeViewModelStoreOwner(owner)
         sidePanel = SidePanel(root, view, touchControls, Prefs(this), panelBack, playClick) {
             val snap by telemetry.snapshot.collectAsState()
-            CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = panelBack, clickSound = playClick, achievements = RetroAchievements, statusBar = companionStatusBar)
+            CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = panelBack, clickSound = playClick, achievements = RetroAchievements, statusBar = companionStatusBar, itemUse = itemUse)
         }
         portraitPanel = PortraitPanel(root, view, touchControls, Prefs(this), portraitBack, playClick) {
             val snap by telemetry.snapshot.collectAsState()
-            CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = portraitBack, clickSound = playClick, achievements = RetroAchievements, statusBar = companionStatusBar)
+            CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = portraitBack, clickSound = playClick, achievements = RetroAchievements, statusBar = companionStatusBar, itemUse = itemUse)
         }
         // Two screens: the game stays on the landscape top one. One screen (a phone): it turns
         // with the device (the user's rotation setting), the companion under the game upright.
@@ -862,7 +901,7 @@ class PokeDaisyActivity : Activity() {
                 if (swap) stage
                 else DualScreenPresentation.companionView(
                     ctx, telemetry, stateSlots, companionSettings, battleInput, companionBack, playClick, RetroAchievements,
-                    initialTab = companionStartTab, statusBar = companionStatusBar,
+                    initialTab = companionStartTab, statusBar = companionStatusBar, itemUse = itemUse,
                 )
             }.also { it.show() }
         }.onFailure { Log.w("pokedaisy", "presentation failed", it) }.getOrNull()
@@ -913,7 +952,7 @@ class PokeDaisyActivity : Activity() {
         val owner = ComposeHostOwner().apply { create(); resume() }
         val view = DualScreenPresentation.companionView(
             this, telemetry, stateSlots, companionSettings, battleInput, companionBack, playClick, RetroAchievements,
-            initialTab = companionStartTab, statusBar = companionStatusBar,
+            initialTab = companionStartTab, statusBar = companionStatusBar, itemUse = itemUse,
         ).apply {
             setViewTreeLifecycleOwner(owner)
             setViewTreeSavedStateRegistryOwner(owner)
@@ -1257,7 +1296,7 @@ class PokeDaisyActivity : Activity() {
         return ComposeView(this).apply {
             setContent {
                 val snap by telemetry.snapshot.collectAsState()
-                CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = mirrorBack, clickSound = playClick, achievements = RetroAchievements, statusBar = companionStatusBar)
+                CompanionScreen(snap, stateSlots, companionSettings, battleInput, back = mirrorBack, clickSound = playClick, achievements = RetroAchievements, statusBar = companionStatusBar, itemUse = itemUse)
             }
         }
     }

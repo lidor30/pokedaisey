@@ -135,6 +135,10 @@ fun itemDescription(id: Int): String = localText?.let { it.itemDescriptions[id] 
     GameKind.RADICAL_RED -> itemDescriptionsRadicalRed[id] ?: ""
     // Renumbered items with no description table: vanilla text would be wrong.
     GameKind.EMERALD_SEAGLASS -> itemDescriptionsSeaglass[id] ?: ""
+    GameKind.GLAZED -> itemDescriptionsGlazed[id] ?: ""
+    GameKind.IMPERIUM -> itemDescriptionsImperium[id] ?: ""
+    GameKind.QUETZAL -> itemDescriptionsQuetzal[id] ?: ""
+    GameKind.ROWE -> itemDescriptionsRowe[id] ?: ""
     GameKind.CELIA, GameKind.TMT2 -> ""
     // Gen 1 items have no descriptions of their own: ours, and what each TM / HM teaches.
     GameKind.YELLOW -> itemDescriptionsYellow[id] ?: tmDescriptionsYellow[id] ?: ""

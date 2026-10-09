@@ -164,7 +164,7 @@ fun GuideScreen(source: GuideSource, ui: GuideUiState, snapshot: SnapshotView, m
             GuideRomSource.encounters(live, snapshot.mapGroup, snapshot.mapNum)
         }
     }
-    val bosses = source.text?.bosses.orEmpty()
+    val bosses = source.text?.let { it.bossesFor?.invoke(snapshot.mapGroup) ?: it.bosses }.orEmpty()
     // Starts from the cache when every team is already loaded, so the page draws at once.
     val cachedParties = remember(live, snapshot.progress) {
         val p = snapshot.progress
@@ -181,7 +181,7 @@ fun GuideScreen(source: GuideSource, ui: GuideUiState, snapshot: SnapshotView, m
 
     val pages = buildList {
         if (live != null || hasAreaGuide(source.id)) add(herePage(snapshot, here, dex, live != null, source.text, source.id, ctx))
-        snapshot.progress?.takeIf { bosses.isNotEmpty() && parties.isNotEmpty() }?.let { add(bossPage(source.text!!, it, parties, snapshot.party)) }
+        snapshot.progress?.takeIf { bosses.isNotEmpty() && parties.isNotEmpty() }?.let { add(bossPage(bosses, it, parties, snapshot.party)) }
         addAll(source.text?.pages.orEmpty())
         // No hand-written WHERE IS (the ROM hacks): one built from the area data.
         if (source.text?.pages.orEmpty().none { it.title == WHERE_IS }) source.id?.let { id ->
@@ -432,12 +432,12 @@ private val PEOPLE_KINDS = setOf(AreaKind.GIFT, AreaKind.KEY, AreaKind.MON, Area
  * the hint is its type, the answer its species, moves and held item.
  */
 private fun bossPage(
-    guide: GameGuide,
+    bosses: List<com.pokedaisy.app.companion.data.Boss>,
     progress: com.pokedaisy.app.companion.data.SaveProgress,
     parties: Map<Int, List<TrainerMon>>,
     party: List<MonView>,
 ): GuidePage {
-    val ahead = guide.bosses.filter { !it.isDone(progress) }
+    val ahead = bosses.filter { !it.isDone(progress) }
     val best = party.filter { !it.isEgg }.maxOfOrNull { it.level }
     // A boss with variants (a team per difficulty, or a run of battles) gets a section per team.
     val shown = ahead.withIndex().flatMap { (i, boss) ->

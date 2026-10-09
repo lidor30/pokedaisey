@@ -19,8 +19,19 @@ import java.nio.ByteBuffer
 import kotlin.math.roundToInt
 
 /**
- * Owns the single emulator thread: run a frame, push its audio (blocking write,
- * which paces us to real time), service any pending savestate request, repeat.
+ * Owns the single emulator thread: run a frame, push its audio, service any
+ * pending savestate request, repeat.
+ *
+ * At 1x the frames follow the refresh of the screen the game is on, like
+ * RetroArch's vsync: one game frame per refresh (60 Hz), or per two (120 Hz),
+ * ticked by the game's GL thread ([onVsync]). The game then runs at the display's
+ * rate (60 Hz is 0.46% faster than the GBA's 59.73) and every refresh shows a new
+ * frame - paced by the audio device or a timer instead, the two clocks drifted
+ * apart and a frame was shown twice or skipped every few seconds, and the audio
+ * buffer handed frames out in bursts. Its audio is resampled to match (MgbaCore.pkSetAudioRate),
+ * nudged by how full the device's buffer is (dynamic rate control), so it never
+ * blocks the loop. With no usable vsync (the view not drawing, an odd refresh
+ * rate) or at any other speed, it falls back to a timer and blocking audio writes.
  *
  * Savestate/loadstate/suspend are always performed on this thread, between
  * frames, so the core is never touched mid-frame.
@@ -275,6 +286,21 @@ class EmulatorEngine(
         cheatsDirty = true
     }
 
+    private class ItemUseRequest(
+        val fns: com.pokedaisy.app.companion.data.FieldItemFns, val itemId: Int, val inBattle: Boolean,
+        val done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit,
+    )
+    @Volatile private var pendingItemUse: ItemUseRequest? = null
+
+    /** Uses [itemId] the way the game does, on the next frame boundary ([com.pokedaisy.app.companion.data.useFieldItem]);
+     * [done] gets what happened, on the emu thread. */
+    fun requestItemUse(
+        fns: com.pokedaisy.app.companion.data.FieldItemFns, itemId: Int, inBattle: Boolean,
+        done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit,
+    ) {
+        pendingItemUse = ItemUseRequest(fns, itemId, inBattle, done)
+    }
+
     fun requestSaveState(slot: Int) { pendingSave = slot.coerceIn(SaveStates.SLOT_MIN, SaveStates.SLOT_MAX) }
     fun requestLoadState(slot: Int) { pendingLoad = slot.coerceIn(SaveStates.SLOT_MIN, SaveStates.SLOT_MAX) }
     fun requestUndoSave() { pendingUndoSave = true }
@@ -284,6 +310,35 @@ class EmulatorEngine(
         val n = (currentSlot + delta).mod(SaveStates.SLOT_MAX - SaveStates.SLOT_MIN + 1)
         currentSlot = n
         onSlotChanged?.invoke(n)
+    }
+
+    /** Refresh ticks from the game's GL thread, at most a few banked ([onVsync]). */
+    private val vsyncTicks = java.util.concurrent.Semaphore(0)
+    @Volatile private var lastVsyncNanos = 0L
+    /** The game screen's refresh period, averaged over recent ticks; 0 = not known yet. */
+    @Volatile private var vsyncPeriodNanos = 0.0
+
+    /** GL thread: the game's screen just refreshed (EmulatorView.onVsync). */
+    fun onVsync() {
+        val now = System.nanoTime()
+        val d = now - lastVsyncNanos
+        lastVsyncNanos = now
+        // A gap (the view paused, a dropped refresh) isn't a period.
+        if (d in 4_000_000L..34_000_000L) {
+            val p = vsyncPeriodNanos
+            vsyncPeriodNanos = if (p == 0.0) d.toDouble() else p + (d - p) * 0.05
+        }
+        if (vsyncTicks.availablePermits() < 4) vsyncTicks.release()
+    }
+
+    /** Refreshes per game frame while the display paces 1x, or 0 for timer pacing. */
+    private fun vsyncsPerFrame(): Int {
+        val p = vsyncPeriodNanos
+        if (p == 0.0 || System.nanoTime() - lastVsyncNanos > 100_000_000L) return 0
+        val hz = 1e9 / p
+        val n = (hz / GBA_FPS).roundToInt()
+        // Within 1.5% of the GBA's own rate (60 / 120 Hz: +0.46%); a 90 Hz screen would judder either way.
+        return if (n >= 1 && kotlin.math.abs(hz / n / GBA_FPS - 1.0) < 0.015) n else 0
     }
 
     private var videoBuf: ByteBuffer? = null
@@ -359,6 +414,13 @@ class EmulatorEngine(
         var decimR = 0
         var decimN = 0
         var measuredSpeed = 4f // uncapped FF's real rate, from the fps log below
+        // Vsync pacing (see the class comment): the device buffer's size, and what's been
+        // written to it since the last resync - minus its play head, what's still queued.
+        val bufferFrames = track?.bufferSizeInFrames ?: 0
+        var framesWritten = 0L
+        var underruns = track?.underrunCount ?: 0
+        var vsyncMode = false
+        val silence = ShortArray(bufferFrames * 2)
         try {
             while (running) {
                 battleInput.tick()
@@ -425,15 +487,51 @@ class EmulatorEngine(
                 // or on a ROM it can't render). Slow-mo stays muted.
                 val spedUp = speed > 1f && clip == null && mode != FfMusicMode.OFF
                 val wantPaused = !((speed == 1f && clip == null) || spedUp)
+                // Refreshes per frame when the display paces 1x; 0 = the timer and blocking audio.
+                val perFrame = if (speed == 1f && track != null && bufferFrames > 0) vsyncsPerFrame() else 0
+                if ((perFrame > 0) != vsyncMode) {
+                    vsyncMode = perFrame > 0
+                    if (vsyncMode) {
+                        vsyncTicks.drainPermits()   // start on the next refresh, not a banked one
+                        // Blocking writes left the buffer about full.
+                        framesWritten = (track!!.playbackHeadPosition.toLong() and 0xFFFFFFFFL) + bufferFrames
+                    } else {
+                        MgbaCore.pkSetAudioRate(sampleRate.toDouble())
+                    }
+                }
                 if (wantPaused != paused) {
                     paused = wantPaused
                     if (paused) runCatching { track?.pause(); track?.flush() }
                     else runCatching { track?.play() }
+                    // flush() empties the buffer and puts the play head back at 0.
+                    framesWritten = 0L
                 }
 
                 val n = MgbaCore.pkReadAudio(scratch)
                 if (n > 0 && !paused && track != null) {
-                    if (speed == 1f) {
+                    if (vsyncMode) {
+                        // The play head wraps as an unsigned int; the difference doesn't care.
+                        val played = track.playbackHeadPosition
+                        var queued = framesWritten.toInt() - played
+                        val nowUnderruns = track.underrunCount
+                        if (queued < 0 || nowUnderruns != underruns) queued = 0   // ran dry: the guess was off
+                        underruns = nowUnderruns
+                        if (queued < bufferFrames / 8) {
+                            // Top up with silence to half full, so a late frame never runs it dry.
+                            val pad = (bufferFrames / 2 - queued) * 2
+                            val w = track.write(silence, 0, pad, AudioTrack.WRITE_NON_BLOCKING)
+                            queued += maxOf(w, 0) / 2
+                        }
+                        framesWritten = played.toLong() + queued
+                        // Samples per emulated second so that a frame's worth lasts one frame of the
+                        // display's, nudged towards a half-full buffer (dynamic rate control).
+                        val fill = queued.toDouble() / bufferFrames
+                        val frameHz = 1e9 / (vsyncPeriodNanos * perFrame)
+                        val drc = 1.0 + DRC_MAX * (1.0 - 2.0 * fill).coerceIn(-1.0, 1.0)
+                        MgbaCore.pkSetAudioRate(sampleRate * GBA_FPS / frameHz * drc)
+                        val w = track.write(scratch, 0, n, AudioTrack.WRITE_NON_BLOCKING)
+                        if (w > 0) framesWritten += w / 2
+                    } else if (speed == 1f) {
                         track.write(scratch, 0, n)   // blocking → real-time pacing at 1x
                     } else {
                         val factor = if (speed.isInfinite()) measuredSpeed else speed
@@ -460,6 +558,16 @@ class EmulatorEngine(
                     if (speed.isInfinite()) measuredSpeed = (fps / 60.0).toFloat().coerceAtLeast(1f)
                     fpsFrames = 0
                     fpsSince = now
+                }
+
+                if (vsyncMode) {
+                    // Wait for the game screen's next refresh(es); if they stop coming (the view
+                    // went away) the wait times out and the timer takes over from the next frame.
+                    val wait = (vsyncPeriodNanos * perFrame * 3).toLong()
+                    runCatching { vsyncTicks.tryAcquire(perFrame, wait, java.util.concurrent.TimeUnit.NANOSECONDS) }
+                    next = System.nanoTime()
+                    prevSpeed = speed
+                    continue
                 }
 
                 if (speed.isInfinite()) {
@@ -511,6 +619,22 @@ class EmulatorEngine(
 
     private fun servicePending() {
         if (cheatsDirty) applyCheats()
+        pendingItemUse?.let { r ->
+            pendingItemUse = null
+            // Not with a menu screen or the region map up either: the game itself only uses items from its bag.
+            val out = runCatching {
+                com.pokedaisy.app.companion.data.useFieldItem(
+                    r.fns, r.itemId, busy = !gba || r.inBattle || menuOpen || mapOpen,
+                    call = { fn, a0, a1 -> MgbaCore.pkCall(fn, a0, a1) },
+                    readRom = { addr, len -> InProcessReader.readCoreMemory(addr, len) },
+                )
+            }.getOrElse {
+                Log.e("pokedaisy", "item use failed", it)
+                com.pokedaisy.app.companion.data.ItemUseOutcome(com.pokedaisy.app.companion.data.ItemUseResult.FAILED)
+            }
+            Log.i("pokedaisy", "item use ${r.itemId}: $out")
+            r.done(out)
+        }
         pendingSuspend?.let { target ->
             pendingSuspend = null
             val ok = saveState(target)
@@ -636,13 +760,18 @@ class EmulatorEngine(
                     .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
                     .build(),
             )
-            .setBufferSizeInBytes(minBuf * 2)
+            // Room for the vsync pacing's rate control to keep it half full: at least ~85 ms.
+            .setBufferSizeInBytes(maxOf(minBuf * 2, 4096 * 4))
             .setTransferMode(AudioTrack.MODE_STREAM)
             .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
             .build()
     }
 
     private companion object {
+        /** The GBA's (and Game Boy's) frame rate: 16777216 Hz / 280896 cycles per frame. */
+        const val GBA_FPS = 16777216.0 / 280896.0
+        /** Dynamic rate control's most the audio is stretched or squeezed (RetroArch's default). */
+        const val DRC_MAX = 0.005
         /** SPEED_CYCLE steps. Index 0 (1×) is the normal, audio-on state. */
         val SPEED_STEPS = floatArrayOf(1f, 1.5f, 2f, 3f, 4f)
     }

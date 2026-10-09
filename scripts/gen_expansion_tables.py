@@ -67,7 +67,15 @@ GAMES = {
         items_base=0x0878EFD4, items_stride=0x2C, items_desc_off=-8,
         moves_base=0x087B652C - 33 * 0x44, moves_stride=0x44, move_bits_off=0x0A,
         chart=0x08475D1C, chart_n=21,
-        mapsec_base=0x08D553D8,
+        # {x, y, w, h, name*} entries - the Johto + Kanto ("JK") map's: its Pokegear map is Emerald's
+        # region_map.c with smol art and 7 maps (gRegionMapInfos 0x08D4D330, by RegionMapType: HOENN,
+        # KANTO, SEVII x3, JOHTO, JK). FlagGet(0x8FF) picks JK over JOHTO (and with it this table and
+        # grid, at 0x081F711E / 0x081F7C10); JK covers every Johto and Kanto section, so it's the one
+        # drawn (RomArt's HNS_REGION_*, Emerald's palette). Its grid is u8 [15][28] at (1, 2),
+        # MAPSEC_NONE 0x7D (the code's `cmp #125`); New Bark, Pallet, Saffron, Cycling Road and the
+        # Power Plant land on their markers, 96 of the grid's 106 sections inside their rects.
+        mapsec_base=0x08D553D4, mapsec_name_off=4,
+        region_map=dict(image="hns", layout=0x08D56858, w=28, h=15, ox=1, oy=2, none=0x7D),
         checks=dict(species={1: "BULBASAUR", 155: "CYNDAQUIL"}, types={1: (13, 4)}, gender={1: 31},
                     items={1: "POKé BALL", 28: "POTION"}, moves={33: (1, 40), 57: (12, 90), 89: (5, 100)}),
     ),
@@ -185,6 +193,45 @@ GAMES = {
                     types={1: (13, 4), 25: (14, 14), 152: (13, 13), 155: (11, 11)},
                     gender={1: 31, 25: 127, 155: 31}, items={1: "Poké Ball", 2: "Great Ball", 28: "Potion"},
                     moves={1: (1, 40), 33: (1, 40), 52: (11, 40), 57: (12, 90), 89: (5, 100), 585: (19, 95)}),
+    ),
+    # Pokemon Emerald Imperium v1.3.1 (splash "PRET x RHH"; the ROM header's RHHEXP block at 0x080001FC
+    # says expansion 1.10.0, 0x600 species, 0x3EA items). Its GF header (0x08000100) points at the tables:
+    # gSpeciesInfo 0x08D5D9D8 (+0x1BC), gItemsInfo 0x086C7A64 (+0x1C8), gMovesInfo 0x08704A74 (+0x1CC),
+    # gMonIconPaletteTable 0x08DC0350 (+0x140). Checked against the data:
+    #  - species: 0x104-byte entries, National Dex ids: "Bulbasaur" at 0x08D5DB08 (entry +0x2C), "Ivysaur"
+    #    0x104 later, "Charmander" (the save's) at 4, "Pikachu" at 25, "Torchic" at 255. Base stats
+    #    45/49/49/45/65/65 at name-0x2C, types (13 Grass, 4 Poison) name-0x26, genderRatio 31 name-0x1A,
+    #    the same offsets as HnS / Lazarus. 1..1535 named; 1536 (= the header's species count) is the
+    #    egg's entry.
+    #  - items: inline names 0x14 into 0x50-byte entries ("Poké Ball" 0x086C7AC8, "Great Ball" 0x50
+    #    later, "Potion" at 28 = the save's bag item); the description pointer 8 bytes before the name.
+    #  - moves: the only pointer to "Pound" is move 1's name (0x08704AA8), 0x34 apart ("Scratch" 10,
+    #    "Tackle" 33, "False Swipe" 206 - the save's Charmander knows 10/45/206); +0xA type/power bits.
+    #  - chart: the unique [21][21] u32 run whose Normal row is 1x except Rock/Steel 0.5x, Ghost 0x
+    #    (0x084EA6DC); Fire's row and Fairy (Dragon -> Fairy 0x) check out.
+    #  - mapsecs: older {x, y, w, h, name ptr} entries from 0x08DDA3E4; 0x00-0xD4 are vanilla Emerald's,
+    #    names and rects byte for byte, then 0xD5-0xD9 are new (FLOATING SLAB, ROCKY SLAB, GRASSY SLAB,
+    #    HOT HOUSE, TRICK HOUSE) and MAPSEC_NONE is 0xDA. The save's gMapHeader reads 0x10 = ROUTE 101.
+    #  - region map: Emerald's region_map.c; its grid (sRegionMap_MapSectionLayout, 0x08DD975C) is
+    #    vanilla's with MAPSEC_NONE 0xDA; palette (0x08DD848C) vanilla's; tiles (LZ 0x08DD84CC, 15360
+    #    bytes: vanilla's 233 + 7 new) and tilemap (LZ 0x08DD92D0, 4 cells changed) add markers for the
+    #    new places, so Emerald's EM_REGION_GFX / _MAP fingerprints don't match: RomArt's IMP_REGION_*
+    #    rebuild regionmap/imperium.png (Emerald's palette). Its rects are Emerald's, + (1, 2).
+    "imperium": dict(
+        suffix="Imperium",
+        label="Pokemon Emerald Imperium v1.3.1",
+        sha1="1d20091c4d936f5eb122db8780554dd0829ffb63",
+        species_name1=0x08D5DB08, species_stride=0x104, species_max=1536,
+        species_types_off=-0x26, species_gender_off=-0x1A,
+        items_base=0x086C7A64 + 0x14, items_stride=0x50, items_name_inline=True, items_desc_off=-8,
+        moves_base=0x08704A74, moves_stride=0x34, move_bits_off=0x0A,
+        chart=0x084EA6DC, chart_n=21,
+        mapsec_base=0x08DDA3E4, mapsec_name_off=4,
+        region_map=dict(image="imperium", layout=0x08DD975C, w=28, h=15, ox=1, oy=2, none=0xDA),
+        checks=dict(species={1: "Bulbasaur", 4: "Charmander", 25: "Pikachu", 255: "Torchic"},
+                    types={1: (13, 4), 4: (11, 11), 25: (14, 14)},
+                    gender={1: 31, 4: 31, 25: 127}, items={1: "Poké Ball", 2: "Great Ball", 28: "Potion"},
+                    moves={1: (1, 40), 10: (1, 40), 33: (1, 40), 52: (11, 40), 57: (12, 90), 89: (5, 100), 585: (19, 95)}),
     ),
 }
 

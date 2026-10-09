@@ -137,6 +137,11 @@ fun activeRegionMap(): RegionMapModel? {
         GameKind.EMERALD_ROGUE -> regionLayoutsRogue
         GameKind.LAZARUS -> regionLayoutsLazarus
         GameKind.SOULGOLD -> regionLayoutsSoulGold
+        GameKind.GLAZED -> regionLayoutsGlazed
+        GameKind.HEART_AND_SOUL -> regionLayoutsHns
+        GameKind.IMPERIUM -> regionLayoutsImperium
+        GameKind.QUETZAL -> regionLayoutsQuetzal
+        GameKind.ROWE -> regionLayoutsRowe
         else -> emptyList()
     }
     return RegionMapModel(images, activeMapSecData, layouts)

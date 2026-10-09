@@ -283,6 +283,8 @@ fun card(): SnapshotView {
             style = when (activeGame) {
                 GameKind.FIRERED -> CardStyle.KANTO
                 GameKind.UNBOUND -> CardStyle.UNBOUND
+                GameKind.GLAZED -> CardStyle.GLAZED
+                GameKind.IMPERIUM -> CardStyle.IMPERIUM
                 else -> CardStyle.HOENN
             },
             name = TrainerCardArt.enc(if (activeGame == GameKind.UNBOUND) "Kai" else if (kanto) "RED" else "MAY"),

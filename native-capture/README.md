@@ -50,7 +50,7 @@ One command per line:
 | `poke8/poke16/poke32 ADDR VAL` | Write RAM (hex or decimal) — e.g. force a party mon fainted/asleep/an egg before opening the party menu |
 | `peek32 ADDR` | Print a word to stdout |
 | `poke8p PTR OFF VAL` / `peek8p PTR OFF` | Write / print the byte at `*(u32 *)PTR + OFF` — save-block fields (Emerald moves its save blocks on every load), e.g. `poke8p 0x030057D8 0x2951 0` clears a caught flag in TMT2 |
-| `call ADDR ARG0 [ARG1]` | Run Thumb function ADDR with r0 = ARG0 (r1 = ARG1) to its return, CPU state restored after (the app's `pk_call`) — e.g. `call 0x081dd164 297` starts FireRed's MUS_VS_TRAINER |
+| `call ADDR ARG0 [ARG1]` | Run Thumb function ADDR with r0 = ARG0 (r1 = ARG1) to its return, CPU state restored after (the app's `pk_call`), and print what it returned in r0 — e.g. `call 0x081dd164 297` starts FireRed's MUS_VS_TRAINER |
 | `park ADDR` | Park the main loop on a Thumb `b .` at ADDR once the VBlank IRQ is fully on (the app's `pkRenderPark`) |
 | `gbpark ADDR` | Game Boy: park the main loop on a `jr @` at ADDR once interrupts are on (`pkRenderGbPark`) |
 | `gbcall FN A C RET` | Game Boy: call FN with A / C until it returns to RET, e.g. Yellow's PlayMusic `gbcall 0x2211 240 8 0x1757` (`pkRenderGbCall`) |

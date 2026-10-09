@@ -48,6 +48,9 @@ data class GameGuide(
     val verified: Boolean = true,
     /** The boss order NEXT BOSS walks through; empty = no such page. */
     val bosses: List<Boss> = emptyList(),
+    /** [bosses] in the order for the map group the player is on (Quetzal: its three regions are
+     * separate campaigns, the one you're in first); null = [bosses]. */
+    val bossesFor: ((mapGroup: Int) -> List<Boss>)? = null,
 )
 
 /** Something the save can show the player already has. */
@@ -109,7 +112,7 @@ data class Boss(
  * map sections - but their guides differ, so each game's [GuideTables] names
  * its own.
  */
-enum class GuideId { FIRERED, LEAFGREEN, EMERALD, RUBY, SAPPHIRE, HEART_AND_SOUL, UNBOUND, RADICAL_RED, ODYSSEY, GAIA, AMETHYST, AMETHYST_V141, CELIA }
+enum class GuideId { FIRERED, LEAFGREEN, EMERALD, RUBY, SAPPHIRE, HEART_AND_SOUL, UNBOUND, RADICAL_RED, ODYSSEY, GAIA, AMETHYST, AMETHYST_V141, CELIA, GLAZED, IMPERIUM, QUETZAL, LAZARUS, SEAGLASS, TMT2, SOULGOLD }
 
 /** [live]'s guide on the native path; else by [game] (the QoL builds have no live tables). */
 fun guideId(game: GameKind?, live: GuideTables?): GuideId? = live?.guide ?: when (game) {
@@ -132,6 +135,13 @@ fun gameGuide(id: GuideId?): GameGuide? = when (id) {
     GuideId.GAIA -> GUIDE_GAIA
     GuideId.AMETHYST, GuideId.AMETHYST_V141 -> GUIDE_AMETHYST
     GuideId.CELIA -> GUIDE_CELIA
+    GuideId.GLAZED -> GUIDE_GLAZED
+    GuideId.IMPERIUM -> GUIDE_IMPERIUM
+    GuideId.QUETZAL -> GUIDE_QUETZAL
+    GuideId.LAZARUS -> GUIDE_LAZARUS
+    GuideId.SEAGLASS -> GUIDE_SEAGLASS
+    GuideId.TMT2 -> GUIDE_TMT2
+    GuideId.SOULGOLD -> GUIDE_SOULGOLD
     null -> null
 }
 

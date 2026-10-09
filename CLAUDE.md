@@ -182,8 +182,11 @@ var); `Boss.variantsFor` lets the teams follow the save (Amethyst's badge-scaled
 text but has its own area data (`GuideId.AMETHYST_V141`) and, via `amethystV141`, its own species / item names (species
 renumbered past 1233). Expansion
 trainers need `TrainerMonLayout` on the `GuideTables`; `altTrainers` reads a hack's extra trainer
-tables. No guide yet for the expansion hacks without source (Lazarus, Seaglass, TMT2): the ROM
-reader only knows the FireRed engine's maps and script commands.
+tables. The expansion hacks without source (Lazarus, Seaglass, TMT2, SoulGold, Glazed, Imperium, Quetzal) get NEXT
+BOSS + HERE only (`Guide<Hack>.kt`, tables found in their ROMs, HERE checked by walking grass headless
+until a wild battle): no area data, since the ROM reader only knows the FireRed engine's maps and script
+commands. TMT2 lists 11 land slots, so its last 1% reads past the table (in the game too); `merge` drops
+slots whose levels can't be real.
 **HERE covers the whole area, for every game with a guide (the user's standing rule)**: not just
 the wild Pokémon but TO DO (hand-written entries tagged `areas = listOf("ROUTE 104", …)`, matched
 to the current map section's name via `areaKey()`), PEOPLE (gifts, gift Pokémon/eggs, in-game
@@ -580,6 +583,46 @@ their declaration order, and `BattlePokemon` (0x60) / `BattleStruct.monToSwitchI
 confirmed by compiling Rogue's headers with host `clang --target=arm-none-eabi` (stub `string.h`, empty
 `generated/*`). Touch battle input stays off.
 
+**Glazed / Emerald Imperium / Quetzal (2026-10-09)**: three more BPEE hacks, found headless from the user's saves
+(`glazed*`, `imperium*`, `quetzal*` fixtures). **Glazed 9.2.0** is an in-place binary edit of retail Emerald: its RAM,
+code and table addresses are retail's (compare literal pools word for word with retail - only the type chart moved),
+its names sit in retail's 412 / 355 / 377 slots (`gen_glazed_tables.py`), FAIRY is type 9, its own Tunod / Johto
+region map is written over retail's blobs (`GZ_REGION_*`, a 64x32 tilemap). **Imperium v1.3.1** is expansion 1.10.0
+(`gen_expansion_tables.py imperium`, `IMP_REGION_*`): 1.10 also packs experience into 21 bits (`Mon.masked`). **Quetzal**
+is its own engine: a 104-byte plaintext struct (`QUETZAL_PARTY_MON`: 10-bit HP at +0x23, egg = IV bit 30), its own
+SaveBlock1 layout and a "BAG3" bit-stream bag (`Bag3Layout`) instead of gBagPockets (`gen_quetzal_tables.py`). Its wild
+Pokémon walk the grass (no random encounters): script a battle (setwildbattle takes a second mon's fields;
+ScriptContext_SetupScript 0x080DB9CC). Its Town Map is FireRed's Kanto / Sevii art, pixel for pixel, redrawn for Emerald's
+region_map.c (8bpp affine, `QTZ_*`) 3 tiles left / 2 up of FireRed's screen, and its mapsec ids are FireRed's: FireRed's
+rects and grids, shifted (`mapSecDataQuetzalOnMap`). Glazed's and Quetzal's party menus are Emerald's slots on TMT2's olive stripes.
+DEX: Glazed is `POKEDEX_EMERALD` (retail's tables rewritten in place, its own 1..386); Imperium's is gSpeciesInfo-based;
+Quetzal's needed new shapes (`entryCategoryPtr`, `BaseStatsLayout`, `DexFlags.seenLevels` / `caughtRegions`). CARD:
+`CardStyle.GLAZED` (its badges / pics / font, 7-digit money, `NativeConfig.maxMoney` 9,999,999) and `.IMPERIUM` (its font,
+three relabelled lines); the card's "all Hoenn caught" star reads each game's own regional list. Quetzal has no card on its
+menus (Emerald's card code survives, reachable only from the cable club) and would need an outfit-based player pic, flag
+banks and per-region badges: no CARD tab there. TMT2's battle block is its own order (PP at +0x26, `TMT2_BATTLE_MON`);
+Amethyst's is rev 0's plus rev 1's three foe fields, its own target-select handler (`*_battle` fixtures).
+R.O.W.E. v2.x (BelialClover's own pokeemerald fork, no expansion): a bit-packed 0x4C-byte plaintext struct Pokemon with no
+IVs (`ROWE_PARTY_MON` / `decodeRoweMon`; nature stored, not PID % 25), vanilla-shaped grown tables (`gen_rowe_tables.py`;
+u16 base stats: `BaseStatsLayout.statsU16`), three region maps picked by gMapHeader.region (`RW_*`), a 10-pocket bag; the
+ROM carries its own symbol table (0x08FB0670) naming most globals. Its system flags were renumbered (none of 0x800+ set on
+the save), so no CARD or GUIDE yet.
+Rogue's DEX: a 2-bit state per *species id* (`DexFlags.bySpecies` / `seenOrCaught`: pokedexBitFlags1 bit 0, ...2 bit 1),
+its own species names (`SpeciesNamesRogue`: ids are national only up to 905). Heart and Soul's map: its Pokégear's
+Johto + Kanto map (`HNS_REGION_*`, smol; the JK entries + grid, MAPSEC_NONE 0x7D) - FLAG 0x8FF picks it in game.
+Guides for the three (live pages only, no area data): Glazed's Tunod gyms; Imperium's (0x78-byte trainers, a 24-byte
+`WildLayout`, random Elite Four teams as variants); Quetzal's three regions as separate campaigns (`GameGuide.bossesFor`
+by map group, NORMAL / HARD variants, Johto / Kanto trainers in `altTrainers`, `GuideTables.flagBanks` / `varBanks` for
+its 0x1000+ flags and 0x5000+ vars). Quetzal's Johto maps (groups 34-35) name their sections from a
+table of their own (0x0922A7E8): `NativeConfig.altMapSecGroups` reads them as 0x100 + id, where the generator puts them.
+**USE on the ITEMS tab** (`FieldItems.kt`, retail FireRed rev 1 / Emerald): a Repel is used by calling the game's own
+VarGet / VarSet / CheckBagHasItem / RemoveBagItem between frames (`MgbaCore.pkCall`, the main core's pk_call returning r0),
+only while ArePlayerFieldControlsLocked is 0 and no battle / menu screen is up; the functions' code is CRC-checked first
+(FireRed's QoL build moved them). The game's own step counter then runs it out. mgba_dump's `call` prints r0 to test such calls.
+**1x frames follow the game screen's vsync** (`EmulatorEngine.onVsync`, ticked from `EmulatorView`'s GL thread): one game
+frame per refresh (60 Hz) or per two (120 Hz), audio resampled to match (`pkSetAudioRate`) with RetroArch-style dynamic
+rate control on the AudioTrack's fill, written non-blocking; no usable vsync (or another speed) falls back to the timer +
+blocking writes. Before, the audio clock paced frames and the display showed one twice / skipped one every few seconds.
 **Frontend launch (Cocoon / iiSU / ES-DE)**: `LaunchActivity` (exported, translucent, no intent
 filter, `taskAffinity=""`) takes the ROM as intent data or a `rom`/`ROM`/`path`/`file`/`uri` extra,
 plays a readable real path in place (`RomUris.originalPath`; needs All files access on 11+), else
@@ -670,8 +713,9 @@ fails while it's stale: `UPDATE_SITE_DATA=1 ./gradlew :app:testDebugUnitTest --t
 `isSupported`'s rules in the browser over that JSON - the ROM is never uploaded; keep the two in step.
 Deployed to Firebase Hosting (`pokedaisy.web.app`) by `.github/workflows/website.yml` on pushes to main touching
 `website/`; the checker's ASK FOR SUPPORT pre-fills `.github/ISSUE_TEMPLATE/rom_request.yml` by field id.
-The site's game matrix is README's Supported games table; a row of all "—" (R.O.W.E.) means detected but no
-companion yet, so the export lists it under `inProgress` - off the matrix, and "in progress" in the ROM check.
+The site's game matrix is README's Supported games table; a row of all "—" means detected but no companion yet,
+so the export lists it under `inProgress` - off the matrix, and "in progress" in the ROM check (none since R.O.W.E.
+got its companion, 2026-10-09).
 The site's demos and art never use real Pokémon / move / item names or the games' art (the user's rule).
 
 **Library names** (`GameTitles.kt`): a game shows as its own name ("Pokémon FireRed") - the player's

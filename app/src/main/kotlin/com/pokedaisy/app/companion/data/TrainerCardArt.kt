@@ -73,14 +73,39 @@ object TrainerCardArt {
         recolor = ::unboundPurple,
     )
 
+    /**
+     * Glazed: retail Emerald's card, with its own Tunod badges (repointed tiles, the palette
+     * edited in place), its own player pics (the front-pic table's 71 / 72 repointed, their
+     * palettes edited in place) and FONT_NORMAL edited in place (its word on the back's
+     * "POKéBLOCKS" line). The widths are retail's.
+     */
+    private val GLAZED = Blobs(
+        RomBlob.EM_CARD_GFX, RomBlob.EM_CARD_FRONT, RomBlob.EM_CARD_BACK, RomBlob.EM_CARD_BG,
+        listOf(RomBlob.EM_CARD_PAL0, RomBlob.EM_CARD_PAL1, RomBlob.EM_CARD_PAL2, RomBlob.EM_CARD_PAL3, RomBlob.EM_CARD_PAL4),
+        RomBlob.EM_CARD_FEMALE_PAL, RomBlob.GZ_CARD_BADGES_PAL, RomBlob.GZ_CARD_BADGES_GFX,
+        RomBlob.GZ_PIC_MALE, RomBlob.GZ_PIC_MALE_PAL, RomBlob.GZ_PIC_FEMALE, RomBlob.GZ_PIC_FEMALE_PAL,
+        RomBlob.GZ_FONT_NORMAL, RomBlob.EM_FONT_NORMAL_WIDTHS,
+    )
+
+    /** Emerald Imperium: retail Emerald's card and pics in its own FONT_NORMAL (and widths). */
+    private val IMPERIUM = Blobs(
+        RomBlob.EM_CARD_GFX, RomBlob.EM_CARD_FRONT, RomBlob.EM_CARD_BACK, RomBlob.EM_CARD_BG,
+        listOf(RomBlob.EM_CARD_PAL0, RomBlob.EM_CARD_PAL1, RomBlob.EM_CARD_PAL2, RomBlob.EM_CARD_PAL3, RomBlob.EM_CARD_PAL4),
+        RomBlob.EM_CARD_FEMALE_PAL, RomBlob.EM_CARD_BADGES_PAL, RomBlob.EM_CARD_BADGES_GFX,
+        RomBlob.EM_PIC_BRENDAN, RomBlob.EM_PIC_BRENDAN_PAL, RomBlob.EM_PIC_MAY, RomBlob.EM_PIC_MAY_PAL,
+        RomBlob.IMP_FONT_NORMAL, RomBlob.IMP_FONT_NORMAL_WIDTHS,
+    )
+
     private fun blobs(style: CardStyle) = when (style) {
         CardStyle.KANTO -> KANTO
         CardStyle.HOENN -> HOENN
         CardStyle.UNBOUND -> UNBOUND
+        CardStyle.GLAZED -> GLAZED
+        CardStyle.IMPERIUM -> IMPERIUM
     }
 
     /** Every blob a card needs, every style. */
-    val BLOBS: List<RomBlob> = (KANTO.all + HOENN.all + UNBOUND.all).distinct()
+    val BLOBS: List<RomBlob> = (KANTO.all + HOENN.all + UNBOUND.all + GLAZED.all + IMPERIUM.all).distinct()
 
     /** One style's decoded blobs. */
     class Art internal constructor(val style: CardStyle, internal val d: Map<RomBlob, ByteArray>)
@@ -122,7 +147,7 @@ object TrainerCardArt {
      */
     fun render(art: Art, card: TrainerCardInfo, back: Boolean, colon: Boolean = true, backdrop: Boolean = true): RomArt.Image {
         val b = blobs(art.style)
-        val kanto = art.style != CardStyle.HOENN
+        val kanto = !art.style.hoenn
         val lay = if (kanto) KANTO_LAYOUT else HOENN_LAYOUT
         fun d(r: RomBlob) = art.d.getValue(r)
         val pal = IntArray(256)
@@ -179,7 +204,7 @@ object TrainerCardArt {
         }
         // BG1.
         val t = Text(img, d(b.font), d(b.widths), lay)
-        if (kanto) kantoText(t, card, back, colon) else hoennText(t, card, back, colon)
+        if (kanto) kantoText(t, card, back, colon) else hoennText(t, card, back, colon, art.style)
         return img
     }
 
@@ -265,21 +290,23 @@ object TrainerCardArt {
         }
     }
 
-    private fun hoennText(t: Text, c: TrainerCardInfo, back: Boolean, colon: Boolean) {
+    private fun hoennText(t: Text, c: TrainerCardInfo, back: Boolean, colon: Boolean, style: CardStyle = CardStyle.HOENN) {
         val pad = 0x77
+        // Imperium words three labels its own way; Glazed prints 7 money digits (its cap is 9,999,999).
+        val imperium = style == CardStyle.IMPERIUM
         if (!back) {
             t.print(16, 33, enc("NAME: ") + c.name)
             val id = enc("IDNo.") + digits(c.trainerId, 5, LEADING_ZEROS, pad)
             t.print((96 - t.width(id)) / 2 + 120, 9, id)
-            val money = enc("¥") + digits(c.money.toInt(), 6, LEFT, pad)
+            val money = enc("¥") + digits(c.money.toInt(), if (style == CardStyle.GLAZED) 7 else 6, LEFT, pad)
             t.print(16, 57, enc("MONEY"))
             t.print(128 - t.width(money), 57, money)
             c.dexCaught?.let { n ->
                 val s = digits(n, 3, LEFT, pad)
-                t.print(16, 73, enc("POKéDEX"))
+                t.print(16, 73, enc(if (imperium) "Pokédex" else "POKéDEX"))
                 t.print(128 - t.width(s), 73, s)
             }
-            t.print(16, 89, enc("TIME"))
+            t.print(16, 89, enc(if (imperium) "Time" else "TIME"))
             val colonW = t.width(enc(":"))
             val x = 128 - (colonW + 30)
             t.print(x, 89, digits(c.hours, 3, RIGHT, pad))
@@ -308,7 +335,7 @@ object TrainerCardArt {
                 x += t.width(part)
             }
         }
-        if (c.trades != 0) stat(2, enc("POKéMON TRADES"), digits(c.trades, 5, RIGHT, pad))
+        if (c.trades != 0) stat(2, enc(if (imperium) "Pokémon TRADES" else "POKéMON TRADES"), digits(c.trades, 5, RIGHT, pad))
         if (c.linkPokeblocks != 0) stat(3, listOf(0x55, 0x56, 0x57, 0x58, 0x59) + enc("S W/FRIENDS"), digits(c.linkPokeblocks, 5, RIGHT, pad))
         if (c.linkContests != 0) stat(4, enc("WON CONTESTS W/FRIENDS"), digits(c.linkContests, 5, RIGHT, pad))
         if (c.battlePoints != 0) {

@@ -40,6 +40,11 @@ import com.pokedaisy.app.companion.data.gameGuide
 import com.pokedaisy.app.companion.data.NATIVE_SAPPHIRE
 import com.pokedaisy.app.companion.data.readPokedexState
 import com.pokedaisy.app.companion.data.NATIVE_TMT2
+import com.pokedaisy.app.companion.data.NATIVE_GLAZED
+import com.pokedaisy.app.companion.data.NATIVE_EMERALD_ROGUE
+import com.pokedaisy.app.companion.data.NATIVE_IMPERIUM
+import com.pokedaisy.app.companion.data.NATIVE_QUETZAL
+import com.pokedaisy.app.companion.data.NATIVE_ROWE
 import com.pokedaisy.app.companion.data.NATIVE_EMERALD_SEAGLASS
 import com.pokedaisy.app.companion.data.NATIVE_LAZARUS
 import com.pokedaisy.app.companion.data.NATIVE_SOULGOLD
@@ -612,6 +617,47 @@ open class CompanionScreenshotTest {
     @Test fun seaglassMap() = retail("emerald_seaglass", NATIVE_EMERALD_SEAGLASS, SEAGLASS_ROM, GameKind.EMERALD_SEAGLASS, "MAP", art = true)
     @Test fun seaglassBattle() =
         retail("emerald_seaglass_battle", NATIVE_EMERALD_SEAGLASS, SEAGLASS_ROM, GameKind.EMERALD_SEAGLASS, "BATTLE", art = true)
+    // Pokémon Glazed: retail Emerald's RAM, its own names / types / map sections, Emerald's bag and party slots on olive.
+    @Test fun glazedParty() = retail("glazed", NATIVE_GLAZED, GLAZED_ROM, GameKind.GLAZED, "PARTY", art = true)
+    @Test fun glazedItems() = retail("glazed", NATIVE_GLAZED, GLAZED_ROM, GameKind.GLAZED, "ITEMS", art = true)
+    @Test fun glazedMap() = retail("glazed", NATIVE_GLAZED, GLAZED_ROM, GameKind.GLAZED, "MAP", art = true)
+    @Test fun imperiumParty() = retail("imperium", NATIVE_IMPERIUM, IMPERIUM_ROM, GameKind.IMPERIUM, "PARTY", art = true)
+    @Test fun imperiumItems() = retail("imperium", NATIVE_IMPERIUM, IMPERIUM_ROM, GameKind.IMPERIUM, "ITEMS", art = true)
+    @Test fun imperiumMap() = retail("imperium", NATIVE_IMPERIUM, IMPERIUM_ROM, GameKind.IMPERIUM, "MAP", art = true)
+    @Test fun imperiumBattle() = retail("imperium_battle", NATIVE_IMPERIUM, IMPERIUM_ROM, GameKind.IMPERIUM, "BATTLE", art = true)
+    @Test fun quetzalParty() = retail("quetzal", NATIVE_QUETZAL, QUETZAL_ROM, GameKind.QUETZAL, "PARTY", art = true)
+    @Test fun quetzalItems() = retail("quetzal", NATIVE_QUETZAL, QUETZAL_ROM, GameKind.QUETZAL, "ITEMS", art = true)
+    @Test fun quetzalMap() = retail("quetzal", NATIVE_QUETZAL, QUETZAL_ROM, GameKind.QUETZAL, "MAP", art = true)
+    @Test fun quetzalBattle() = retail("quetzal_battle", NATIVE_QUETZAL, QUETZAL_ROM, GameKind.QUETZAL, "BATTLE", art = true)
+    @Test fun glazedDex() = retail("glazed", NATIVE_GLAZED, GLAZED_ROM, GameKind.GLAZED, "DEX", art = true)
+    @Test fun glazedDexEntry() = retail("glazed", NATIVE_GLAZED, GLAZED_ROM, GameKind.GLAZED, "DEX", entry = 322, art = true)
+    @Test fun imperiumDex() = retail("imperium", NATIVE_IMPERIUM, IMPERIUM_ROM, GameKind.IMPERIUM, "DEX", art = true)
+    @Test fun imperiumDexEntry() = retail("imperium", NATIVE_IMPERIUM, IMPERIUM_ROM, GameKind.IMPERIUM, "DEX", entry = 4, art = true)
+    @Test fun quetzalDex() = retail("quetzal", NATIVE_QUETZAL, QUETZAL_ROM, GameKind.QUETZAL, "DEX", art = true)
+    @Test fun quetzalDexEntry() = retail("quetzal", NATIVE_QUETZAL, QUETZAL_ROM, GameKind.QUETZAL, "DEX", entry = 4, art = true)
+    @Test fun glazedCard() = retail("glazed", NATIVE_GLAZED, GLAZED_ROM, GameKind.GLAZED, "CARD", art = true)
+    @Test fun imperiumCard() = retail("imperium", NATIVE_IMPERIUM, IMPERIUM_ROM, GameKind.IMPERIUM, "CARD", art = true)
+    @Test fun tmt2Battle() = retail("tmt2_battle", NATIVE_TMT2, "Pokemon Too Many Types 2 (v1.5.2).gba", GameKind.TMT2, "BATTLE", art = true)
+    @Test fun amethystBattle() = retail("amethyst_battle", NATIVE_AMETHYST, "Pokemon Amethyst (v1.3.0).gba", GameKind.AMETHYST, "BATTLE", art = true)
+    @Test fun heartAndSoulMap() = retail("heart_and_soul", NATIVE_HEART_AND_SOUL, "Pokémon Heart and Soul (v2.0.6).gba", GameKind.HEART_AND_SOUL, "MAP", art = true)
+    @Test fun emeraldRogueDex() = hackDex("emerald_rogue", NATIVE_EMERALD_ROGUE, "Pokemon Emerald Rogue (v2.2.1-EX).gba", GameKind.EMERALD_ROGUE)
+    @Test fun emeraldRogueDexEntry() = hackDex("emerald_rogue", NATIVE_EMERALD_ROGUE, "Pokemon Emerald Rogue (v2.2.1-EX).gba", GameKind.EMERALD_ROGUE, 744)
+    @Test fun imperiumGuideBoss() = retailGuide("imperium", NATIVE_IMPERIUM, IMPERIUM_ROM, "NEXT BOSS", kind = GameKind.IMPERIUM)
+    @Test fun quetzalGuideBoss() = retailGuide("quetzal", NATIVE_QUETZAL, QUETZAL_ROM, "NEXT BOSS", kind = GameKind.QUETZAL)
+    @Test fun quetzalGuideHere() = retailGuide("quetzal", NATIVE_QUETZAL, QUETZAL_ROM, "HERE", kind = GameKind.QUETZAL)
+    @Test fun lazarusGuideBoss() = retailGuide("lazarus", NATIVE_LAZARUS, LAZARUS_ROM, "NEXT BOSS", kind = GameKind.LAZARUS)
+    @Test fun seaglassGuideBoss() = retailGuide("emerald_seaglass", NATIVE_EMERALD_SEAGLASS, SEAGLASS_ROM, "NEXT BOSS", kind = GameKind.EMERALD_SEAGLASS)
+    @Test fun tmt2GuideBoss() = retailGuide("tmt2", NATIVE_TMT2, TMT2_ROM, "NEXT BOSS", kind = GameKind.TMT2)
+    @Test fun tmt2GuideHere() = retailGuide("tmt2", NATIVE_TMT2, TMT2_ROM, "HERE", kind = GameKind.TMT2)
+    @Test fun soulGoldGuideBoss() = retailGuide("soulgold", NATIVE_SOULGOLD, SG_ROM, "NEXT BOSS", kind = GameKind.SOULGOLD)
+    @Test fun soulGoldGuideHere() = retailGuide("soulgold", NATIVE_SOULGOLD, SG_ROM, "HERE", kind = GameKind.SOULGOLD)
+    @Test fun glazedGuideBoss() = retailGuide("glazed", NATIVE_GLAZED, GLAZED_ROM, "NEXT BOSS", kind = GameKind.GLAZED)
+    @Test fun roweParty() = retail("rowe", NATIVE_ROWE, ROWE_ROM, GameKind.ROWE, "PARTY", art = true)
+    @Test fun roweItems() = retail("rowe", NATIVE_ROWE, ROWE_ROM, GameKind.ROWE, "ITEMS", art = true)
+    @Test fun roweMap() = retail("rowe", NATIVE_ROWE, ROWE_ROM, GameKind.ROWE, "MAP", art = true)
+    @Test fun roweBattle() = retail("rowe_battle", NATIVE_ROWE, ROWE_ROM, GameKind.ROWE, "BATTLE", art = true)
+    @Test fun roweDexEntry() = retail("rowe", NATIVE_ROWE, ROWE_ROM, GameKind.ROWE, "DEX", entry = 884, art = true)
+    @Test fun glazedBattle() = retail("glazed_battle", NATIVE_GLAZED, GLAZED_ROM, GameKind.GLAZED, "BATTLE", art = true)
     @Test fun yellowParty() = yellow("yellow", "PARTY")
     @Test fun yellowItems() = yellow("yellow", "ITEMS")
     @Test fun yellowBattle() = yellow("yellow_battle", "BATTLE")
@@ -781,8 +827,8 @@ open class CompanionScreenshotTest {
         romLanguage = cfg.language
         romGameCode = cfg.gameCode
         val t = cfg.pokedex!!
+        PokedexSource.reader = rom // before the flags: Rogue's are by species, read through the ROM
         val dex = readPokedexState(rom.withRam(FixtureMemoryReader.load(fixture)), cfg, t)!!
-        PokedexSource.reader = rom
         DecompIconSource.reader = rom
         DecompIconSource.tables = cfg.iconTables
         val shown = if (!t.hasRegional || dex.national) (1..t.nationalCount).toList() else PokedexSource.regionalOrder(t)!!.toList()
@@ -804,6 +850,20 @@ open class CompanionScreenshotTest {
 
     @Test fun map() = tab("MAP")
     @Test fun items() = tab("ITEMS")
+
+    /** A Repel's description with USE (FieldItems.kt). */
+    @Test fun itemsRepelUse() = paparazzi.snapshot {
+        activeGame = GameKind.EMERALD
+        val use = object : com.pokedaisy.app.companion.ItemUse {
+            override fun canUse(itemId: Int) = itemId in com.pokedaisy.app.companion.data.REPEL_ITEMS
+            override fun use(itemId: Int, done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit) {}
+        }
+        val items = listOf(
+            ItemView(86, "Repel", 3, spriteAsset("items", 86), description = "Prevents weak wild POKéMON from appearing for 100 steps."),
+            ItemView(13, "Potion", 2, spriteAsset("items", 13)),
+        )
+        QolTheme { ItemsScreen(items, androidx.compose.ui.Modifier.fillMaxSize(), itemUse = use, initialItemId = 86) }
+    }
 
     /** Two stacks of one item (99 Repels and 5 more): LazyColumn used to throw on the repeated key. */
     @Test fun itemsDuplicateStacks() = paparazzi.snapshot {
@@ -867,6 +927,12 @@ private const val ML_FR_JA = ML + "Pocket Monsters - FireRed (Japan) (Rev 1)/Poc
 private const val ML_RU_JA = ML + "Pocket Monsters - Ruby (Japan) (Rev 1)/Pocket Monsters - Ruby (Japan) (Rev 1).gba"
 private fun port(key: String) = com.pokedaisy.app.companion.data.RETAIL_PORTS.getValue(key)()
 private const val SEAGLASS_ROM = "Pokemon Emerald Seaglass (v3.0).gba"
+private const val LAZARUS_ROM = "Pokemon Lazarus (v2.0).gba"
+private const val TMT2_ROM = "Pokemon Too Many Types 2 (v1.5.2).gba"
+private const val GLAZED_ROM = "Glazed (9.2.0).gba"
+private const val IMPERIUM_ROM = "Emerald Imperium (v1.3.1).gba"
+private const val QUETZAL_ROM = "PokemonQuetzalEnglishAlpha9v0.gba"
+private const val ROWE_ROM = "Pokémon R.O.W.E. (v2.1.9.1 Experimental).gba"
 private const val SAPPHIRE_ROM = "Pokemon - Sapphire Version (USA, Europe) (Rev 1).gba"
 private const val HNS_ROM = "Pokémon Heart and Soul (v2.0.6).gba"
 

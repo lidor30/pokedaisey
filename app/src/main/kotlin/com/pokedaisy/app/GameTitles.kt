@@ -59,6 +59,9 @@ object GameTitles {
         "ea5d369cc8a31cbf1cfacb7c9470ea670f08957b" to "Pokémon SoulGold",
         "805d880ee229fb6dc3ce03d7b03baf48f0d759d0" to "Pokémon SoulGold",
         "5d6a036260fdbde96f85b5c1b92d0256d3aebafb" to "Pokémon SoulGold",
+        "e10105d8544469c6a11ca2cf510289981df3c3b0" to "Pokémon Glazed",
+        "1d20091c4d936f5eb122db8780554dd0829ffb63" to "Pokémon Emerald Imperium",
+        "d0658315da1e8827f66f15c3d3a000fe747e163e" to "Pokémon Quetzal",
         // Game Boy (pret/pokeyellow's roms.sha1).
         "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1" to "Pokémon Yellow",
     )

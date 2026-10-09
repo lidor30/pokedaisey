@@ -21,6 +21,35 @@ class HackPokedexTest {
         return dex!!
     }
 
+    /** Emerald Rogue: a 2-bit state per species - its dex said Seen 2 / Caught 1 (COTTONEE seen, ROCKRUFF caught). */
+    @Test
+    fun `Emerald Rogue - species-indexed 2-bit state`() {
+        // No. n reads its species' bit, and species come from the ROM (Gen 9 isn't No. = species).
+        val rom = RomFileReader.load("$ROM_DIR/Pokemon Emerald Rogue (v2.2.1-EX).gba")
+        assumeTrue(rom != null)
+        PokedexSource.reader = rom!!
+        val dex = state("emerald_rogue", NATIVE_EMERALD_ROGUE)
+        assertEquals(setOf(546, 744), dex.seen)
+        assertEquals(setOf(744), dex.caught)
+    }
+
+    /** Quetzal: 3-bit seen levels (6 species), caught per region (CHARMANDER, Kanto) - its dex said SEEN 6 / OWN 1. */
+    @Test
+    fun `Quetzal - seen levels and caught per region`() {
+        val dex = state("quetzal", NATIVE_QUETZAL)
+        assertEquals(6, dex.seen.size)
+        assertTrue(dex.seen.containsAll(listOf(4, 7, 19, 133)))
+        assertEquals(setOf(4), dex.caught)
+        assertTrue(dex.national)
+    }
+
+    /** Glazed: retail's flags (its own numbering, CHIMCHAR No.322); Imperium: SaveBlock1's, by national number. */
+    @Test
+    fun `Glazed and Imperium - the starter caught`() {
+        assertEquals(setOf(322), state("glazed", NATIVE_GLAZED).caught)
+        assertEquals(setOf(4), state("imperium", NATIVE_IMPERIUM).caught)
+    }
+
     @Test
     fun `Odyssey - Talrega 1, National 8 seen, 2 owned`() {
         val dex = state("odyssey_dex", NATIVE_ODYSSEY)
@@ -228,6 +257,38 @@ class HackPokedexTest {
         assertEquals(listOf("Blaze"), chimchar.abilities)
         assertEquals("Iron Fist", chimchar.hiddenAbility)
         assertEquals(62, chimchar.weightHg)
+    }
+
+    @Test
+    fun `Emerald Rogue entries and the MODERN list`() = roms("Pokemon Emerald Rogue (v2.2.1-EX).gba", GameKind.EMERALD_ROGUE, POKEDEX_EMERALD_ROGUE) { t ->
+        assertEquals(179, PokedexSource.regionalOrder(t)!!.first()) // MAREEP is MODERN's No. 001
+        assertEquals("Seed", PokedexSource.entry(t, 1)!!.category)
+        assertEquals(1305, PokedexSource.speciesFor(t, 921)) // PAWMI
+    }
+
+    @Test
+    fun `Quetzal entries`() = roms("PokemonQuetzalEnglishAlpha9v0.gba", GameKind.QUETZAL, POKEDEX_QUETZAL) { t ->
+        val charmander = PokedexSource.entry(t, 4)!!
+        assertEquals("Lizard" to (6 to 85), charmander.category to (charmander.heightDm to charmander.weightHg))
+        assertEquals(listOf("Blaze"), charmander.abilities)
+        assertEquals("Solar Power", charmander.hiddenAbility)
+        assertEquals(31, charmander.genderRatio)
+        assertEquals(1244, PokedexSource.speciesFor(t, 915)) // LECHONK
+    }
+
+    @Test
+    fun `Imperium entries and the Hoenn order`() = roms("Emerald Imperium (v1.3.1).gba", GameKind.IMPERIUM, POKEDEX_IMPERIUM) { t ->
+        assertEquals(252, PokedexSource.regionalOrder(t)!!.first())
+        val charmander = PokedexSource.entry(t, 4)!!
+        assertEquals("Lizard" to (6 to 85), charmander.category to (charmander.heightDm to charmander.weightHg))
+        assertEquals(listOf("Blaze"), charmander.abilities)
+    }
+
+    @Test
+    fun `Glazed entries in its own numbering`() = roms("Glazed (9.2.0).gba", GameKind.GLAZED, POKEDEX_EMERALD) { t ->
+        val chimchar = PokedexSource.entry(t, 322)!!
+        assertEquals(298 to "CHIMP", chimchar.species to chimchar.category)
+        assertEquals(5 to 62, chimchar.heightDm to chimchar.weightHg)
     }
 
     /** Loads the user's ROM (or skips), checks [check], then that every entry

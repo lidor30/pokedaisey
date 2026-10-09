@@ -113,6 +113,88 @@ class HackGuidesTest {
         assertNotNull(g.kind.name, next)
     }
 
+    /** Glazed: no area data yet, so its own checks - the tables, Tunod's leaders, the save's map. */
+    private val glazed = Game("Glazed (9.2.0).gba", GameKind.GLAZED, NATIVE_GLAZED, "glazed")
+
+    @Test fun `glazed tables, leaders and HERE`() {
+        val rom = load(glazed) ?: return
+        assertTrue(guideTablesMatchRom(rom, glazed.t))
+        for (boss in GUIDE_GLAZED.bosses) {
+            val team = GuideRomSource.party(glazed.t, boss.trainer(noProgress))!!
+            assertTrue(boss.title, team.size in 1..6 && team.all { it.species in 1..411 && it.level in 1..100 })
+        }
+        // Forest Pass (0.17), where the save stands: SENTRET is in its grass.
+        val here = GuideRomSource.encounters(glazed.t, 0, 17)!!
+        assertEquals(100, here.grass.sumOf { it.percent })
+        assertTrue(here.grass.any { speciesNamesGlazed[it.species] == "SENTRET" })
+        val progress = readSaveProgress(FixtureMemoryReader.load(glazed.fixture), glazed.cfg, glazed.t)!!
+        assertEquals("LEADER SPARKY", GUIDE_GLAZED.bosses.first { !it.isDone(progress) }.title)
+    }
+
+    private val imperium = Game("Emerald Imperium (v1.3.1).gba", GameKind.IMPERIUM, NATIVE_IMPERIUM, "imperium")
+    private val quetzal = Game("PokemonQuetzalEnglishAlpha9v0.gba", GameKind.QUETZAL, NATIVE_QUETZAL, "quetzal")
+
+    /** Every boss team of Imperium's and Quetzal's guides (Quetzal's NORMAL and HARD, three regions' tables). */
+    @Test fun `imperium and quetzal tables and teams`() = listOf(imperium, quetzal).forEach { g ->
+        val rom = load(g) ?: return@forEach
+        assertTrue(g.kind.name, guideTablesMatchRom(rom, g.t))
+        for (boss in gameGuide(g.t.guide)!!.bosses) for ((label, id) in boss.teams(noProgress)) {
+            val team = GuideRomSource.party(g.t, id)
+            val what = "${g.kind} ${boss.title} $label ($id)"
+            assertTrue(what, team != null && team.size in 1..6)
+            assertTrue(what, team!!.all { it.species > 0 && it.level in 1..100 && it.moves.isNotEmpty() })
+        }
+    }
+
+    /** ROXANNE's team; HERE on each save's map (Imperium: Route 101 has the Shinx a walk met; Quetzal: Kanto Route 1). */
+    @Test fun `imperium and quetzal HERE and NEXT BOSS`() {
+        load(imperium)?.let {
+            assertEquals(listOf(15, 15, 15, 14).sorted(), GuideRomSource.party(imperium.t, 265)!!.map { m -> m.level }.sorted())
+            val here = GuideRomSource.encounters(imperium.t, 0, 16)!!
+            assertTrue(here.grass.any { e -> speciesNamesImperium[e.species] == "Shinx" })
+            val p = readSaveProgress(FixtureMemoryReader.load("imperium"), NATIVE_IMPERIUM, imperium.t)!!
+            assertEquals("LEADER ROXANNE", GUIDE_IMPERIUM.bosses.first { b -> !b.isDone(p) }.title)
+        }
+        load(quetzal)?.let {
+            val here = GuideRomSource.encounters(quetzal.t, 0x25, 0x4C)!!
+            assertTrue(listOf("Pidgey", "Rattata", "Fletchling", "Wooloo", "Lechonk").all { n -> here.grass.any { e -> speciesNamesQuetzal[e.species] == n } })
+            val p = readSaveProgress(FixtureMemoryReader.load("quetzal"), NATIVE_QUETZAL, quetzal.t)!!
+            // On Kanto's Route 1 (map group 0x25): Kanto's campaign first.
+            assertEquals("LEADER BROCK", GUIDE_QUETZAL.bossesFor!!(0x25).first { b -> !b.isDone(p) }.title)
+        }
+    }
+
+    private val lazarus = Game("Pokemon Lazarus (v2.0).gba", GameKind.LAZARUS, NATIVE_LAZARUS, "lazarus")
+    private val seaglass = Game("Pokemon Emerald Seaglass (v3.0).gba", GameKind.EMERALD_SEAGLASS, NATIVE_EMERALD_SEAGLASS, "emerald_seaglass")
+    private val tmt2 = Game("Pokemon Too Many Types 2 (v1.5.2).gba", GameKind.TMT2, NATIVE_TMT2, "tmt2")
+    private val soulgold = Game("Pokemon-SoulGold-v1.1.4.gba", GameKind.SOULGOLD, NATIVE_SOULGOLD, "soulgold")
+    private val soulgold12 = Game("Soulgold (v1.2).gba", GameKind.SOULGOLD, NATIVE_SOULGOLD_V1_2, "soulgold_v12")
+    private val soulgold12b = Game("Pokemon-SoulGold-v1.2.gba", GameKind.SOULGOLD, NATIVE_SOULGOLD_V1_2B, "soulgold_v12b")
+    private val expansion = listOf(lazarus, seaglass, tmt2, soulgold, soulgold12, soulgold12b)
+
+    /** The expansion hacks' tables and every team (SoulGold's Kanto BROCK has mons with no moves listed: the game fills them). */
+    @Test fun `expansion hacks tables and teams`() = expansion.forEach { g ->
+        val rom = load(g) ?: return@forEach
+        assertTrue(g.fixture, guideTablesMatchRom(rom, g.t))
+        for (boss in gameGuide(g.t.guide)!!.bosses) for ((label, id) in boss.teams(noProgress)) {
+            val team = GuideRomSource.party(g.t, id)
+            val what = "${g.fixture} ${boss.title} $label ($id)"
+            assertTrue(what, team != null && team.size in 1..6)
+            assertTrue(what, team!!.all { it.species > 0 && it.level in 1..100 })
+        }
+        val progress = readSaveProgress(FixtureMemoryReader.load(g.fixture), g.cfg, g.t)
+        assertNotNull(g.fixture, gameGuide(g.t.guide)!!.bosses.firstOrNull { !it.isDone(progress!!) })
+    }
+
+    /** HERE on a map each was walked on headless until a wild battle came (that foe is in the table). */
+    @Test fun `expansion hacks HERE`() = listOf(lazarus to (0 to 79), seaglass to (0 to 16), tmt2 to (0 to 32), soulgold to (0 to 16)).forEach { (g, map) ->
+        load(g) ?: return@forEach
+        val here = GuideRomSource.encounters(g.t, map.first, map.second)
+        assertNotNull(g.fixture, here)
+        // TMT2's tables have 11 land slots: the game's last 1% reads past them.
+        assertEquals(g.fixture, if (g === tmt2) 99 else 100, here!!.grass.sumOf { it.percent })
+    }
+
     @Test fun `generated WHERE IS`() = all.forEach { g ->
         select(g)
         val page = generatedWhereIs(g.t.guide, { "AREA $it" }) { false }

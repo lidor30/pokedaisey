@@ -33,6 +33,34 @@ class RomArtTest {
 
     @Test fun emeraldSuppliesItsArt() = assertGolden(composed(RomFileReader.EMERALD_PATH), EMERALD)
 
+    /** Glazed wrote its own region map (Tunod + Johto) over retail Emerald's blobs; the rest of its art is retail's. */
+    @Test fun glazedSuppliesItsRegionMap() {
+        val images = composed(System.getProperty("user.home") + "/Downloads/Game ROMs & Emulation/gba/Glazed (9.2.0).gba")
+        assertEquals("38897c17", pixels(images.getValue("regionmap/glazed.png")))
+        assertTrue("regionmap/hoenn.png" !in images)
+    }
+
+    /** Imperium's region map: Emerald's with markers for its new places, on Emerald's palette. */
+    @Test fun imperiumSuppliesItsRegionMap() {
+        val images = composed(System.getProperty("user.home") + "/Downloads/Game ROMs & Emulation/gba/Emerald Imperium (v1.3.1).gba")
+        assertEquals("a9c4cfb6", pixels(images.getValue("regionmap/imperium.png")))
+    }
+
+    /** Quetzal's Kanto / Sevii maps: FireRed's art redrawn for Emerald's region_map.c (QTZ_*). */
+    @Test fun quetzalSuppliesItsRegionMaps() {
+        val images = composed(System.getProperty("user.home") + "/Downloads/Game ROMs & Emulation/gba/PokemonQuetzalEnglishAlpha9v0.gba")
+        assertEquals(
+            listOf("eee6e9af", "307eba25", "f356dacb", "508b250a"),
+            listOf("kanto", "sevii123", "sevii45", "sevii67").map { pixels(images.getValue("regionmap/quetzal_$it.png")) },
+        )
+    }
+
+    /** Heart and Soul's Johto + Kanto Pokegear map (smol, HNS_REGION_*), on Emerald's palette. */
+    @Test fun heartAndSoulSuppliesItsRegionMap() {
+        val images = composed(System.getProperty("user.home") + "/Downloads/Game ROMs & Emulation/gba/Pokémon Heart and Soul (v2.0.6).gba")
+        assertEquals("54343313", pixels(images.getValue("regionmap/hns.png")))
+    }
+
     @Test fun romWithoutTheArtGivesNothing() {
         val rom = ByteArray(1 shl 20) { (it * 31 + (it ushr 7)).toByte() }
         assertTrue(RomArt.compose(RomArt.find(rom)).isEmpty())

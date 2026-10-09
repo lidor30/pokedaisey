@@ -109,6 +109,15 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
     fun publishFrame() = renderer.publish()
 
     /**
+     * GL thread, once per draw: in RENDERMODE_CONTINUOUSLY the previous swap has just
+     * returned, so this ticks with the refresh of the display the game is on - what
+     * EmulatorEngine paces 1x frames to ([EmulatorEngine.onVsync]).
+     */
+    var onVsync: (() -> Unit)?
+        get() = renderer.onVsync
+        set(v) { renderer.onVsync = v }
+
+    /**
      * Drops the renderer's reference to the current framebuffer and blocks
      * (briefly, bounded) until the GL thread has actually applied that —
      * call this BEFORE tearing down/restarting the emulator core. Render
@@ -161,6 +170,7 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
         private var colorTarget = RenderTarget()
         private var effectTarget = RenderTarget()
         @Volatile var holdFrame: () -> Boolean = { false }
+        @Volatile var onVsync: (() -> Unit)? = null
 
         /** Onto the view: textures start with the game's top row, the view with its bottom one. */
         private val viewUv: FloatBuffer = floats(
@@ -253,7 +263,10 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
             dirtyGeometry = true
         }
 
-        override fun onDrawFrame(gl: GL10?) = synchronized(lock) { draw() }
+        override fun onDrawFrame(gl: GL10?) {
+            onVsync?.invoke()
+            synchronized(lock) { draw() }
+        }
 
         private fun draw() {
             GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)

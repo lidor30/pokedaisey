@@ -38,6 +38,12 @@ object MgbaCore {
     external fun pkVideoWidth(): Int
     external fun pkVideoHeight(): Int
     external fun pkSampleRate(): Int
+    /** Resample the core's audio to [rate] samples per emulated second (default [pkSampleRate]). Emu thread. */
+    external fun pkSetAudioRate(rate: Double)
+
+    /** Runs the game's Thumb function [fn] (r0 = [a0], r1 = [a1]) to its return on the player's
+     * core and gives back its r0, or -1 if it never returned. Emu thread, between frames. */
+    external fun pkCall(fn: Long, a0: Int, a1: Int): Long
 
     external fun pkSetKeys(mask: Int)
     external fun pkRunFrame()
