@@ -726,7 +726,7 @@ val GUIDE_TABLES_TMT2 = GuideTables(
  * headers of 84 bytes; set 0 the default). Flags 0x1898 (0x2AA bytes), vars 0x1B42. */
 val GUIDE_TABLES_SOULGOLD = GuideTables(
     trainers = 0x084A4CDCL, learnsets = 0, wildHeaders = 0x094158D8L,
-    sb1FlagsOff = 0x1898, sb1VarsOff = 0x1B42, flagBytes = 0x2AA,
+    sb1FlagsOff = 0x1898, sb1VarsOff = 0x1C10, flagBytes = 0x2AA, varCount = 0x300,
     probeTrainer = 19, probeName = "Falkner", guide = GuideId.SOULGOLD,
     trainerStride = 0x34, trainerNameOff = 0x1F, trainerNameLen = 11, trainerSizeOff = 0x2B, trainerPartyOff = 8,
     trainerMon = TrainerMonLayout(stride = 0x28, movesOff = 0x0C, speciesOff = 0x14, itemOff = 0x16, levelOff = 0x1C),
