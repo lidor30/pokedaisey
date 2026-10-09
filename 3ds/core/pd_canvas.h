@@ -43,7 +43,7 @@ int pd_text_fit(struct pd_canvas* c, int x, int y, int max_w, const char* utf8, 
 // Right-aligned at right.
 void pd_text_right(struct pd_canvas* c, int right, int y, const char* utf8, uint32_t color, uint32_t shadow);
 // Word-wrapped into max_w, lineH apart, at most maxLines (the last cut with
-// "..."). Returns the lines drawn.
+// "..."). Returns the lines drawn; with c NULL it only counts them.
 int pd_text_wrap(struct pd_canvas* c, int x, int y, int max_w, int lineH, int maxLines, const char* utf8,
                  uint32_t color, uint32_t shadow);
 

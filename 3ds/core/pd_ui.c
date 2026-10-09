@@ -7,12 +7,24 @@
 #include "pd_ui_internal.h"
 
 #define CHIP_H 22
-#define FF_W 30
-#define GEAR_W 26
+#define FF_W 28
+#define GEAR_W 24
 // How far the stylus moves on a list before it scrolls instead of tapping.
 #define DRAG_SLOP 6
 
-static const char* const TAB_LABELS[] = { "PARTY", "BATTLE", "BAG" };
+// The tab bar's chips; SETTINGS is the gear after them. A battle puts BATTLE
+// in the last chip's slot (the app's rule) and gives it back afterwards.
+#define BAR_TABS 5
+static const enum pd_tab BAR[BAR_TABS] = { PD_TAB_PARTY, PD_TAB_BAG, PD_TAB_MAP, PD_TAB_GUIDE, PD_TAB_DEX };
+static const char* const TAB_LABELS[PD_TAB_COUNT] = {
+    [PD_TAB_PARTY] = "PARTY", [PD_TAB_BAG] = "BAG", [PD_TAB_MAP] = "MAP", [PD_TAB_GUIDE] = "GUIDE",
+    [PD_TAB_DEX] = "DEX", [PD_TAB_BATTLE] = "BATTLE", [PD_TAB_SETTINGS] = "",
+};
+
+// The tab a bar slot shows now.
+static enum pd_tab slot_tab(const struct pd_ui* ui, int slot) {
+    return slot == ui->battleSlot ? PD_TAB_BATTLE : BAR[slot];
+}
 
 // The SETTINGS gear, 11x11 (bit 0 = left):
 //   ....###....   .##.###.##.   .#########.   ..###.###..
@@ -27,18 +39,28 @@ void pd_ui_init(struct pd_ui* ui, struct pd_settings* settings) {
     ui->summarySlot = -1;
     ui->bagSelected = -1;
     ui->pressedId = -1;
+    ui->battleSlot = -1;
+    ui->dexNational = -1;
+    ui->mapPage = -1;
+    ui->mapSel = -1;
+    ui->mapDungeon = -1;
+    ui->guideOpen = -1;
     ui->settings = settings;
 }
 
 void pd_ui_update(struct pd_ui* ui, const struct pd_snapshot* s) {
     bool on = s->valid && s->inBattle && s->battlers[PD_POS_PLAYER_LEFT].species;
     if (on && !ui->battleWasOn) {
-        if (ui->tab != PD_TAB_BATTLE) ui->tabBeforeBattle = ui->tab;
+        // BATTLE takes the bar's last tab's place (the app's rule - PARTY,
+        // what a battle needs most, stays); its end brings back what was open.
+        ui->tabBeforeBattle = ui->tab;
+        ui->battleSlot = BAR_TABS - 1;
         ui->tab = PD_TAB_BATTLE;
         ui->summarySlot = -1;
         ui->overlay = PD_OVERLAY_NONE;
-    } else if (!on && ui->battleWasOn && ui->tab == PD_TAB_BATTLE) {
-        ui->tab = ui->tabBeforeBattle;
+    } else if (!on && ui->battleWasOn) {
+        if (ui->tab == PD_TAB_BATTLE) ui->tab = ui->tabBeforeBattle;
+        ui->battleSlot = -1;
     }
     ui->battleWasOn = on;
     if (ui->summarySlot >= s->partyCount) ui->summarySlot = -1;
@@ -58,12 +80,12 @@ static void chip(struct pd_ui* ui, struct pd_canvas* c, int x, int w, bool open,
 }
 
 static void tab_bar(struct pd_ui* ui, struct pd_canvas* c, const struct pd_host_info* host) {
-    int tabs = 3;
-    int w = (c->w - MARGIN * (tabs + 3) - FF_W - GEAR_W) / tabs;
+    int w = (c->w - MARGIN * (BAR_TABS + 3) - FF_W - GEAR_W) / BAR_TABS;
     int x = MARGIN;
-    for (int t = 0; t < tabs; t++, x += w + MARGIN) {
-        bool open = ui->tab == (enum pd_tab) t;
-        chip(ui, c, x, w, open, HIT_TAB + t);
+    for (int i = 0; i < BAR_TABS; i++, x += w + MARGIN) {
+        enum pd_tab t = slot_tab(ui, i);
+        bool open = ui->tab == t;
+        chip(ui, c, x, w, open, HIT_TAB + (int) t);
         int tw = pd_text_width(TAB_LABELS[t]);
         pd_text(c, x + (w - tw) / 2, pd_text_y(2, CHIP_H), TAB_LABELS[t], open ? PD_VALUE : PD_TITLE_TEXT,
                 open ? PD_VALUE_SHADOW : PD_TITLE_SHADOW);
@@ -93,10 +115,42 @@ void pd_ui_draw(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g,
         ui_party_tab(ui, c, s);
     } else if (ui->tab == PD_TAB_BAG) {
         ui_bag_tab(ui, c, g, s);
+    } else if (ui->tab == PD_TAB_MAP) {
+        ui_map_tab(ui, c, g, s);
+    } else if (ui->tab == PD_TAB_GUIDE) {
+        ui_guide_tab(ui, c, g, s);
+    } else if (ui->tab == PD_TAB_DEX) {
+        ui_dex_tab(ui, c, g, s);
     } else {
         ui_battle_tab(ui, c, s);
     }
-    ui_overlay(ui, c);
+    if (ui->overlay == PD_OVERLAY_PLACES) {
+        ui_places_overlay(ui, c, g);
+    } else if (ui->overlay == PD_OVERLAY_GUIDE_NOTICE) {
+        ui_guide_notice(ui, c, g);
+    } else {
+        ui_overlay(ui, c);
+    }
+}
+
+// The list a drag scrolls right now.
+static int* scroll_target(struct pd_ui* ui) {
+    if (ui->overlay == PD_OVERLAY_PLACES) return &ui->placesScroll;
+    switch (ui->tab) {
+    case PD_TAB_BAG: return &ui->bagScroll;
+    case PD_TAB_DEX: return &ui->dexScroll;
+    case PD_TAB_GUIDE: return &ui->guideScroll;
+    default: return NULL;
+    }
+}
+
+bool pd_ui_tick(struct pd_ui* ui, unsigned ms) {
+    // The MAP cursor swaps sizes every 20 GBA frames, like the game's.
+    ui->blinkMs += ms;
+    if (ui->blinkMs < 333) return false;
+    ui->blinkMs %= 333;
+    ui->mapBlink = !ui->mapBlink;
+    return ui->tab == PD_TAB_MAP && ui->overlay == PD_OVERLAY_NONE;
 }
 
 static void close_overlay(struct pd_ui* ui, enum pd_action action) {
@@ -105,6 +159,7 @@ static void close_overlay(struct pd_ui* ui, enum pd_action action) {
 }
 
 static void act(struct pd_ui* ui, int id) {
+    if (ui_map_act(ui, id) || ui_dex_act(ui, id) || ui_guide_act(ui, id)) return;
     if (ui->overlay != PD_OVERLAY_NONE) {
         if (id >= HIT_OPTION && id < HIT_OPTION + 8) {
             int i = id - HIT_OPTION;
@@ -170,7 +225,8 @@ bool pd_ui_touch(struct pd_ui* ui, int x, int y, bool down) {
             ui->pressedId = -1;
         }
         if (ui->dragging) {
-            ui->bagScroll -= y - ui->touchLastY;
+            int* scroll = scroll_target(ui);
+            if (scroll) *scroll -= y - ui->touchLastY;
             ui->touchLastY = y;
             return true;
         }
@@ -197,11 +253,22 @@ bool pd_ui_touch(struct pd_ui* ui, int x, int y, bool down) {
 
 void pd_ui_next_tab(struct pd_ui* ui, int dir) {
     if (ui->overlay != PD_OVERLAY_NONE) return;
-    ui->tab = (enum pd_tab) ((ui->tab + PD_TAB_COUNT + dir) % PD_TAB_COUNT);
+    // The bar's order, then the gear.
+    enum pd_tab order[BAR_TABS + 1];
+    int at = 0;
+    for (int i = 0; i < BAR_TABS; i++) {
+        order[i] = slot_tab(ui, i);
+        if (order[i] == ui->tab) at = i;
+    }
+    order[BAR_TABS] = PD_TAB_SETTINGS;
+    if (ui->tab == PD_TAB_SETTINGS) at = BAR_TABS;
+    ui->tab = order[(at + BAR_TABS + 1 + dir) % (BAR_TABS + 1)];
     ui->summarySlot = -1;
 }
 
 bool pd_ui_back(struct pd_ui* ui) {
+    // The GUIDE's notice: BACK is its GO BACK.
+    if (ui->overlay == PD_OVERLAY_GUIDE_NOTICE) return ui_guide_act(ui, HIT_NOTICE_BACK);
     if (ui->overlay != PD_OVERLAY_NONE) {
         ui->overlay = PD_OVERLAY_NONE;
         return true;
@@ -212,6 +279,19 @@ bool pd_ui_back(struct pd_ui* ui) {
     }
     if (ui->tab == PD_TAB_BAG && ui->bagSelected >= 0) {
         ui->bagSelected = -1;
+        return true;
+    }
+    if (ui->tab == PD_TAB_DEX && ui->dexOpen) {
+        ui->dexOpen = 0;
+        return true;
+    }
+    if (ui->tab == PD_TAB_MAP && (ui->mapSel >= 0 || ui->mapDungeon >= 0 || ui->mapPage >= 0)) {
+        ui->mapSel = ui->mapDungeon = ui->mapPage = -1;
+        return true;
+    }
+    if (ui->tab == PD_TAB_GUIDE && ui->guideOpen >= 0) {
+        ui->guideOpen = -1;
+        ui->guideLevel = 0;
         return true;
     }
     return false;

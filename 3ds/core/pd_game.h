@@ -33,6 +33,30 @@ struct pd_config {
     // bagOrder[i] is the pocket (PD_POCKET_*) the game keeps at index i.
     uint32_t bagPockets;
     uint8_t bagOrder[5];
+
+    // POKéDEX (the app's PokedexTables): ROM tables ...
+    uint32_t dexEntries;       // gPokedexEntries, by national number
+    uint32_t dexEntryStride;
+    uint32_t speciesInfo;      // gBaseStats, 28 bytes per species
+    uint32_t speciesToNational; // u16 per species from species 1
+    uint32_t abilityNames;     // 13 bytes each
+    uint32_t frontPics;        // {LZ77 pointer, size, tag} per species
+    uint32_t palettes;         // {LZ77 pointer, tag} per species
+    uint32_t regionalOrder;    // u16 national numbers; 0 = national 1..regionalCount
+    int regionalCount;
+    const char* regionName;
+    // ... and the save: SaveBlock2's owned / seen flags, SaveBlock1's two
+    // copies of seen (all must agree), the National Dex byte.
+    uint32_t dexSeenCopy1, dexSeenCopy2; // in SaveBlock1
+    uint8_t nationalMagicOff, nationalMagic; // SaveBlock2 + 0x18 + off == magic
+
+    // GUIDE (the app's GuideTables): ROM tables and SaveBlock1 offsets.
+    uint32_t trainers;    // gTrainers, 0x28 bytes each
+    uint32_t learnsets;   // gLevelUpLearnsets, a pointer per species
+    uint32_t wildHeaders; // gWildMonHeaders, 20 bytes each
+    uint32_t flagsOff, varsOff, flagBytes; // in SaveBlock1
+    int probeTrainer;     // checks the tables match the ROM ...
+    const char* probeName; // ... by this trainer's name
 };
 
 // The bag's pockets, in a fixed order of our own (the app's QOL_POCKET_* ids).
@@ -52,7 +76,22 @@ struct pd_game {
     const char* title;  // "Pokémon FireRed"
     const struct pd_config* cfg; // NULL = detected but not supported
     const char* unsupported;     // why, when cfg is NULL
+    // The ROM's bytes (0x08000000 on the bus), for the tabs that read its
+    // tables and art; the host sets them once the ROM is loaded (NULL = none).
+    const uint8_t* rom;
+    size_t romSize;
+    unsigned loadId; // new on every pd_game_detect (see pd_rom_id)
 };
+
+// Which ROM the tabs' caches were built from: 0 = none, else new for every
+// game loaded. Not the ROM pointer - mGBA's 3DS build loads every game into
+// the same fixed buffer.
+unsigned pd_rom_id(const struct pd_game* g);
+
+// Reads from the ROM at a bus address (0x08xxxxxx); false if out of range.
+bool pd_rom_read(const struct pd_game* g, uint32_t addr, void* out, size_t len);
+// A pointer into the ROM at a bus address, with at least len bytes after it.
+const uint8_t* pd_rom_at(const struct pd_game* g, uint32_t addr, size_t len);
 
 // Reads the ROM header (the first 0xC0 bytes of the ROM) and its size.
 void pd_game_detect(struct pd_game* g, const uint8_t* header, size_t romSize);

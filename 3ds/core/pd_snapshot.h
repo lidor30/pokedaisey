@@ -47,6 +47,10 @@ struct pd_battle_mon {
 
 // A pocket's slots: every pocket of FireRed's and Emerald's bag holds at most 64.
 #define PD_POCKET_SLOTS 64
+#define PD_NATIONAL_COUNT 386
+#define PD_DEX_BYTES 52
+#define PD_FLAG_BYTES 0x12C // Emerald's; FireRed's 0x120 fit
+#define PD_VAR_COUNT 0x100
 
 struct pd_item {
     uint16_t id, quantity;
@@ -69,9 +73,37 @@ struct pd_snapshot {
     // By PD_POCKET_*; bagOk = the pockets read (not just empty).
     bool bagOk;
     struct pd_pocket_items bag[PD_POCKET_COUNT];
+
+    // Where the player stands: SaveBlock1.pos and the map's group / number,
+    // and gMapHeader's layout size and map type (for the head on the MAP).
+    bool posOk;
+    int x, y, mapGroup, mapNum;
+    int mapW, mapH, mapType;
+    int gender; // SaveBlock2.playerGender: 0 boy, 1 girl, -1 unknown
+
+    // POKéDEX: by national number - 1, a bit each (the app's
+    // readPokedexState: seen only when SaveBlock2's flags and both of
+    // SaveBlock1's copies agree; caught only when also seen).
+    bool dexOk, dexNational;
+    uint8_t dexSeen[PD_DEX_BYTES], dexCaught[PD_DEX_BYTES];
+
+    // The GUIDE's save data: SaveBlock1's event flags and vars.
+    bool flagsOk;
+    uint8_t flags[PD_FLAG_BYTES];
+    uint16_t vars[PD_VAR_COUNT];
 };
 
+bool pd_flag(const struct pd_snapshot* s, int flag);
+int pd_var(const struct pd_snapshot* s, int var);
+bool pd_dex_seen(const struct pd_snapshot* s, int national);
+bool pd_dex_caught(const struct pd_snapshot* s, int national);
+bool pd_bag_has(const struct pd_snapshot* s, int item);
+
 void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn read, void* ctx);
+
+// The English games' text (up to 0xFF or maxLen bytes) as UTF-8; line breaks
+// become spaces and control codes are skipped.
+void pd_gen3_text(const uint8_t* src, size_t maxLen, char* out, size_t outLen);
 
 // Decodes one struct Pokemon (100 bytes); false for an empty slot.
 bool pd_decode_party_mon(const uint8_t* raw, struct pd_mon* out);

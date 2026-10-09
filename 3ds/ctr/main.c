@@ -25,6 +25,7 @@
 
 #include "../core/pd_canvas.h"
 #include "../core/pd_game.h"
+#include "../core/pd_map.h"
 #include "../core/pd_menu.h"
 #include "../core/pd_settings.h"
 #include "../core/pd_snapshot.h"
@@ -248,6 +249,8 @@ struct game_mem {
     size_t ewramSize;
     uint8_t* iwram;
     size_t iwramSize;
+    const uint8_t* rom;
+    size_t romSize;
 };
 
 static bool bus_read(void* ctx, uint32_t addr, void* out, size_t len) {
@@ -258,6 +261,11 @@ static bool bus_read(void* ctx, uint32_t addr, void* out, size_t len) {
     }
     if (addr >= 0x03000000 && addr - 0x03000000 + len <= m->iwramSize) {
         memcpy(out, m->iwram + (addr - 0x03000000), len);
+        return true;
+    }
+    // ROM: pointers in RAM often lead into it (a map's layout).
+    if (addr >= 0x08000000 && addr - 0x08000000 + len <= m->romSize) {
+        memcpy(out, m->rom + (addr - 0x08000000), len);
         return true;
     }
     return false;
@@ -374,6 +382,15 @@ static bool run_game(const char* file) {
     struct game_mem mem = { 0 };
     mem.ewram = core->getMemoryBlock(core, 0x02, &mem.ewramSize);
     mem.iwram = core->getMemoryBlock(core, 0x03, &mem.iwramSize);
+    // The ROM as mGBA loaded it, for MAP / POKéDEX / GUIDE, which read its
+    // tables and art. The region map is rebuilt now (a pass over the whole
+    // ROM, about a second here) rather than on the first MAP open, mid-game.
+    size_t romSize = 0;
+    game.rom = core->getMemoryBlock(core, 0x08, &romSize);
+    game.romSize = game.rom ? romSize : 0;
+    mem.rom = game.rom;
+    mem.romSize = game.romSize;
+    pd_map_art(&game);
 
     struct pd_ui ui;
     pd_ui_init(&ui, &settings);
@@ -397,6 +414,7 @@ static bool run_game(const char* file) {
     int leaveHeld = 0;
     unsigned frame = 0, fpsFrames = 0;
     u64 fpsStart = osGetTime();
+    u64 lastTick = fpsStart;
     bool appRunning = true;
 
     while ((appRunning = aptMainLoop())) {
@@ -474,6 +492,8 @@ static bool run_game(const char* file) {
 
         fpsFrames += (unsigned) frames;
         u64 now = osGetTime();
+        redraw |= pd_ui_tick(&ui, (unsigned) (now - lastTick));
+        lastTick = now;
         if (now - fpsStart >= 1000) {
             // Against the GBA's own 268111856 / 4481136 = 59.73 frames a second.
             unsigned pct = (unsigned) ((u64) fpsFrames * 1000 * 100 * 4481136 / ((now - fpsStart) * 268111856ULL));

@@ -1,5 +1,6 @@
 // The companion on the 3DS's 320x240 bottom screen: PARTY (with a summary on
-// tap), BATTLE (cards + your moves' verdicts), BAG and SETTINGS, in the app's
+// tap), BAG, MAP, GUIDE, POKéDEX, BATTLE (cards + your moves' verdicts) and
+// SETTINGS, in the app's
 // FireRed OPTION-screen look (app/.../companion/ui/GbaMenu.kt). Immediate
 // mode: every pd_ui_draw records where its tappable parts went, and
 // pd_ui_touch looks a tap up there - no layout pass to keep in sync.
@@ -21,8 +22,11 @@
 
 enum pd_tab {
     PD_TAB_PARTY,
-    PD_TAB_BATTLE,
     PD_TAB_BAG,
+    PD_TAB_MAP,
+    PD_TAB_GUIDE,
+    PD_TAB_DEX,
+    PD_TAB_BATTLE,
     PD_TAB_SETTINGS,
     PD_TAB_COUNT,
 };
@@ -42,6 +46,7 @@ enum pd_screen_mode {
 struct pd_settings {
     int screenMode; // enum pd_screen_mode
     int ffSpeed;    // PD_FF_MIN..PD_FF_MAX
+    int guideNotice; // a bit per game kind whose GUIDE notice was accepted
 };
 
 enum pd_action {
@@ -64,7 +69,7 @@ struct pd_host_info {
     char stateWhen[24]; // when it was made, shown beside LOAD STATE
 };
 
-#define PD_UI_MAX_HITS 32
+#define PD_UI_MAX_HITS 64
 struct pd_hit {
     int x, y, w, h;
     int id;
@@ -78,16 +83,33 @@ enum pd_overlay {
     PD_OVERLAY_CONFIRM_SAVE,
     PD_OVERLAY_CONFIRM_LOAD,
     PD_OVERLAY_CONFIRM_LEAVE,
+    PD_OVERLAY_PLACES,       // the MAP's list of places
+    PD_OVERLAY_GUIDE_NOTICE, // the GUIDE's "AI-written, may be wrong" notice
 };
 
 struct pd_ui {
     enum pd_tab tab;
     enum pd_tab tabBeforeBattle; // the tab a battle took over from
+    int battleSlot;              // the bar slot BATTLE shows in, -1 = none
     bool battleWasOn;
     int summarySlot; // party slot whose summary is open, -1 = none
     int bagPocket;   // index into the game's own pocket order
     int bagSelected; // item index in that pocket, -1 = none
     int bagScroll;   // pixels
+
+    // POKéDEX: the list's scroll, the open entry (national number, 0 = the
+    // list), and which dex shows (-1 = the save's own: National once it has
+    // it, else the regional one).
+    int dexScroll, dexOpen, dexNational;
+    // MAP: the page shown (-1 = the player's), the tapped place, the cursor's blink.
+    int mapPage, mapSel, mapDungeon, mapSelTx, mapSelTy;
+    bool mapBlink;
+    unsigned blinkMs;
+    int placesScroll;
+    // GUIDE: the page, its scroll, the open entry and how far it's revealed.
+    int guidePage, guideScroll, guideOpen, guideLevel;
+    bool guideNoticeShown;
+
     enum pd_overlay overlay;
     struct pd_settings* settings;
     enum pd_action action;
@@ -111,6 +133,9 @@ void pd_ui_next_tab(struct pd_ui* ui, int dir);
 bool pd_ui_back(struct pd_ui* ui);
 // The last thing the player asked the host for (once), or PD_ACTION_NONE.
 enum pd_action pd_ui_take_action(struct pd_ui* ui);
+// Time passing (milliseconds since the last call): true when something on
+// screen animates and needs a redraw (the MAP cursor's blink).
+bool pd_ui_tick(struct pd_ui* ui, unsigned ms);
 
 const char* pd_screen_mode_name(int mode);
 

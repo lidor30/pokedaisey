@@ -99,6 +99,37 @@ void ui_row(struct pd_canvas* c, int x, int y, int w, const char* label, const c
     }
 }
 
+#define BALL_RED 0xE84848
+#define BALL_DARK 0x404040
+#define BALL_SEEN 0xA8A8B0
+
+void ui_ball(struct pd_canvas* c, int x, int y, bool caught) {
+    pd_round_rect(c, x, y, 10, 10, 5, caught ? BALL_DARK : BALL_SEEN);
+    if (caught) {
+        pd_round_rect(c, x + 1, y + 1, 8, 8, 4, 0xFFFFFF);
+        pd_fill(c, x + 2, y + 1, 6, 1, BALL_RED);
+        pd_fill(c, x + 1, y + 2, 8, 3, BALL_RED);
+        pd_fill(c, x + 1, y + 5, 8, 1, BALL_DARK);
+        pd_fill(c, x + 4, y + 4, 2, 3, 0xFFFFFF);
+    } else {
+        pd_round_rect(c, x + 2, y + 2, 6, 6, 3, 0xE0E0E8);
+    }
+}
+
+int ui_clamp_scroll(int scroll, int total, int view) {
+    int max = total - view;
+    if (max < 0) max = 0;
+    return scroll < 0 ? 0 : scroll > max ? max : scroll;
+}
+
+void ui_scroll_bar(struct pd_canvas* c, int x, int y, int h, int scroll, int total, uint32_t color) {
+    if (total <= h) return;
+    int th = h * h / total;
+    if (th < 8) th = 8;
+    int ty = y + (h - th) * scroll / (total - h);
+    pd_fill(c, x, ty, 2, th, color);
+}
+
 void ui_format_money(long v, char* buf, size_t len) {
     if (v < 0) {
         snprintf(buf, len, "-");

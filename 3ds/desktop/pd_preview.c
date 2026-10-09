@@ -34,8 +34,9 @@ static bool load(const char* dir, const char* name, uint8_t* buf, size_t len) {
     return n == len;
 }
 
+// The fixture's RAM, and the ROM when one was given (ctx: the game).
 static bool fixture_read(void* ctx, uint32_t addr, void* out, size_t len) {
-    (void) ctx;
+    if (pd_rom_read(ctx, addr, out, len)) return true;
     if (addr >= 0x02000000 && addr + len <= 0x02040000) {
         memcpy(out, ewram + (addr - 0x02000000), len);
         return true;
@@ -49,6 +50,10 @@ static bool fixture_read(void* ctx, uint32_t addr, void* out, size_t len) {
 
 // Both screens in one picture: the top screen (here a stand-in for the game
 // at 1x, centred) over the bottom one, centred like on the console.
+// The UI being shot: with PD_PREVIEW_HITS set, each shot also prints where
+// its tap targets are (id x y w h), for writing emulator test steps.
+static const struct pd_ui* shotUi;
+
 static void shot(const char* dir, const char* name, const char* what, const uint32_t* bottom) {
     static uint32_t img[TOP_W * TOP_H * 2];
     for (int i = 0; i < TOP_W * TOP_H * 2; i++) img[i] = 0x101010;
@@ -68,6 +73,12 @@ static void shot(const char* dir, const char* name, const char* what, const uint
         exit(1);
     }
     printf("%s\n", path);
+    if (shotUi && getenv("PD_PREVIEW_HITS")) {
+        for (int i = 0; i < shotUi->hitCount; i++) {
+            const struct pd_hit* h = &shotUi->hits[i];
+            printf("  hit %d: %d %d %d %d\n", h->id, h->x, h->y, h->w, h->h);
+        }
+    }
 }
 
 // The stylus, driven by what the last draw recorded: each step finds its
@@ -84,6 +95,19 @@ struct preview {
 
 static void draw(struct preview* p) {
     pd_ui_draw(p->ui, p->c, p->g, p->s, p->host);
+}
+
+static bool has_hit(struct preview* p, int id) {
+    for (int i = 0; i < p->ui->hitCount; i++)
+        if (p->ui->hits[i].id == id) return true;
+    return false;
+}
+
+// The first hit with an id in [lo, hi), or -1.
+static int first_hit(struct preview* p, int lo, int hi) {
+    for (int i = 0; i < p->ui->hitCount; i++)
+        if (p->ui->hits[i].id >= lo && p->ui->hits[i].id < hi) return p->ui->hits[i].id;
+    return -1;
 }
 
 static void centre_of(struct preview* p, int id, int* x, int* y) {
@@ -126,8 +150,8 @@ static void drag(struct preview* p, int id, int dy) {
 }
 
 int main(int argc, char** argv) {
-    if (argc != 5) {
-        fprintf(stderr, "usage: pd_preview <fixture dir> <BPRE|BPGE|BPEE> <out dir> <name>\n");
+    if (argc != 5 && argc != 6) {
+        fprintf(stderr, "usage: pd_preview <fixture dir> <BPRE|BPGE|BPEE> <out dir> <name> [rom]\n");
         return 2;
     }
     const char *dir = argv[1], *code = argv[2], *out = argv[3], *name = argv[4];
@@ -140,9 +164,24 @@ int main(int argc, char** argv) {
     header[0xBC] = strcmp(code, "BPEE") ? 1 : 0;
     struct pd_game game;
     pd_game_detect(&game, header, 0x1000000);
+    // A ROM (pret's byte-identical builds stand in for retail) feeds the tabs
+    // that read it: MAP, POKéDEX, GUIDE.
+    if (argc == 6) {
+        static uint8_t rom[32 << 20];
+        FILE* f = fopen(argv[5], "rb");
+        size_t n = f ? fread(rom, 1, sizeof(rom), f) : 0;
+        if (f) fclose(f);
+        if (n < 0xC0) {
+            fprintf(stderr, "pd_preview: can't read the ROM %s\n", argv[5]);
+            return 1;
+        }
+        pd_game_detect(&game, rom, n);
+        game.rom = rom;
+        game.romSize = n;
+    }
 
     struct pd_snapshot snap;
-    pd_snapshot_read(&snap, &game, fixture_read, NULL);
+    pd_snapshot_read(&snap, &game, fixture_read, &game);
 
     static uint32_t px[PD_UI_WIDTH * PD_UI_HEIGHT];
     struct pd_canvas c;
@@ -150,6 +189,7 @@ int main(int argc, char** argv) {
     struct pd_settings settings = { .screenMode = PD_SCREEN_SHARP, .ffSpeed = 2 };
     struct pd_ui ui;
     pd_ui_init(&ui, &settings);
+    shotUi = &ui;
     pd_ui_update(&ui, &snap);
 
     struct pd_host_info host = { .count = 2, .hasState = true };
@@ -173,7 +213,9 @@ int main(int argc, char** argv) {
     shot(out, name, "summary", px);
     tap(&p, HIT_BACK, 0);
 
-    tap(&p, HIT_TAB + PD_TAB_BATTLE, 0);
+    // BATTLE has a chip only while a battle is on.
+    ui.tab = PD_TAB_BATTLE;
+    draw(&p);
     shot(out, name, "battle", px);
 
     // BAG: a tapped item shows its description; a drag scrolls the list; the
@@ -199,6 +241,79 @@ int main(int argc, char** argv) {
     shot(out, name, "confirm-save", px);
     tap(&p, HIT_YES, 0);
     printf("action %d\n", pd_ui_take_action(&ui));
+    host.ffOn = false;
+
+    // MAP: where the player is, a tapped place, the cursor's other size, PLACES.
+    tap(&p, HIT_TAB + PD_TAB_MAP, 0);
+    shot(out, name, "map", px);
+    if (game.rom) {
+        tap(&p, HIT_MAP, 0);
+        shot(out, name, "map-tapped", px);
+        ui.mapBlink = true;
+        draw(&p);
+        shot(out, name, "map-blink", px);
+        tap(&p, HIT_MAP_PLACES, 0);
+        drag(&p, HIT_SCRIM, -200);
+        shot(out, name, "map-places", px);
+        pd_ui_back(&ui);
+        draw(&p);
+    }
+
+    // POKéDEX: the list, scrolled, an entry, the next one, the other dex.
+    // (In a battle DEX's chip is BATTLE's.)
+    ui.tab = PD_TAB_DEX;
+    draw(&p);
+    shot(out, name, "dex", px);
+    if (game.rom && ui.tab == PD_TAB_DEX && ui.hitCount > 0) {
+        drag(&p, HIT_DEX_LIST, -120);
+        shot(out, name, "dex-scrolled", px);
+        ui.dexOpen = 6;
+        draw(&p);
+        shot(out, name, "dex-entry", px);
+        tap(&p, HIT_DEX_NEXT, 0);
+        shot(out, name, "dex-next", px);
+        tap(&p, HIT_BACK, 0);
+        tap(&p, HIT_DEX_TOGGLE, 0);
+        shot(out, name, "dex-other", px);
+    }
+
+    // GUIDE: the first-open notice, then each page (an entry's hint and
+    // answer on the first static one).
+    ui.tab = PD_TAB_GUIDE;
+    draw(&p);
+    shot(out, name, "guide", px);
+    if (has_hit(&p, HIT_NOTICE_OK)) {
+        tap(&p, HIT_NOTICE_OK, 0);
+        static const char* const PAGE_SHOTS[] = { "guide-p0", "guide-p1", "guide-p2", "guide-p3", "guide-p4" };
+        for (int page = 0; page < 5 && has_hit(&p, HIT_GUIDE_PAGE + page); page++) {
+            tap(&p, HIT_GUIDE_PAGE + page, 0);
+            shot(out, name, PAGE_SHOTS[page], px);
+            if (has_hit(&p, HIT_GUIDE_LIST)) {
+                drag(&p, HIT_GUIDE_LIST, -100);
+                if (ui.guideScroll > 0) {
+                    char what[32];
+                    snprintf(what, sizeof(what), "%s-scrolled", PAGE_SHOTS[page]);
+                    shot(out, name, what, px);
+                    drag(&p, HIT_GUIDE_LIST, 400);
+                }
+            }
+        }
+        // The end of HERE (PEOPLE, ITEMS).
+        tap(&p, HIT_GUIDE_PAGE, 0);
+        drag(&p, HIT_GUIDE_LIST, -4000);
+        shot(out, name, "guide-p0-end", px);
+        // A hint, then its answer, on the last page (STUCK? has hints).
+        int last = 0;
+        while (has_hit(&p, HIT_GUIDE_PAGE + last + 1)) last++;
+        tap(&p, HIT_GUIDE_PAGE + last, 0);
+        int row = first_hit(&p, HIT_GUIDE_ROW, HIT_GUIDE_ROW + 800);
+        if (row >= 0) {
+            tap(&p, row, 0);
+            shot(out, name, "guide-hint", px);
+            tap(&p, row, 0);
+            shot(out, name, "guide-answer", px);
+        }
+    }
 
     // The decoded party, for checking against the app's tests.
     for (int i = 0; i < snap.partyCount; i++) {
@@ -206,12 +321,8 @@ int main(int argc, char** argv) {
                snap.party[i].level, snap.party[i].hp, snap.party[i].maxHp);
     }
     printf("inBattle=%d mapsec=%d money=%ld\n", snap.inBattle, snap.mapsec, snap.money);
-    for (int p = 0; p < PD_POCKET_COUNT; p++) {
-        printf("%s:", pd_pocket_name(p));
-        for (int i = 0; i < snap.bag[p].count; i++) {
-            printf(" %s x%d,", pd_item_name(&game, snap.bag[p].items[i].id), snap.bag[p].items[i].quantity);
-        }
-        printf("\n");
-    }
+    printf("pos (%d,%d) map %d.%d %dx%d type %d gender %d; dex %d national %d; flags %d\n", snap.x, snap.y,
+           snap.mapGroup, snap.mapNum, snap.mapW, snap.mapH, snap.mapType, snap.gender, snap.dexOk, snap.dexNational,
+           snap.flagsOk);
     return 0;
 }

@@ -9,8 +9,10 @@ GCC="$DEVKITARM/bin/arm-none-eabi-gcc"
 OBJCOPY="$DEVKITARM/bin/arm-none-eabi-objcopy"
 GBAFIX=/opt/devkitpro/tools/bin/gbafix
 
-# fixture key, game code, revision
-for spec in "firered_vanilla BPRE 1" "emerald_vanilla BPEE 0" "emerald_de_battle BPEE 0"; do
+# fixture key, game code, revision, the decomp build standing in for retail
+for spec in "firered_vanilla BPRE 1 pokefirered/pokefirered_rev1.gba" \
+            "emerald_vanilla BPEE 0 pokeemerald/pokeemerald.gba" \
+            "emerald_de_battle BPEE 0 pokeemerald/pokeemerald.gba"; do
     set -- $spec
     out="build/fixture-$1"
     "$GCC" -mthumb -mcpu=arm7tdmi -O2 -specs=gba.specs \
@@ -23,4 +25,15 @@ for spec in "firered_vanilla BPRE 1" "emerald_vanilla BPEE 0" "emerald_de_battle
     "$GBAFIX" "$out.gba" -tPOKEDAISYTST -c"$2" -m01 -r"$3" > /dev/null
     rm "$out.elf"
     echo "$out.gba ($2 rev $3)"
+    # With the decomp built (make decomps), a second ROM for the tabs that read
+    # the game's tables and art (MAP, POKéDEX, GUIDE): the decomp's ROM with
+    # this one written over its start. The loader and the fixture's RAM take
+    # ~300 KB there - game code the loader never runs; the tables and art all
+    # sit past 0x08200000. Derived from a game ROM, so build/ only.
+    decomp="build/decomps/$4"
+    if [ -f "$decomp" ]; then
+        cp "$decomp" "$out-rom.gba"
+        dd if="$out.gba" of="$out-rom.gba" conv=notrunc status=none
+        echo "$out-rom.gba ($2 rev $3 over $4)"
+    fi
 done

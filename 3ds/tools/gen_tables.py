@@ -67,8 +67,10 @@ def main():
 
     chart = [(int(k), int(v)) for k, v in re.findall(r"(\d+) to (\d+)", block(read("chart"), "typeEffectiveness"))]
 
+    # In capitals with a small é, like the app's gameCase() for FireRed / Emerald.
     def mapsecs(name, decl):
-        return {int(k): v for k, v in re.findall(r'(\d+) to MapSecInfo\("([^"]*)"', block(read(name), decl))}
+        return {int(k): "".join(c if c == "é" else c.upper() for c in v)
+                for k, v in re.findall(r'(\d+) to MapSecInfo\("([^"]*)"', block(read(name), decl))}
 
     fr_secs = mapsecs("mapsec_firered", "mapSecData")
     em_secs = mapsecs("mapsec_emerald", "mapSecDataEmerald")

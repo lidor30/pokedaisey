@@ -7,6 +7,7 @@
 void pd_settings_defaults(struct pd_settings* s) {
     s->screenMode = PD_SCREEN_SHARP;
     s->ffSpeed = PD_FF_MIN;
+    s->guideNotice = 0;
 }
 
 static bool int_in(const char* v, int lo, int hi, int* out) {
@@ -30,6 +31,7 @@ bool pd_settings_load(struct pd_settings* s, const char* path) {
         const char* value = eq + 1;
         if (!strcmp(key, "screen")) int_in(value, 0, PD_SCREEN_MODES - 1, &s->screenMode);
         else if (!strcmp(key, "ff")) int_in(value, PD_FF_MIN, PD_FF_MAX, &s->ffSpeed);
+        else if (!strcmp(key, "guide")) int_in(value, 0, 0xFFFF, &s->guideNotice);
     }
     fclose(f);
     return true;
@@ -38,6 +40,6 @@ bool pd_settings_load(struct pd_settings* s, const char* path) {
 bool pd_settings_save(const struct pd_settings* s, const char* path) {
     FILE* f = fopen(path, "w");
     if (!f) return false;
-    fprintf(f, "screen=%d\nff=%d\n", s->screenMode, s->ffSpeed);
+    fprintf(f, "screen=%d\nff=%d\nguide=%d\n", s->screenMode, s->ffSpeed, s->guideNotice);
     return fclose(f) == 0;
 }

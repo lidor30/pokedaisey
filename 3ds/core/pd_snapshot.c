@@ -8,6 +8,8 @@
 #define MON_SIZE 100
 #define BATTLE_MON_SIZE 0x58
 #define MAP_HEADER_MAPSEC_OFF 0x14
+#define MAP_HEADER_MAP_TYPE_OFF 0x17
+#define SAVEBLOCK2_GENDER_OFF 8
 #define BATTLE_TYPE_DOUBLE 0x0001
 #define BATTLE_TYPE_TRAINER 0x0008
 #define MAX_MONEY 999999
@@ -54,22 +56,45 @@ static const char* gen3_char(uint8_t c) {
     case 0xB6: return "♀";
     case 0xB8: return ",";
     case 0xBA: return "/";
+    case 0xF0: return ":";
     default: return "?";
     }
 }
 
-static void decode_name(const uint8_t* src, int maxLen, char* out, size_t outLen) {
+// Control-code argument counts after 0xFC (the app's FC_ARGS).
+static const uint8_t FC_ARGS[] = { 0, 1, 1, 1, 3, 1, 1, 0, 1, 0, 0, 2, 1, 1, 1, 0, 2, 1, 1, 1, 1, 0, 0, 0, 0 };
+
+void pd_gen3_text(const uint8_t* src, size_t maxLen, char* out, size_t outLen) {
     size_t n = 0;
     out[0] = 0;
-    for (int i = 0; i < maxLen && src[i] != 0xFF; i++) {
-        const char* s = gen3_char(src[i]);
+    for (size_t i = 0; i < maxLen && src[i] != 0xFF; i++) {
+        const char* s;
+        uint8_t c = src[i];
+        if (c == 0xFE || c == 0xFA || c == 0xFB) {
+            s = " "; // line / paragraph breaks
+        } else if (c == 0xFC) {
+            uint8_t code = i + 1 < maxLen ? src[i + 1] : 0;
+            i += 1 + (code < sizeof(FC_ARGS) ? FC_ARGS[code] : 0);
+            continue;
+        } else {
+            s = gen3_char(c);
+        }
         size_t l = strlen(s);
         if (n + l + 1 > outLen) break;
+        // One space for a run of breaks.
+        if (*s == ' ' && l == 1 && n && out[n - 1] == ' ') continue;
         memcpy(out + n, s, l);
         n += l;
     }
     out[n] = 0;
     while (n && out[n - 1] == ' ') out[--n] = 0;
+    size_t lead = 0;
+    while (out[lead] == ' ') lead++;
+    if (lead) memmove(out, out + lead, n - lead + 1);
+}
+
+static void decode_name(const uint8_t* src, int maxLen, char* out, size_t outLen) {
+    pd_gen3_text(src, (size_t) maxLen, out, outLen);
 }
 
 // GetMonGender: the personality's low byte against the species' ratio; and
@@ -143,6 +168,9 @@ static void decode_battle_mon(const uint8_t* raw, struct pd_battle_mon* b) {
     b->maxHp = u16(raw + 0x2C);
     b->status = u32(raw + 0x4C);
 }
+
+static void read_save_fields(struct pd_snapshot* s, const struct pd_config* cfg, pd_read_fn read, void* ctx,
+                             uint32_t sb1, uint32_t sb2);
 
 static bool read_u32(pd_read_fn read, void* ctx, uint32_t addr, uint32_t* out) {
     uint8_t b[4];
@@ -228,6 +256,92 @@ void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn
             }
         }
     }
+
+    bool saveOk = haveKey && in_ram(sb1);
+    s->gender = -1;
+    if (saveOk) read_save_fields(s, cfg, read, ctx, sb1, sb2);
+
+    // --- the map: gMapHeader's layout size and type ---
+    uint32_t layout = 0, w = 0, h = 0;
+    uint8_t type = 0;
+    // (The layout lives in the ROM: the host's read serves ROM addresses too.)
+    if (read_u32(read, ctx, cfg->mapHeader, &layout) && (in_ram(layout) || (layout >= 0x08000000 && layout < 0x0A000000)) &&
+        read_u32(read, ctx, layout, &w) &&
+        read_u32(read, ctx, layout + 4, &h) && w >= 1 && w <= 1024 && h >= 1 && h <= 1024 &&
+        read(ctx, cfg->mapHeader + MAP_HEADER_MAP_TYPE_OFF, &type, 1)) {
+        s->mapW = (int) w;
+        s->mapH = (int) h;
+        s->mapType = type;
+    }
+}
+
+// The save's own fields: position, gender, the POKéDEX's flags, event flags
+// and vars.
+static void read_save_fields(struct pd_snapshot* s, const struct pd_config* cfg, pd_read_fn read, void* ctx,
+                             uint32_t sb1, uint32_t sb2) {
+    uint8_t pos[6];
+    if (read(ctx, sb1, pos, sizeof(pos))) {
+        s->posOk = true;
+        s->x = u16(pos);
+        s->y = u16(pos + 2);
+        s->mapGroup = pos[4];
+        s->mapNum = pos[5];
+    }
+    uint8_t gender = 0xFF;
+    if (read(ctx, sb2 + SAVEBLOCK2_GENDER_OFF, &gender, 1)) s->gender = gender <= 1 ? gender : -1;
+
+    // struct Pokedex at SaveBlock2+0x18: owned at +0x10, seen at +0x44.
+    uint8_t owned[PD_DEX_BYTES], seen[PD_DEX_BYTES], copy1[PD_DEX_BYTES], copy2[PD_DEX_BYTES], magic = 0;
+    if (cfg->dexSeenCopy1 && read(ctx, sb2 + 0x28, owned, PD_DEX_BYTES) && read(ctx, sb2 + 0x5C, seen, PD_DEX_BYTES) &&
+        read(ctx, sb1 + cfg->dexSeenCopy1, copy1, PD_DEX_BYTES) &&
+        read(ctx, sb1 + cfg->dexSeenCopy2, copy2, PD_DEX_BYTES) &&
+        read(ctx, sb2 + 0x18 + cfg->nationalMagicOff, &magic, 1)) {
+        s->dexOk = true;
+        s->dexNational = magic == cfg->nationalMagic;
+        for (int i = 0; i < PD_DEX_BYTES; i++) {
+            s->dexSeen[i] = seen[i] & copy1[i] & copy2[i];
+            s->dexCaught[i] = owned[i] & s->dexSeen[i];
+        }
+    }
+
+    if (cfg->flagBytes && cfg->flagBytes <= PD_FLAG_BYTES && read(ctx, sb1 + cfg->flagsOff, s->flags, cfg->flagBytes)) {
+        uint8_t vars[PD_VAR_COUNT * 2];
+        if (read(ctx, sb1 + cfg->varsOff, vars, sizeof(vars))) {
+            s->flagsOk = true;
+            for (int i = 0; i < PD_VAR_COUNT; i++) s->vars[i] = u16(vars + i * 2);
+        }
+    }
+}
+
+bool pd_flag(const struct pd_snapshot* s, int flag) {
+    return s->flagsOk && flag >= 0 && flag / 8 < PD_FLAG_BYTES && (s->flags[flag / 8] >> (flag % 8) & 1);
+}
+
+int pd_var(const struct pd_snapshot* s, int var) {
+    int i = var - 0x4000;
+    return s->flagsOk && i >= 0 && i < PD_VAR_COUNT ? s->vars[i] : 0;
+}
+
+static bool dex_bit(const uint8_t* bits, int national) {
+    int i = national - 1;
+    return i >= 0 && i < PD_NATIONAL_COUNT && (bits[i / 8] >> (i % 8) & 1);
+}
+
+bool pd_dex_seen(const struct pd_snapshot* s, int national) {
+    return s->dexOk && dex_bit(s->dexSeen, national);
+}
+
+bool pd_dex_caught(const struct pd_snapshot* s, int national) {
+    return s->dexOk && dex_bit(s->dexCaught, national);
+}
+
+bool pd_bag_has(const struct pd_snapshot* s, int item) {
+    for (int p = 0; p < PD_POCKET_COUNT; p++) {
+        for (int i = 0; i < s->bag[p].count; i++) {
+            if (s->bag[p].items[i].id == item) return true;
+        }
+    }
+    return false;
 }
 
 static const char* item_entry(const char* const* t, int n, int item) {

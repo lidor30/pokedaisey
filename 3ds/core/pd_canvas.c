@@ -203,9 +203,10 @@ int pd_text_wrap(struct pd_canvas* c, int x, int y, int max_w, int lineH, int ma
             }
             cut = true;
         }
-        if (cut) {
+        // No canvas: only counting the lines.
+        if (c && cut) {
             pd_text_fit(c, x, y + lines * lineH, max_w, line, color, shadow);
-        } else {
+        } else if (c) {
             pd_text(c, x, y + lines * lineH, line, color, shadow);
         }
         lines++;

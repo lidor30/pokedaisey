@@ -27,6 +27,21 @@ enum {
     HIT_YES = 800,
     HIT_NO = 801,
     HIT_SCRIM = 802,
+    HIT_MAP = 900,         // the map itself (where: the touch's start)
+    HIT_MAP_REGION = 901,
+    HIT_MAP_ME = 902,
+    HIT_MAP_PLACES = 903,
+    HIT_PLACE = 1000,      // + PLACES row
+    HIT_DEX_LIST = 1400,
+    HIT_DEX_ROW = 1500,    // + national number
+    HIT_DEX_TOGGLE = 1900,
+    HIT_DEX_PREV = 1901,
+    HIT_DEX_NEXT = 1902,
+    HIT_GUIDE_PAGE = 2000, // + page
+    HIT_GUIDE_ROW = 2100,  // + entry
+    HIT_GUIDE_LIST = 2900,
+    HIT_NOTICE_OK = 2901,
+    HIT_NOTICE_BACK = 2902,
 };
 
 enum setting_row {
@@ -56,6 +71,25 @@ void ui_battle_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_snapsh
 void ui_bag_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_snapshot* s);
 void ui_settings_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_snapshot* s,
                      const struct pd_host_info* host);
+void ui_map_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_snapshot* s);
+void ui_guide_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_snapshot* s);
+void ui_dex_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_snapshot* s);
 void ui_overlay(struct pd_ui* ui, struct pd_canvas* c);
+// Overlays drawn by their tab's file (PLACES, the GUIDE notice).
+void ui_places_overlay(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g);
+void ui_guide_notice(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g);
+
+// A tap each tab's file handles; true if it was theirs.
+bool ui_map_act(struct pd_ui* ui, int id);
+bool ui_dex_act(struct pd_ui* ui, int id);
+bool ui_guide_act(struct pd_ui* ui, int id);
+
+// The lists' caught / seen mark: a Poké Ball, or a grey one.
+void ui_ball(struct pd_canvas* c, int x, int y, bool caught);
+
+// A scrolled list's offset clamped to its content: max(0, total - view).
+int ui_clamp_scroll(int scroll, int total, int view);
+// A thin scroll bar along a list's right edge.
+void ui_scroll_bar(struct pd_canvas* c, int x, int y, int h, int scroll, int total, uint32_t color);
 
 #endif
