@@ -32,12 +32,20 @@ object DecompIconSource {
     @Volatile
     var tables: IconTables = IconTables()
         set(value) {
-            if (value != field) {
+            val changed = value != field
+            if (changed) {
                 monCache.clear()
                 itemCache.clear()
             }
             field = value
+            if (changed) iconsChanged()
         }
+
+    /** Bumped when icons may read differently now (new tables, or the core came up under a
+     * launch's saved companion data): icon composables key their loads on it. */
+    val generation = kotlinx.coroutines.flow.MutableStateFlow(0)
+
+    fun iconsChanged() { generation.value++ }
 
     /** Swappable so tests / previews can read a ROM file instead of the core. */
     @Volatile
@@ -66,8 +74,9 @@ object DecompIconSource {
         if (sig in missing) return null
         synchronized(lock) {
             cache[key]?.let { return it }
+            // A read that failed (the core not up yet) isn't a missing icon: the next try may work.
             val bmp = try { fetch() } catch (e: Exception) {
-                android.util.Log.w("pokedaisy", "DecompIcon fetch $key failed", e); null
+                android.util.Log.w("pokedaisy", "DecompIcon fetch $key failed", e); return null
             }
             if (bmp == null) { missing.add(sig); return null }
             if (!loggedOnce) {

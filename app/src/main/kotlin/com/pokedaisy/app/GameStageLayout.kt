@@ -8,7 +8,7 @@ import kotlin.math.min
 /**
  * The top screen. While [bar] (the status bar) is shown, [game] is fitted at
  * the GBA's 3:2 in the space left under it, [bar] exactly as wide as the game
- * right above it, the pair centred; [hud] moves down under the bar. With the
+ * right above it, the pair centred; [huds] move down under the bar. With the
  * bar gone it's a plain FrameLayout ([game] fills its area and letterboxes
  * itself), as before. [game]'s margins bound its area either way. With
  * [stretch] the game takes all the space under the bar (and stretches itself
@@ -20,7 +20,8 @@ class GameStageLayout(
     context: Context,
     private val game: View,
     private val bar: View,
-    private val hud: View,
+    /** The HUD's messages and the FPS / CPU readout: kept under the bar. */
+    private val huds: List<View>,
 ) : FrameLayout(context) {
 
     private var gameW = 0
@@ -98,7 +99,7 @@ class GameStageLayout(
         val y = lp.topMargin + if (topAligned) 0 else (areaH - barH - gameH) / 2
         if (barShown) bar.layout(x, y, x + gameW, y + barH)
         game.layout(x, y + barH, x + gameW, y + barH + gameH)
-        hud.offsetTopAndBottom(y + barH)
+        huds.forEach { it.offsetTopAndBottom(y + barH) }
     }
 
     private fun exactly(size: Int) = MeasureSpec.makeMeasureSpec(size, MeasureSpec.EXACTLY)

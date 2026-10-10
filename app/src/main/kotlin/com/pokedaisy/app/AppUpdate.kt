@@ -57,9 +57,10 @@ class AppUpdateFlow(private val activity: ComponentActivity) {
         if (checking) return
         checking = true
         Thread({
-            // An APK we already offered is spent once it's installed (or abandoned).
-            updatesDir.listFiles()?.forEach { if (pendingApk != it) it.delete() }
             val found = AppUpdater.check(BuildConfig.VERSION_NAME)
+            // An APK we already offered is spent once it's installed (or abandoned) - but the one for the
+            // release still on offer is kept, so UPDATE installs it at once instead of downloading it again.
+            updatesDir.listFiles()?.forEach { if (pendingApk != it && (found == null || it.name != apkName(found))) it.delete() }
             activity.runOnUiThread {
                 checking = false
                 if (found != null) {
@@ -89,8 +90,10 @@ class AppUpdateFlow(private val activity: ComponentActivity) {
         error = null
         progress = 0f
         Thread({
-            val apk = File(updatesDir, "PokeDaisy-${r.version}.apk")
-            val ok = AppUpdater.download(r, apk) { p -> activity.runOnUiThread { progress = p } }
+            val apk = File(updatesDir, apkName(r))
+            // Already here and whole (an earlier try that didn't reach the installer): no second download.
+            val ok = (apk.isFile && (r.apkSize <= 0 || apk.length() == r.apkSize)) ||
+                AppUpdater.download(r, apk) { p -> activity.runOnUiThread { progress = p } }
             activity.runOnUiThread {
                 progress = null
                 when {
@@ -153,17 +156,24 @@ class AppUpdateFlow(private val activity: ComponentActivity) {
 
     private fun install(apk: File) {
         if (!canInstall()) {
-            pendingApk = apk
-            runCatching {
+            // Android's "install unknown apps" page for this app; back in onResume, the installer opens.
+            val opened = runCatching {
                 activity.startActivity(
                     Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${activity.packageName}")),
                 )
+            }.isSuccess
+            if (opened) {
+                pendingApk = apk
+                Toast.makeText(activity, tr("Allow PokéDaisy to install apps, then come back"), Toast.LENGTH_LONG).show()
+                return
             }
-            Toast.makeText(activity, tr("Allow PokéDaisy to install apps, then come back"), Toast.LENGTH_LONG).show()
-            return
+            // A device without that page (it failed silently once, leaving UPDATE to download again and again):
+            // the installer itself asks for the permission on the way.
         }
         launchInstaller(apk)
     }
+
+    private fun apkName(r: AppUpdater.Release) = "PokeDaisy-${r.version}.apk"
 
     private fun launchInstaller(apk: File) {
         val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.updates", apk)

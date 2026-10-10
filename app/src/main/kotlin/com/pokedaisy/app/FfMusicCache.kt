@@ -37,6 +37,22 @@ class FfMusicCache(filesDir: File, romCrc: String) {
 
     fun has(key: String): Boolean = file(key).let { it.isFile && it.length() > 0 }
 
+    /** How many launches' background passes [song] (a song id or key) failed in (the pass gives up on it after a couple:
+     * retrying it every launch kept the render core busy - and the device hot - for good). */
+    fun failures(song: String): Int = failureCounts()[song] ?: 0
+
+    fun noteFailure(song: String) = synchronized(this) {
+        val counts = failureCounts().toMutableMap()
+        counts[song] = (counts[song] ?: 0) + 1
+        runCatching { File(dir, FAILED).writeText(counts.entries.joinToString("\n") { "${it.key} ${it.value}" }) }
+    }
+
+    private fun failureCounts(): Map<String, Int> = runCatching {
+        File(dir, FAILED).takeIf { it.isFile }?.readLines()?.mapNotNull { l ->
+            l.split(' ').takeIf { it.size == 2 }?.let { (a, b) -> b.toIntOrNull()?.let { a to it } }
+        }?.toMap()
+    }.getOrNull().orEmpty()
+
     /** The cached clip for [key], or null if nothing's been captured yet. */
     fun fileIfCached(key: String): File? = file(key).takeIf { it.isFile && it.length() > 0 }
 
@@ -77,6 +93,7 @@ class FfMusicCache(filesDir: File, romCrc: String) {
         const val CACHE_VERSION = 6
 
         private const val PREFETCHED = ".prefetched"
+        private const val FAILED = ".failed"
 
         /** Longest recording per key. Recording stops a few seconds after the
          * song's loop is seen (M4aLoopWatch), so this only has to cover the

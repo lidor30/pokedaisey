@@ -186,6 +186,8 @@ internal val trCompanionInfo: Map<String, Tr> = mapOf(
     "HIDDEN|ability" to Tr(ja = "かくれとくせい", fr = "CACHÉ", de = "VERSTECKT", it = "NASCOSTA", es = "OCULTA"),
     "LOADING ACHIEVEMENTS" to Tr(ja = "じっせきを よみこみちゅう", fr = "CHARGEMENT DES SUCCÈS", de = "ERFOLGE WERDEN GELADEN", it = "CARICAMENTO OBIETTIVI", es = "CARGANDO LOGROS"),
     "LOCKED ONLY" to Tr(ja = "みかいじょ だけ", fr = "VERROUILLÉS", de = "NUR GESPERRTE", it = "SOLO BLOCCATI", es = "SOLO BLOQUEADOS"),
+    "UNLOCKED ONLY" to Tr(ja = "かいじょずみ だけ", fr = "DÉBLOQUÉS", de = "NUR FREIGESCHALTETE", it = "SOLO SBLOCCATI", es = "SOLO DESBLOQUEADOS"),
+    "NONE UNLOCKED YET" to Tr(ja = "まだ ひとつも かいじょ していない", fr = "RIEN DE DÉBLOQUÉ", de = "NOCH NICHTS FREIGESCHALTET", it = "ANCORA NESSUNO SBLOCCATO", es = "AÚN NADA DESBLOQUEADO"),
     "ALL UNLOCKED!" to Tr(ja = "ぜんぶ かいじょ!", fr = "TOUT EST DÉBLOQUÉ !", de = "ALLES FREIGESCHALTET!", it = "TUTTI SBLOCCATI!", es = "¡TODO DESBLOQUEADO!"),
     "{0} ENTRIES" to Tr(ja = "{0}にん", fr = "{0} ENTRÉES", de = "{0} EINTRÄGE", it = "{0} VOCI", es = "{0} ENTRADAS"),
     "COULDN'T LOAD THE LEADERBOARD" to Tr(ja = "ランキングを よみこめなかった", fr = "CLASSEMENT INDISPONIBLE", de = "BESTENLISTE NICHT GELADEN", it = "CLASSIFICA NON CARICATA", es = "NO SE PUDO CARGAR LA CLASIFICACIÓN"),

@@ -334,6 +334,7 @@ fun QolTheme(content: @Composable () -> Unit) {
         // runCatching: previews / screenshot tests may have no real prefs.
         val id = runCatching { com.pokedaisy.app.Prefs(context).appTheme }.getOrDefault(DAISY_THEME_ID)
         QolColors.applyTheme(themeById(id))
+        runCatching { DarkMode.load(context) }
     }
 
     val pixel = pixelFontFamily()

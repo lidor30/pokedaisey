@@ -2,9 +2,17 @@
   "firestore": {
     "rules": "firestore.rules"
   },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "runtime": "nodejs22",
+      "ignore": ["node_modules", ".git", "*.log"]
+    }
+  ],
   "hosting": {
     "public": "dist",
-    "ignore": ["firebase.json", "firestore.rules", "**/.*", "**/node_modules/**"],
+    "ignore": ["firebase.json", "firestore.rules", "functions/**", "**/.*", "**/node_modules/**"],
     "cleanUrls": true,
     "trailingSlash": true,
     "headers": [

@@ -136,7 +136,7 @@ private fun SlotCard(
                     .fillMaxWidth()
                     .aspectRatio(3f / 2f)
                     .clip(PixelRoundedShape(u * 3))
-                    .background(Color(0xFF20242C))
+                    .background(OptionColors.imageWell)
                     .soundClickable(enabled = slot.present, onClick = onLoad)
                     // Frame on top of the screenshot: the list window's dark + blue lines.
                     .drawWithContent {

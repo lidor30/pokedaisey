@@ -2,10 +2,12 @@ package com.pokedaisy.app.companion
 
 import com.pokedaisy.app.companion.i18n.tk
 import android.util.Log
+import com.pokedaisy.app.companion.data.DecompIconSource
 import com.pokedaisy.app.companion.data.InProcessReader
 import com.pokedaisy.app.companion.data.SnapshotView
 import com.pokedaisy.app.companion.data.TelemetrySampler
 import com.pokedaisy.app.companion.data.activeGame
+import com.pokedaisy.app.companion.data.hasData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -28,6 +30,30 @@ class TelemetryStore {
 
     fun reset() {
         sampler = TelemetrySampler()
+        cached = null
+        _snapshot.value = SnapshotView(connected = false, error = tk("starting…"))
+    }
+
+    // The launch's saved copy ([com.pokedaisy.app.companion.data.SnapshotCache]) while it's shown.
+    @Volatile private var cached: SnapshotView? = null
+    private var cachedSamples = 0
+
+    /** Shows [v] (the copy saved beside the state this launch resumes) until the live data is in.
+     * Call before the engine starts. */
+    fun showCached(v: SnapshotView) {
+        val game = v.game ?: return
+        // The per-game look reads activeGame; another game's icon tables would read this ROM wrong.
+        if (game != activeGame) DecompIconSource.tables = com.pokedaisy.app.companion.data.IconTables()
+        activeGame = game
+        cachedSamples = 0
+        cached = v
+        _snapshot.value = v
+    }
+
+    /** The resume state didn't load after all (the save changed since): its copy is stale. */
+    fun dropCached() {
+        if (cached == null) return
+        cached = null
         _snapshot.value = SnapshotView(connected = false, error = tk("starting…"))
     }
 
@@ -39,6 +65,19 @@ class TelemetryStore {
      * second read. */
     fun refresh(): SnapshotView {
         val s = sampler.sample(InProcessReader)
+        val c = cached
+        if (c != null) {
+            // Live replaces the saved copy once it has data (or won't get any); until then the copy stays.
+            if (s.hasData || s.unsupported || ++cachedSamples > CACHED_MAX_SAMPLES) {
+                cached = null
+                // Icons the copy couldn't read yet (the core wasn't up) can load now.
+                DecompIconSource.iconsChanged()
+            } else {
+                // The sampler sets FireRed while it's still detecting: keep the copy's look.
+                activeGame = c.game ?: activeGame
+                return s
+            }
+        }
         _snapshot.value = s
         if (logCount++ % 5 == 0) {
             // pockets=<pocket id>:<count>,... - lets scripts/smoke_test.sh (and
@@ -58,6 +97,9 @@ class TelemetryStore {
         return s
     }
 
+    /** What a savestate made now should carry beside it: the live data, else the saved copy still showing. */
+    fun forState(): SnapshotView? = _snapshot.value.takeIf { it.hasData }
+
     /** Fast, non-1Hz-throttled peek at (battleActiveBattler, battleInputState)
      * — see [TelemetrySampler.sampleBattleInputFast]. Call on the emu thread. */
     fun refreshBattleInputFast(): Pair<Int, Int>? = sampler.sampleBattleInputFast(InProcessReader)
@@ -70,4 +112,9 @@ class TelemetryStore {
 
     /** The detected game's gPartyMenu + gPlayerParty, when its config has them. */
     fun knownPartyMenu(): Pair<Long, Long>? = sampler.knownPartyMenu
+
+    private companion object {
+        /** ~1 sample a second: a game whose data never comes in drops the copy after this long. */
+        const val CACHED_MAX_SAMPLES = 20
+    }
 }

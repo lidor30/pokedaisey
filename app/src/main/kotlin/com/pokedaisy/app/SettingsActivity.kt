@@ -1,5 +1,7 @@
 package com.pokedaisy.app
 
+import com.pokedaisy.app.companion.ui.theme.DarkModeSetting
+import com.pokedaisy.app.companion.ui.theme.DarkMode
 import com.pokedaisy.app.companion.i18n.L10n
 import com.pokedaisy.app.companion.i18n.tk
 import com.pokedaisy.app.companion.i18n.tr
@@ -439,6 +441,18 @@ class SettingsActivity : ComponentActivity() {
                 prefs.swapScreens = !prefs.swapScreens
                 revision++
             }.takeIf { hasSecondScreen },
+            // The game's frames per second and the app's CPU share, in the game's corner.
+            SettingRow(tk("FPS / CPU"), onOff(prefs.showPerformance)) {
+                prefs.showPerformance = !prefs.showPerformance
+                revision++
+            },
+            // OFF / ON / AUTO (the device's): both screens switch at once.
+            SettingRow(tk("DARK MODE"), DarkMode.setting.label) {
+                val modes = DarkModeSetting.entries
+                selector = Selector(tk("DARK MODE"), modes.map { it.label }, DarkMode.setting.label) { l ->
+                    DarkMode.set(this@SettingsActivity, modes.first { it.label == l })
+                }
+            },
             // Changes the colors immediately, everywhere — the companion screen too.
             SettingRow(tk("THEME"), themeLabels[themeIdx]) {
                 selector = Selector(tk("THEME"), themeLabels, themeLabels[themeIdx]) {

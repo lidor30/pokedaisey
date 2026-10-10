@@ -48,13 +48,16 @@ fun DaisyBackdrop(logos: Boolean = false) {
         0f, LOOP_S, infiniteRepeatable(tween((LOOP_S * 1000).toInt(), easing = LinearEasing), RepeatMode.Restart),
         label = "daisy-clock",
     )
+    // Dark mode: the same page at night - deep ink, the blobs as dim glows, the dots and logos fainter.
+    val dark = com.pokedaisy.app.companion.ui.theme.DarkMode.on
+    val blobs = if (dark) NIGHT_BLOBS else BLOBS
     Canvas(Modifier.fillMaxSize()) {
-        drawRect(PAGE)
+        drawRect(if (dark) NIGHT_PAGE else PAGE)
         // vw / vh like the site's CSS; the blobs size by the longer side so they stay soft on a phone too.
         val vw = size.width / 100f
         val vh = size.height / 100f
         val big = max(size.width, size.height) / 100f
-        for (b in BLOBS) {
+        for (b in blobs) {
             // CSS drift: ease-in-out to translate(6vw, 4vh) scale(1.08) and back, 30 s each way.
             val p = (1 - cos(PI * (((t + b.delay) / 30f) % 2f)).toFloat()) / 2f
             val center = Offset(b.x * vw + 6 * vw * p, b.y * vh + b.yw * big + 4 * vh * p)
@@ -69,7 +72,7 @@ fun DaisyBackdrop(logos: Boolean = false) {
                 radius = reach, center = center,
             )
         }
-        drawRect(dotBrush(1.dp.toPx().roundToInt().coerceAtLeast(1), 12.dp.toPx().roundToInt().coerceAtLeast(4)))
+        drawRect(dotBrush(1.dp.toPx().roundToInt().coerceAtLeast(1), 12.dp.toPx().roundToInt().coerceAtLeast(4), dark))
         if (logos) {
             val logo = logoBitmap
             for (petal in PETALS) {
@@ -84,7 +87,7 @@ fun DaisyBackdrop(logos: Boolean = false) {
                     rotate(phase * 360f, pivot = Offset(side / 2f, side / 2f)) {
                         drawImage(
                             logo, dstOffset = IntOffset.Zero, dstSize = IntSize(side, side),
-                            alpha = LOGO_ALPHA, filterQuality = FilterQuality.None,
+                            alpha = if (dark) NIGHT_LOGO_ALPHA else LOGO_ALPHA, filterQuality = FilterQuality.None,
                         )
                     }
                 }
@@ -101,6 +104,10 @@ private val PAGE = Color(0xFFF7F6FB)
 /** The site's petals stand out a touch more here, on a screen with less going on. */
 private const val LOGO_ALPHA = 0.16f
 
+/** Dark mode's page: a blue-black ink, and the petals a little quieter on it. */
+private val NIGHT_PAGE = Color(0xFF12141C)
+private const val NIGHT_LOGO_ALPHA = 0.11f
+
 /** A blob: centre at [x] vw, [y] vh + [yw] of the longer side; radius [r] of the longer side. */
 private class Blob(val x: Float, val y: Float, val yw: Float, val r: Float, val color: Color, val delay: Float)
 
@@ -109,6 +116,13 @@ private val BLOBS = listOf(
     Blob(11f, 0f, 9f, 23f, Color(0xFFFFD2CC), 0f),
     Blob(90f, 18f, 20f, 20f, Color(0xFFFFF0B0), 10f),
     Blob(45f, 100f, 5f, 25f, Color(0xFFD6E2FF), 20f),
+)
+
+// The same three blobs at night: plum, amber and indigo glows where the peach, yellow and blue are.
+private val NIGHT_BLOBS = listOf(
+    Blob(11f, 0f, 9f, 23f, Color(0xFF6A2F45), 0f),
+    Blob(90f, 18f, 20f, 20f, Color(0xFF6A4418), 10f),
+    Blob(45f, 100f, 5f, 25f, Color(0xFF233A7A), 20f),
 )
 
 /** A logo: at [x] / [y] % of the screen, [scale] (1 or 2), its float [delay] s in, [duration] s round. */
@@ -130,12 +144,14 @@ private val logoBitmap: ImageBitmap by lazy {
 }
 
 /** The site's dot grid: a [dot]-px square of its ink at 9% every [step] px, as a repeating tile. */
-private fun dotBrush(dot: Int, step: Int): Brush {
-    val key = dot to step
+private fun dotBrush(dot: Int, step: Int, dark: Boolean = false): Brush {
+    val key = Triple(dot, step, dark)
     dotBrushes[key]?.let { return it }
-    val px = IntArray(step * step) { i -> if (i % step < dot && i / step < dot) 0x171D1B26 else 0 }
+    // Dark: white dots at ~6%, as faint on the ink as the site's are on its page.
+    val ink = if (dark) 0x10FFFFFF else 0x171D1B26
+    val px = IntArray(step * step) { i -> if (i % step < dot && i / step < dot) ink else 0 }
     val tile = android.graphics.Bitmap.createBitmap(px, step, step, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
     return ShaderBrush(ImageShader(tile, TileMode.Repeated, TileMode.Repeated)).also { dotBrushes[key] = it }
 }
 
-private val dotBrushes = HashMap<Pair<Int, Int>, Brush>()
+private val dotBrushes = HashMap<Triple<Int, Int, Boolean>, Brush>()

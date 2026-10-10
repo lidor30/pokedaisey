@@ -110,6 +110,8 @@ data class AchievementPopup(
     val detail: String = "",
     val badgeUrl: String? = null,
     val points: Int = 0,
+    /** The achievement it's about (an unlock, its progress): a tap opens it in the list. 0 = none. */
+    val achievementId: Int = 0,
 ) {
     enum class Kind { UNLOCKED, MASTERED, GAME_LOADED, PROGRESS, LEADERBOARD, NOTICE }
 }

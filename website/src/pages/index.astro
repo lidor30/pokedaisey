@@ -162,7 +162,7 @@ const title = 'POKEDAISY'.split('');
           <h3 class="device-name">{name}</h3>
           <p class="small muted">{text}</p>
           <span class={`chip ${frame}`}>{status}</span>
-          {icon === 'moreDevice' && <a class="btn f-btn h-btnHot small" href={`${REPO_URL}/issues/new?template=feature_request.yml`}>REQUEST A DEVICE</a>}
+          {icon === 'moreDevice' && <a class="btn f-btn h-btnHot small" href="/feedback/#feature">REQUEST A DEVICE</a>}
         </article>
       ))}
     </div>
@@ -224,9 +224,9 @@ const title = 'POKEDAISY'.split('');
         </div>
         <p class="small muted">Bug reports, game requests and a star help just as much:</p>
         <div class="cta">
-          <a class="btn f-btn h-btnHot small" href={`${REPO_URL}/issues/new?template=bug_report.yml`}><Pixel name="bug" scale={0.667} /> REPORT A BUG</a>
-          <a class="btn f-btn h-btnHot small" href={`${REPO_URL}/issues/new?template=rom_request.yml`}><Pixel name="logo" scale={0.334} /> REQUEST A GAME</a>
-          <a class="btn f-btn h-btnHot small" href={`${REPO_URL}/issues/new?template=feature_request.yml`}><Pixel name="guide" scale={0.5} /> SUGGEST A FEATURE</a>
+          <a class="btn f-btn h-btnHot small" href="/feedback/#bug"><Pixel name="bug" scale={0.667} /> REPORT A BUG</a>
+          <a class="btn f-btn h-btnHot small" href="/feedback/#game"><Pixel name="logo" scale={0.334} /> REQUEST A GAME</a>
+          <a class="btn f-btn h-btnHot small" href="/feedback/#feature"><Pixel name="guide" scale={0.5} /> SUGGEST A FEATURE</a>
           <a class="btn f-btn h-btnHot small" href={REPO_URL}><Pixel name="star" scale={0.667} /> STAR ON GITHUB</a>
         </div>
       </div>

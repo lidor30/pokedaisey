@@ -106,6 +106,19 @@ object PixelIcons {
         "00100",
     )
 
+    /** A funnel: a list's filter (ACHIEVEMENTS' ALL / LOCKED / UNLOCKED). Cap-height of the pixel font. */
+    val filter = listOf(
+        "111111111",
+        "111111111",
+        ".1111111.",
+        "..11111..",
+        "...111...",
+        "...111...",
+        "...111...",
+        "...111...",
+        "...11....",
+    )
+
     /** A trophy cup, for [PixelArt]: '1' the cup, '2' its shading and base. A badge not loaded (yet). */
     val trophy = listOf(
         "111111111111",
@@ -362,7 +375,11 @@ fun PixelArt(bitmap: List<String>, palette: Map<Char, Color>, modifier: Modifier
  * diagonally, like [GbaText]), one cell per GBA pixel of [m].
  */
 @Composable
-fun ShadowedPixelIcon(bitmap: List<String>, color: Color, shadow: Color, m: GbaTextMetrics, modifier: Modifier = Modifier) {
+fun ShadowedPixelIcon(
+    bitmap: List<String>, color: Color, shadow: Color, m: GbaTextMetrics, modifier: Modifier = Modifier,
+    /** One cell's size: a GBA pixel, or [GbaTextMetrics.fontPixel] to match the text beside it. */
+    cell: androidx.compose.ui.unit.Dp = m.u,
+) {
     val h = bitmap.size + 1
     val w = bitmap.maxOf { it.length } + 1
     fun on(x: Int, y: Int) = bitmap.getOrNull(y)?.getOrNull(x) == '1'
@@ -375,7 +392,7 @@ fun ShadowedPixelIcon(bitmap: List<String>, color: Color, shadow: Color, m: GbaT
             }
         })
     }
-    PixelArt(shadowed, mapOf('F' to color, 'S' to shadow), modifier.size(m.u * w, m.u * h))
+    PixelArt(shadowed, mapOf('F' to color, 'S' to shadow), modifier.size(cell * w, cell * h))
 }
 
 /** [PixelIcons.trophy] in gold (the badge colours), e.g. beside RetroAchievements' name. */
@@ -393,7 +410,8 @@ fun CoffeeCup(modifier: Modifier = Modifier) = PixelArt(
 
 /** [PixelIcons.github] in GitHub's near-black, beside the repo link. */
 @Composable
-fun GitHubMark(modifier: Modifier = Modifier) = PixelIcon(PixelIcons.github, Color(0xFF202020), modifier.fillMaxSize())
+fun GitHubMark(modifier: Modifier = Modifier) =
+    PixelIcon(PixelIcons.github, if (OptionColors.dark) Color(0xFFD8DCE4) else Color(0xFF202020), modifier.fillMaxSize())
 
 /** The Poké Ball rocking like a capture shake (tip left, tip right, rest) -
  * the app's "working on it" animation. Turns in 10° steps, pivoting at its base. */

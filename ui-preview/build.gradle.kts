@@ -57,6 +57,8 @@ tasks.register<JavaExec>("render") {
     systemProperty("game", (project.findProperty("game") as String?) ?: "FIRERED")
     // -Plang=JA / FR / DE / IT / ES: the app's text in that language.
     systemProperty("lang", (project.findProperty("lang") as String?) ?: "")
+    // -Pdark=true: every screen in DARK MODE (pair with -Pout=build/shots-dark).
+    systemProperty("dark", (project.findProperty("dark") as String?) ?: "")
     // -PcompanionW=960 [-PcompanionH=1080]: the companion as a single-screen device's side panel
     // of that size, at the density the app gives it there (sidePanelDensity).
     systemProperty("companionW", (project.findProperty("companionW") as String?) ?: "")

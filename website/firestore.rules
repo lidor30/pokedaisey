@@ -1,11 +1,36 @@
 rules_version = '2';
 
-// PokéDaisy's Firestore: only the app's opt-in BEST EFFORT reports (BestEffortShare.kt), write-only.
+// PokéDaisy's Firestore: the app's opt-in BEST EFFORT reports (BestEffortShare.kt) and the website's feedback
+// form (functions/feedback-form.js), both write-only.
 // A report is exactly these fields, about the ROM alone - no names, accounts or device details - and
 // nobody can read, change or delete one through the API (look at them in the Firebase console).
 // Deploy from website/: firebase deploy --only firestore:rules
 service cloud.firestore {
   match /databases/{database}/documents {
+    function text(v, key, max) {
+      return !(key in v) || (v[key] is string && v[key].size() > 0 && v[key].size() <= max);
+    }
+    function needed(v, key, max) {
+      return key in v && text(v, key, max);
+    }
+    function validFeedback(kind, v) {
+      return (kind == 'game'
+          && v.keys().hasOnly(['game', 'official_page', 'game_code', 'size', 'sha1', 'notes'])
+          && needed(v, 'game', 120) && text(v, 'official_page', 300) && text(v, 'game_code', 20)
+          && (!('size' in v) || (v['size'] is string && v['size'].matches('^[0-9]{1,12}$')))
+          && 'sha1' in v && v.sha1 is string && v.sha1.matches('^[0-9a-f]{40}$')
+          && text(v, 'notes', 4000))
+        || (kind == 'bug'
+          && v.keys().hasOnly(['app_version', 'device', 'device_model', 'game', 'what_happened', 'steps', 'logs'])
+          && needed(v, 'app_version', 20)
+          && 'device' in v && v.device in ['AYN Thor', 'Retroid Pocket Duo', 'Another dual-screen device', 'A single-screen device']
+          && text(v, 'device_model', 120) && needed(v, 'game', 120) && needed(v, 'what_happened', 4000)
+          && text(v, 'steps', 4000) && text(v, 'logs', 20000))
+        || (kind == 'feature'
+          && v.keys().hasOnly(['idea', 'game'])
+          && needed(v, 'idea', 4000) && text(v, 'game', 120));
+    }
+
     match /bestEffortReports/{report} {
       allow create: if request.resource.data.keys().hasOnly(
             ['sha1', 'size', 'gameCode', 'revision', 'matchedAs', 'full', 'off', 'appVersion'])
@@ -20,6 +45,19 @@ service cloud.firestore {
         && request.resource.data.off is list && request.resource.data.off.size() <= 3
         && request.resource.data.off.hasOnly(['DEX', 'GUIDE', 'ITEM_TEXT'])
         && request.resource.data.appVersion is string && request.resource.data.appVersion.matches('^[0-9A-Za-z.-]{1,20}$');
+      allow read, update, delete: if false;
+    }
+    // The website's feedback form (src/pages/feedback.astro): a game request, a bug or an idea, from players
+    // without a GitHub account. Exactly { kind, values, contact? }; values holds only that kind's fields, as
+    // strings within functions/feedback-form.js' limits (change them together). The Cloud Function
+    // (functions/index.js) posts it as a GitHub issue; nobody can read one back through the API.
+    match /feedback/{entry} {
+      allow create: if request.resource.data.keys().hasOnly(['kind', 'values', 'contact'])
+        && request.resource.data.keys().hasAll(['kind', 'values'])
+        && (!('contact' in request.resource.data)
+            || (request.resource.data.contact is string && request.resource.data.contact.size() <= 200))
+        && request.resource.data.values is map
+        && validFeedback(request.resource.data.kind, request.resource.data.values);
       allow read, update, delete: if false;
     }
     match /{document=**} {

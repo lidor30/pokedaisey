@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion.ui
 
+import com.pokedaisy.app.companion.data.typeInText
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -193,9 +194,9 @@ fun evoReqText(r: EvoReq): String = when (r) {
     EvoReq.Random -> tr("by chance (personality)")
     is EvoReq.Beauty -> tr("BEAUTY {0}+", r.min)
     is EvoReq.KnowsMove -> tr("knows {0}", lookupMove(r.move).name)
-    is EvoReq.KnowsMoveType -> tr("knows a {0} move", typeName(r.type))
+    is EvoReq.KnowsMoveType -> tr("knows a {0} move", typeInText(typeName(r.type)))
     is EvoReq.SpeciesInParty -> tr("{0} in the party", speciesName(r.species))
-    is EvoReq.TypeInParty -> tr("a {0} type in the party", typeName(r.type))
+    is EvoReq.TypeInParty -> tr("a {0} type in the party", typeInText(typeName(r.type)))
     EvoReq.DarkInParty -> tr("a {0} type in the party", activeTypeNames.values.firstOrNull { it.equals("DARK", ignoreCase = true) } ?: "DARK")
     is EvoReq.AtPlace -> tr("at {0}", placeName(r.mapsec))
     EvoReq.SomePlace -> tr("at a special place")

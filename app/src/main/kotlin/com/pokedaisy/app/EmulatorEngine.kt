@@ -1,5 +1,6 @@
 package com.pokedaisy.app
 
+import com.pokedaisy.app.companion.data.SnapshotCache
 import com.pokedaisy.app.companion.i18n.tr
 import android.graphics.Bitmap
 import android.media.AudioAttributes
@@ -109,8 +110,19 @@ class EmulatorEngine(
      * yet ([FfMusicKey]) - hand it to [FfMusicRenderer.request]. */
     var onFfMusicWanted: ((key: String) -> Unit)? = null
 
+    /** STEADY: whether this song's clip is cached or on its way (SongRenderer.willRender). While it's on its
+     * way FF is silent - the song isn't played sped up first; null = no renderer, SPED-UP stands in. */
+    var ffMusicWillRender: ((key: String) -> Boolean)? = null
+
     /** Invoked on the emu thread ~1×/sec (between frames) — do core memory reads here. */
     var onSample: (() -> Unit)? = null
+
+    /** A savestate was just written to this file (emu thread, between frames): save what goes beside it. */
+    var onStateSaved: ((File) -> Unit)? = null
+
+    /** The start's resume state loaded (true) or was skipped / failed (false), before the first frame.
+     * Only fired for a start that was given one. */
+    var onResumeResult: ((Boolean) -> Unit)? = null
 
     /** Bottom-screen touch battle control (see PLAN.md Phase 5):
      * drives the real battle menu via synthetic button presses through the
@@ -329,8 +341,34 @@ class EmulatorEngine(
     /** The game screen's refresh period, averaged over recent ticks; 0 = not known yet. */
     @Volatile private var vsyncPeriodNanos = 0.0
 
-    /** GL thread: the game's screen just refreshed (EmulatorView.onVsync). */
-    fun onVsync() {
+    /** Game frames run since the core started - SETTINGS > FPS / CPU counts them per second. */
+    @Volatile var framesRun = 0L
+        private set
+
+    // FPS / CPU's performance panel (PerformanceOverlay), all cumulative / latest - the reader takes differences.
+    /** Time the emu thread spent on frames (the core, audio and the watchers - not waiting), in total. */
+    @Volatile var workNanos = 0L
+        private set
+    /** The longest frame's work since [takeMaxWorkNanos] last ran. */
+    private val maxWork = java.util.concurrent.atomic.AtomicLong(0)
+    fun takeMaxWorkNanos(): Long = maxWork.getAndSet(0)
+    /** The game screen's refresh as measured (Hz, 0 = unknown) and refreshes per frame (0 = timer pacing). */
+    val refreshHz: Float get() = vsyncPeriodNanos.let { if (it > 0.0) (1e9 / it).toFloat() else 0f }
+    val refreshesPerFrame: Int get() = pacedPerFrame
+    /** The speed the core runs at now (1 = real time, Infinity = uncapped FF). */
+    @Volatile var currentSpeed = 1f
+        private set
+    /** The audio device ran dry this many times since the game started (each one a crackle). */
+    @Volatile var audioUnderruns = 0
+        private set
+
+    /** Vsync pacing's refreshes per game frame (0 = timer pacing), and refreshes since the last frame. */
+    @Volatile private var pacedPerFrame = 0
+    @Volatile private var ticksSinceFrame = 0
+
+    /** GL thread: the game's screen just refreshed (EmulatorView.onVsync). Returns how long the draw may
+     * wait for the frame this refresh starts (~60% of a refresh), or 0 when none is due. */
+    fun onVsync(): Long {
         val now = System.nanoTime()
         val d = now - lastVsyncNanos
         lastVsyncNanos = now
@@ -339,7 +377,12 @@ class EmulatorEngine(
             val p = vsyncPeriodNanos
             vsyncPeriodNanos = if (p == 0.0) d.toDouble() else p + (d - p) * 0.05
         }
-        if (vsyncTicks.availablePermits() < 4) vsyncTicks.release()
+        // At most one frame's worth of refreshes banked: after a hiccup the game drops a frame's time
+        // rather than racing through several frames back to back (4 were banked: a visible rush).
+        val n = pacedPerFrame
+        if (vsyncTicks.availablePermits() < maxOf(1, n)) vsyncTicks.release()
+        if (n == 0) return 0L
+        return if (++ticksSinceFrame >= n) (vsyncPeriodNanos * 0.6).toLong() else 0L
     }
 
     /** Refreshes per game frame while the display paces 1x, or 0 for timer pacing. */
@@ -362,6 +405,7 @@ class EmulatorEngine(
         if (!MgbaCore.pkInit(rom.absolutePath, save.absolutePath)) {
             loadError = "mGBA could not load ${rom.name}"
             running = false
+            if (resume != null) onResumeResult?.invoke(false)
             return
         }
         vw = MgbaCore.pkVideoWidth()
@@ -378,13 +422,16 @@ class EmulatorEngine(
             if (MgbaCore.pkStateMatchesSave(resume.absolutePath) == 0) {
                 Log.w("pokedaisy", "resume skipped: ${save.name} changed since the state was made")
                 resume.renameTo(File(resume.parentFile, "resume.replaced"))
+                SnapshotCache.fileFor(resume).delete()
                 startNotice = tr("Your save changed since you last played here, so the game started from the save file")
             } else {
                 val ok = MgbaCore.pkLoadState(resume.absolutePath)
                 Log.i("pokedaisy", "resume state load: $ok")
                 resume.delete()
+                SnapshotCache.fileFor(resume).delete()
                 if (ok) resumed = resume
             }
+            onResumeResult?.invoke(resumed != null)
         }
         // The game's set loads after the resume (it needs the server), so the
         // resumed progress is handed over to be put back once it has.
@@ -436,6 +483,7 @@ class EmulatorEngine(
         var frame = 0L
         try {
             while (running) {
+                val frameStart = System.nanoTime()
                 battleInput.tick()
                 val rewindWanted = rewindEntries
                 if (rewindWanted != rewindApplied) {
@@ -448,6 +496,8 @@ class EmulatorEngine(
                 MgbaCore.pkSetKeys(input.mask or (if ((frame++ / 2) % 2 == 0L) input.turboMask else 0))
                 MgbaCore.pkRunFrame()
                 onFrame?.invoke()
+                framesRun++
+                ticksSinceFrame = 0
                 // Achievements never take the game down with them (a pending JNI
                 // exception from a callback would otherwise end this loop).
                 try {
@@ -503,13 +553,18 @@ class EmulatorEngine(
                         clip?.let { FfMusicPlayer.Clip(it, ffMusicCache.introIfCached(ffMusicKey!!), songStartedAt) },
                     )
                 }
+                // STEADY with the song's clip still rendering: FF stays silent until it's in (it used to
+                // play the song SPED-UP meanwhile, then switch) - unless no clip will ever come.
+                val awaitingClip = mode == FfMusicMode.STEADY && clip == null && ffMusicKey != null &&
+                    ffMusicWillRender?.invoke(ffMusicKey) == true
                 // Heard at 1x (unless a clip is playing through SMART's 1x); during FF
-                // only as SPED-UP (which STEADY falls back to until its clip is ready,
-                // or on a ROM it can't render). Slow-mo stays muted.
-                val spedUp = speed > 1f && clip == null && mode != FfMusicMode.OFF
+                // only as SPED-UP (which STEADY falls back to only for a song or ROM it can't
+                // render). Slow-mo stays muted.
+                val spedUp = speed > 1f && clip == null && mode != FfMusicMode.OFF && !awaitingClip
                 val wantPaused = rewinding || !((speed == 1f && clip == null) || spedUp)
                 // Refreshes per frame when the display paces 1x; 0 = the timer and blocking audio.
                 val perFrame = if (speed == 1f && track != null && bufferFrames > 0) vsyncsPerFrame() else 0
+                pacedPerFrame = perFrame
                 if ((perFrame > 0) != vsyncMode) {
                     vsyncMode = perFrame > 0
                     if (vsyncMode) {
@@ -572,6 +627,11 @@ class EmulatorEngine(
                     }
                 }
 
+                val work = System.nanoTime() - frameStart
+                workNanos += work
+                if (work > maxWork.get()) maxWork.set(work)
+                currentSpeed = speed
+                if (fpsFrames and 31 == 0) track?.let { t -> runCatching { audioUnderruns = t.underrunCount } }
                 if (++fpsFrames >= 120) {
                     val now = System.nanoTime()
                     val fps = fpsFrames * 1e9 / (now - fpsSince)
@@ -616,6 +676,7 @@ class EmulatorEngine(
         } finally {
             // A loop that died mid-game mustn't look alive, or leave a suspend for the next start.
             running = false
+            pacedPerFrame = 0   // no frames are coming: the GL thread mustn't wait for one
             pendingSuspend = null
             runCatching { track?.stop() }
             runCatching { track?.release() }
@@ -671,6 +732,7 @@ class EmulatorEngine(
                 val cur = states.stateFile(save)
                 if (cur.isFile) cur.copyTo(states.bakFile(save), overwrite = true)
                 RetroAchievements.progressFile(cur).let { if (it.isFile) it.copyTo(RetroAchievements.progressFile(states.bakFile(save)), overwrite = true) }
+                SnapshotCache.copy(cur, states.bakFile(save))
                 states.thumbFile(save).let { if (it.isFile) it.copyTo(states.bakThumbFile(save), overwrite = true) }
             }
             val ok = saveState(states.stateFile(save))
@@ -700,6 +762,7 @@ class EmulatorEngine(
                     val bakProgress = RetroAchievements.progressFile(bak)
                     if (bakProgress.isFile) bakProgress.copyTo(cur, overwrite = true) else cur.delete()
                 }
+                SnapshotCache.copy(bak, states.stateFile(slot))
                 states.bakThumbFile(slot).let { if (it.isFile) it.copyTo(states.thumbFile(slot), overwrite = true) }
                 true
             }.getOrDefault(false)
@@ -713,10 +776,12 @@ class EmulatorEngine(
         }
     }
 
-    /** A savestate plus its achievement progress beside it (RetroAchievements.progressFile). */
+    /** A savestate plus its achievement progress (RetroAchievements.progressFile) and
+     * companion data ([onStateSaved]) beside it. */
     private fun saveState(target: File): Boolean {
         val ok = MgbaCore.pkSaveState(target.absolutePath)
         if (ok) RetroAchievements.afterSaveState(target)
+        if (ok) runCatching { onStateSaved?.invoke(target) }.onFailure { Log.w("pokedaisy", "state side data failed", it) }
         return ok
     }
 

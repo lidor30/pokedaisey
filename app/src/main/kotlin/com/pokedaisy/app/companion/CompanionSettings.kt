@@ -89,6 +89,9 @@ interface CompanionSettings {
     val appLanguage: String get() = com.pokedaisy.app.companion.i18n.LANGUAGE_AUTO
     fun setAppLanguage(code: String) {}
 
+    /** Saves DARK MODE (an ordinal of DarkModeSetting, see [Prefs.darkMode]); the look itself is DarkMode's state. */
+    fun setDarkMode(v: Int) {}
+
     /** Whether battle INFO has a STATS page with the foe's IVs - see [Prefs.showFoeIvs]. */
     val showFoeIvs: Boolean get() = false
     fun setShowFoeIvs(on: Boolean) {}
@@ -111,6 +114,10 @@ interface CompanionSettings {
     /** The status bar over the companion's tabs instead of over the game - see [Prefs.statusBarOnCompanion]. */
     val statusBarOnCompanion: Boolean get() = false
     fun setStatusBarOnCompanion(on: Boolean) {}
+
+    /** FPS / CPU over the game's corner - see [Prefs.showPerformance]. */
+    val showPerformance: Boolean get() = false
+    fun setShowPerformance(on: Boolean) {}
 
     /** Whether the game is stretched to fill the top screen instead of kept at
      * 3:2 - see [Prefs.stretchGame]. */
@@ -237,7 +244,8 @@ enum class GridStrength(val label: String) {
  */
 enum class FfMusicMode(val label: String, val alpha: Boolean = false) {
     /** The song at its normal tempo: a clean clip rendered from the ROM
-     * (FfMusicRenderer), looped while the game races; SPED-UP until it's ready. */
+     * (FfMusicRenderer), looped while the game races; silent until it's ready (SPED-UP only for a song
+     * that can't get a clip). */
     STEADY(tk("STEADY"), alpha = true),
 
     /** The game's own audio, sped up with it (pitch and tempo). */

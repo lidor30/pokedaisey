@@ -83,6 +83,16 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
         renderMode = RENDERMODE_CONTINUOUSLY
     }
 
+    override fun surfaceCreated(holder: android.view.SurfaceHolder) {
+        super.surfaceCreated(holder)
+        // The game makes 60 frames a second: ask for a 60 Hz (or a multiple) refresh for this surface. A
+        // 120 Hz screen then can drop to 60 while the game is up - half the draws and composition (heat) -
+        // and every refresh shows a new frame. A hint: the system may keep its rate.
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            runCatching { holder.surface.setFrameRate(60f, android.view.Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE) }
+        }
+    }
+
     // The window reports its first draw (and drops Android 12's splash screen) only once every
     // surfaceRedrawNeededAsync it asked for has called back. GLSurfaceView keeps just the latest
     // finishDrawing: a view resized twice before its first frame (STATUS BAR over a portrait
@@ -128,9 +138,14 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
      * returned, so this ticks with the refresh of the display the game is on - what
      * EmulatorEngine paces 1x frames to ([EmulatorEngine.onVsync]).
      */
-    var onVsync: (() -> Unit)?
+    var onVsync: (() -> Long)?
         get() = renderer.onVsync
         set(v) { renderer.onVsync = v }
+
+    /** New game frames put on screen so far, and refreshes whose due frame came too late to wait for
+     * (it showed a refresh later) - for FPS / CPU's performance panel. */
+    val framesShown: Long get() = renderer.framesShown
+    val lateFrames: Long get() = renderer.lateFrames
 
     /**
      * Drops the renderer's reference to the current framebuffer and blocks
@@ -185,7 +200,11 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
         private var colorTarget = RenderTarget()
         private var effectTarget = RenderTarget()
         @Volatile var holdFrame: () -> Boolean = { false }
-        @Volatile var onVsync: (() -> Unit)? = null
+        @Volatile var framesShown = 0L
+        @Volatile var lateFrames = 0L
+
+        /** Ticks the engine; returns how long this draw may wait for the game frame that tick starts (0 = none due). */
+        @Volatile var onVsync: (() -> Long)? = null
 
         /** Onto the view: textures start with the game's top row, the view with its bottom one. */
         private val viewUv: FloatBuffer = floats(
@@ -233,6 +252,19 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
             dst.position(0)
             dst.put(src)
             fresh = true
+            (frameLock as Object).notifyAll()
+        }
+
+        /** GL thread: the frame this refresh started is on its way - wait for it (at most [nanos]), so it
+         * shows on this refresh. Drawn without waiting, a frame finishing just after the draw showed one
+         * refresh late and the next one on time: two frames on one refresh, then one held for two. */
+        private fun awaitFresh(nanos: Long) = synchronized(frameLock) {
+            val end = System.nanoTime() + nanos
+            while (!fresh) {
+                val left = end - System.nanoTime()
+                if (left <= 0) { lateFrames++; break }
+                (frameLock as Object).wait(left / 1_000_000L, (left % 1_000_000L).toInt())
+            }
         }
 
         fun setStretch(on: Boolean) = synchronized(lock) {
@@ -279,7 +311,8 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
         }
 
         override fun onDrawFrame(gl: GL10?) {
-            onVsync?.invoke()
+            val wait = onVsync?.invoke() ?: 0L
+            if (wait > 0) awaitFresh(wait)
             synchronized(lock) { draw() }
         }
 
@@ -319,6 +352,7 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
                         GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf,
                     )
                     fresh = false
+                    framesShown++
                 }
             }
 

@@ -350,7 +350,7 @@ internal fun ThreatPill(mon: MonView, threats: List<MonView>) {
     if (hits.isEmpty()) return
     val worst = hits.maxBy { it.pct }
     when {
-        worst.pct > 100 -> VerdictPill("${worst.type.uppercase()} ${worst.label}", verdictColor(50))
+        worst.pct > 100 -> VerdictPill("${com.pokedaisy.app.companion.data.typeLabel(worst.type)} ${worst.label}", verdictColor(50))
         worst.pct < 100 -> VerdictPill(tr("RESISTS"), verdictColor(200))
     }
 }

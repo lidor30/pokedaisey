@@ -73,6 +73,8 @@ val SETTING_KEYWORDS: Map<String, String> = mapOf(
     "COMPANION" to "portrait phone bottom position layout",
     "SWAP SCREENS" to "dual screen display switch top bottom",
     "THEME" to "colors look background skin style",
+    "FPS / CPU" to "fps frame rate framerate cpu usage performance speed overlay counter 60",
+    "DARK MODE" to "dark night black theme light colors appearance auto system",
     "RESUME GAMES" to "auto resume continue launch boot",
     "FOLDERS" to "roms folder saves directory path location storage retroarch syncthing save states",
     "COVER ART" to "box art boxart covers steamgriddb images thumbnails api key",

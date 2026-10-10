@@ -45,3 +45,28 @@ the repo secret `FIREBASE_SERVICE_ACCOUNT_POKEDAISY`: a service account JSON key
 *Firebase Hosting Admin*, *API Keys Viewer* and *Cloud Run Viewer* roles.
 
 By hand (this skips the release rule - deploy from a release tag's checkout): `npm run build && npx firebase-tools deploy --only hosting` (or `hosting:channel:deploy <name>` for a preview).
+
+## Feedback form (no GitHub account)
+
+`/feedback/` (`src/pages/feedback.astro`) lets anyone request a game, report a bug or suggest a feature. The
+fields, limits and the GitHub issue's layout live in one file, `functions/feedback-form.js`, which mirrors
+`.github/ISSUE_TEMPLATE/*.yml`; `firestore.rules` holds the same limits (`test/feedback.test.js` fails if they
+drift). A submission is written straight to Firestore's `feedback` collection (write-only: nobody can read one
+back through the API) and the Cloud Function in `functions/index.js` posts it as a GitHub issue, then notes the
+issue number on the document. The optional contact (email / Discord) stays in Firestore; it's never on the issue.
+A submission with more than 3 links is held (`status: 'held'`) for a look in the Firebase console.
+
+One-time setup (none of it goes through the website workflow, which deploys hosting only):
+
+1. Firebase console > Firestore: create the database if it isn't there yet.
+2. Switch the project to the **Blaze** plan (Cloud Functions and Secret Manager need it; this traffic stays
+   within the free tier).
+3. Make a GitHub **fine-grained token**: repository access *only* `lidor30/pokedaisy`, permission
+   *Issues: Read and write*, nothing else. Then, from `website/`:
+   `npx firebase-tools functions:secrets:set GITHUB_TOKEN` (paste the token).
+4. Deploy the rules and the function: `npx firebase-tools deploy --only firestore:rules,functions`
+   (redo after changing `firestore.rules` or `functions/`).
+
+Without step 2-4's function, submissions still land in Firestore (rules deployed) - read them in the console.
+Rotate the token by setting the secret again and redeploying the function. Test the rules locally with
+`npx firebase-tools emulators:exec --only firestore "<script>"` (no project needed).

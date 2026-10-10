@@ -546,7 +546,7 @@ class LibraryActivity : ComponentActivity() {
             modifier = modifier
                 .aspectRatio(ICON_ASPECT)
                 .clip(PixelRoundedShape(u * 3))
-                .background(Color(0xFF20242C))
+                .background(com.pokedaisy.app.companion.ui.OptionColors.imageWell)
                 .drawWithContent {
                     drawContent()
                     val px = u.toPx()
@@ -1311,7 +1311,7 @@ class LibraryActivity : ComponentActivity() {
 
     companion object {
         /** The options popup's subtle 1u frame. */
-        private val MenuBorder = Color(0xFFA8A8B0)
+        private val MenuBorder get() = if (OptionColors.dark) Color(0xFF4A5262) else Color(0xFFA8A8B0)
         const val EXTRA_ROM = "rom"
         private const val MAX_COVER_WIDTH = 480
     }

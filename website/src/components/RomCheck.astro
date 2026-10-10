@@ -56,6 +56,7 @@ import Pixel from './Pixel.astro';
   .rows dd { margin: 0; color: #cb0707; text-shadow: var(--px) var(--px) 0 #e0a564; overflow-wrap: anywhere; }
   .rows dd.plain { color: #8c8c94; text-shadow: none; }
   .message { color: #3c3b45; text-shadow: none; margin-bottom: 8px; }
+  [data-actions] { display: flex; flex-wrap: wrap; gap: 16px; }
   @media (max-width: 760px) { .rows { grid-template-columns: 1fr; gap: 0; } .rows dd { margin-bottom: 6px; } }
 </style>
 
@@ -122,6 +123,22 @@ import Pixel from './Pixel.astro';
       return a;
     };
 
+    // The same request without a GitHub account: the website's form, filled in through the #hash
+    // (stays in the browser - a hash isn't sent to the server).
+    const formLink = (r: any) => {
+      const params = new URLSearchParams({
+        game: r.name.replace(/\.[^.]+$/, ''),
+        game_code: r.code ? `${r.code} (rev ${r.rev})` : 'Game Boy',
+        size: String(r.size),
+        sha1: r.sha1,
+      });
+      const a = document.createElement('a');
+      a.className = 'btn f-btn h-btnHot small';
+      a.href = `/feedback/#${params}`;
+      a.textContent = 'NO GITHUB ACCOUNT? ASK HERE';
+      return a;
+    };
+
     const check = async (file: File) => {
       dropText.textContent = 'CHECKING…';
       drop.classList.add('busy');
@@ -147,7 +164,7 @@ import Pixel from './Pixel.astro';
         if (r.sha1) row('SHA-1', r.sha1, true);
         message.textContent = MESSAGES[v.status === 'unsupported' ? v.reason : v.status](v, r);
         if (r.sha1 && (v.status === 'likely' || ['unknown-hack', 'retail-hack', 'revision', 'other-game', 'gb'].includes(v.reason))) {
-          actions.append(requestLink(r));
+          actions.append(requestLink(r), formLink(r));
         }
       } catch (e) {
         const stamp = document.createElement('span');

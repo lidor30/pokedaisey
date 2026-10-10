@@ -596,13 +596,13 @@ object RetroAchievements : CompanionAchievements {
                 onUnlockSound?.invoke()
                 listDirty = true
                 framesSinceList = 30
-                AchievementPopup(AchievementPopup.Kind.UNLOCKED, e.title.orEmpty(), e.description.orEmpty(), e.badgeUrl, e.points)
+                AchievementPopup(AchievementPopup.Kind.UNLOCKED, e.title.orEmpty(), e.description.orEmpty(), e.badgeUrl, e.points, achievementId = e.id)
             }
             RaEvent.GAME_COMPLETED ->
                 AchievementPopup(AchievementPopup.Kind.MASTERED, e.title ?: tr("GAME COMPLETE"), tr("EVERY ACHIEVEMENT UNLOCKED"), e.badgeUrl)
             RaEvent.PROGRESS_SHOW, RaEvent.PROGRESS_UPDATE -> {
                 listDirty = true
-                AchievementPopup(AchievementPopup.Kind.PROGRESS, e.title.orEmpty(), e.extra, e.badgeUrl)
+                AchievementPopup(AchievementPopup.Kind.PROGRESS, e.title.orEmpty(), e.extra, e.badgeUrl, achievementId = e.id)
             }
             RaEvent.LEADERBOARD_STARTED -> AchievementPopup(AchievementPopup.Kind.LEADERBOARD, e.title.orEmpty(), tr("LEADERBOARD ATTEMPT STARTED"))
             RaEvent.LEADERBOARD_FAILED -> AchievementPopup(AchievementPopup.Kind.LEADERBOARD, e.title.orEmpty(), tr("LEADERBOARD ATTEMPT FAILED"))

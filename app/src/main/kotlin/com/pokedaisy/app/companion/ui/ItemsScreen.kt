@@ -1,5 +1,10 @@
 package com.pokedaisy.app.companion.ui
 
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.lerp
+import com.pokedaisy.app.companion.ui.theme.nightSurface
+import com.pokedaisy.app.companion.ui.theme.nightShadow
+import com.pokedaisy.app.companion.ui.theme.nightInk
 import com.pokedaisy.app.companion.i18n.tk
 import com.pokedaisy.app.companion.i18n.tr
 import androidx.compose.foundation.Canvas
@@ -156,7 +161,24 @@ private data class BagPalette(
     /** ...and its outer border: only over the window's own outer border, for a clean corner. */
     val selectedBorderReach get() = panelLayers[0].second
     val panelFrame get() = panelLayers.sumOf { it.second }
+
+    /** Dark mode's version: the same windows in their own hues, dark, with light text (theme/NightColors.kt). */
+    fun night(scrim: Float = OptionColors.backdropScrim): BagPalette = copy(
+        panelLayers = panelLayers.map { (c, w) -> c.nightSurface() to w },
+        fill = fill.nightSurface(),
+        divider = divider?.nightShadow(),
+        text = text.nightInk(), textShadow = textShadow.nightShadow(),
+        tabText = tabText.nightInk(), tabTextShadow = tabTextShadow.nightShadow(),
+        descLayers = descLayers.map { (c, w) -> c.nightSurface() to w },
+        descFill = descFill.nightSurface(),
+        descText = descText.nightInk(), descTextShadow = descTextShadow.nightShadow(),
+        iconBox = iconBox.nightSurface(), iconBoxEdge = iconBoxEdge.nightSurface(),
+        backdrop = backdrop?.let { (a, b) -> lerp(a, NIGHT, scrim) to lerp(b, NIGHT, scrim) },
+        dividerShadow = dividerShadow?.nightSurface(),
+    )
 }
+
+private val nightBags = java.util.concurrent.ConcurrentHashMap<BagPalette, BagPalette>()
 
 /** Sampled 1:1 from a FireRed bag screenshot. */
 private val FireRedBag = BagPalette(
@@ -382,7 +404,9 @@ fun ItemsBackdrop(game: GameKind, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val gen = rememberArtGeneration()
     val art = remember(pal.backdropArt, gen) { pal.backdropArt?.let { GameArt.get(context, it)?.asImageBitmap() } }
-    Canvas(modifier) {
+    // Dark mode: an image backdrop (SoulGold's night sky) under the game backdrops' scrim; stripes come pre-dimmed.
+    val scrim = OptionColors.backdropScrim
+    Canvas(modifier.then(if (scrim > 0f && art != null) Modifier.drawWithContent { drawContent(); drawRect(NIGHT.copy(alpha = scrim)) } else Modifier)) {
         if (art != null) {
             // Whole GBA pixels, tiled like the game's wrapping BG layer.
             val w = art.width * m.px
@@ -409,7 +433,11 @@ fun ItemsBackdrop(game: GameKind, modifier: Modifier = Modifier) {
 }
 
 /** Same grouping as the companion backdrop (rememberGameBackground). */
-private fun bagPaletteFor(game: GameKind): BagPalette = when (game) {
+private fun bagPaletteFor(game: GameKind): BagPalette =
+    // Gen 1's white goes nearly black, like its party backdrop (GameBackdrop).
+    lightBagFor(game).let { if (OptionColors.dark) nightBags.getOrPut(it) { it.night(if (game == GameKind.YELLOW) 0.9f else OptionColors.backdropScrim) } else it }
+
+private fun lightBagFor(game: GameKind): BagPalette = when (game) {
     GameKind.EMERALD -> EmeraldBag
     GameKind.HEART_AND_SOUL -> HeartAndSoulBag
     GameKind.UNBOUND -> UnboundBag

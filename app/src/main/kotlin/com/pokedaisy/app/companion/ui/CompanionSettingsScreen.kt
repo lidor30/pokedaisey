@@ -1,5 +1,7 @@
 package com.pokedaisy.app.companion.ui
 
+import com.pokedaisy.app.companion.ui.theme.DarkModeSetting
+import com.pokedaisy.app.companion.ui.theme.DarkMode
 import com.pokedaisy.app.companion.i18n.L10n
 import com.pokedaisy.app.companion.i18n.tk
 import com.pokedaisy.app.companion.i18n.tr
@@ -396,6 +398,17 @@ private fun homeRows(
         SettingRow(tk("ASPECT"), aspectLabel(s.stretchGame)) { s.setStretchGame(!s.stretchGame); changed() },
         // FILTER (LCD / LCD PAPER / SCANLINES / CRT) and GBA COLORS, on their own page.
         SettingRow(tk("SHADERS"), s.screenFilter.label) { navigate(Page.SHADERS) },
+        // The game's frames per second and the app's CPU share, in the game's corner.
+        SettingRow(tk("FPS / CPU"), onOff(s.showPerformance)) { s.setShowPerformance(!s.showPerformance); changed() },
+        // OFF / ON / AUTO (the device's): both screens switch at once.
+        SettingRow(tk("DARK MODE"), DarkMode.setting.label) {
+            val modes = DarkModeSetting.entries
+            select(Selector(tk("DARK MODE"), modes.map { it.label }, DarkMode.setting.label) { l ->
+                val pick = modes.first { it.label == l }
+                DarkMode.setting = pick
+                s.setDarkMode(pick.ordinal)
+            })
+        },
         // A phone upright: the companion along the screen's bottom, or right under the game (the touch pad below it).
         s.portraitUnderGame?.let { under ->
             SettingRow(tk("COMPANION"), portraitPlaceLabel(under)) { s.setPortraitUnderGame(!under); changed() }

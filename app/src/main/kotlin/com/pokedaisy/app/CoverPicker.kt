@@ -253,7 +253,7 @@ private fun RemoteThumb(url: String, source: CoverSource, m: GbaTextMetrics) {
             .fillMaxWidth()
             .aspectRatio(1f)
             .clip(PixelRoundedShape(u * 3))
-            .background(Color(0xFF20242C))
+            .background(com.pokedaisy.app.companion.ui.OptionColors.imageWell)
             .drawWithContent {
                 drawContent()
                 val px = u.toPx()

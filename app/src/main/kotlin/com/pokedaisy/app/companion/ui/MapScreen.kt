@@ -240,7 +240,8 @@ private fun RegionMap(
                 drawContent()
                 val px = (MAP_FRAME / 5).toPx().coerceAtLeast(1f)
                 drawLayeredFrame(
-                    listOf(OptionColors.frameDark to 2 * px, OptionColors.frameLight to px, Color.White to 2 * px),
+                    // The list window's inner white band; dark mode's title window slate.
+                    listOf(OptionColors.frameDark to 2 * px, OptionColors.frameLight to px, (if (OptionColors.dark) OptionColors.titleFill else Color.White) to 2 * px),
                     radius = 12.dp.toPx(),
                 )
             },
@@ -330,8 +331,9 @@ private fun MapLabel(style: MapLabelStyle, label: String, dungeon: String?, crop
                     .drawBehind {
                         when (style) {
                             MapLabelStyle.FIRERED -> drawRect(FR_STRIP)
-                            MapLabelStyle.GEN1 -> drawRect(Color.White)
-                            MapLabelStyle.EMERALD -> drawLayeredBox(OptionColors.listLayers.map { (c, lw) -> c to lw * sy }, Color.White, radius = sy)
+                            // The game's white label window; its text is titleText, so dark mode takes the title window's fill.
+                            MapLabelStyle.GEN1 -> drawRect(OptionColors.titleFill)
+                            MapLabelStyle.EMERALD -> drawLayeredBox(OptionColors.listLayers.map { (c, lw) -> c to lw * sy }, OptionColors.titleFill, radius = sy)
                         }
                     }
                     // FireRed's text sits 2px in, but the tab's frame covers the map's edge here.

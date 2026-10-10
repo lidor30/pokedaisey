@@ -156,6 +156,11 @@ class Prefs(context: Context) {
         get() = p.getBoolean("hotkeys_enabled", true)
         set(v) = p.edit().putBoolean("hotkeys_enabled", v).apply()
 
+    /** SETTINGS > FPS / CPU: the game's frames per second and the app's CPU share over the game's corner. */
+    var showPerformance: Boolean
+        get() = p.getBoolean("show_performance", false)
+        set(v) = p.edit().putBoolean("show_performance", v).apply()
+
     /** Whether the game has a status bar on top (game, location, money, clock, battery). */
     var statusBar: Boolean
         get() = p.getBoolean("status_bar", false)
@@ -298,6 +303,12 @@ class Prefs(context: Context) {
     var appTheme: Int
         get() = p.getInt("app_theme", 8)
         set(v) = p.edit().putInt("app_theme", v).apply()
+
+    /** SETTINGS > DARK MODE: 0 off (the default: the OPTION screen's white windows), 1 on, 2 AUTO (the device's
+     * own light / dark setting). See DarkMode (companion/ui/theme/DarkMode.kt). */
+    var darkMode: Int
+        get() = p.getInt("dark_mode", 0)
+        set(v) = p.edit().putInt("dark_mode", v).apply()
 
     /** User-supplied SteamGridDB API key (Settings > Cover Art) — see
      * [SteamGridDbClient]. Null/blank = cover-art fetching is off; nothing is

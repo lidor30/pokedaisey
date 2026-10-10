@@ -265,12 +265,16 @@ internal val caughtBall = mapOf(
 private val seenBall = mapOf(
     'K' to Color(0xFF8C8C94), 'R' to Color(0xFFC6C5C5), 'W' to Color(0xFFF0F0F0), 'H' to Color(0xFFE0E0E0),
 )
+// Dark mode: the seen-only ball as dim as the light one is faint, on the dark list.
+private val seenBallNight = mapOf(
+    'K' to Color(0xFF70778A), 'R' to Color(0xFF3E4552), 'W' to Color(0xFF4C5464), 'H' to Color(0xFF454C5A),
+)
 
 @Composable
 private fun DexMark(caught: Boolean, seen: Boolean, modifier: Modifier) {
     when {
         caught -> PixelArt(PixelIcons.pokeBall, caughtBall, modifier.semantics { contentDescription = tr("Caught") })
-        seen -> PixelArt(PixelIcons.pokeBall, seenBall, modifier.semantics { contentDescription = tr("Seen") })
+        seen -> PixelArt(PixelIcons.pokeBall, if (OptionColors.dark) seenBallNight else seenBall, modifier.semantics { contentDescription = tr("Seen") })
         else -> Spacer(modifier)
     }
 }
@@ -350,7 +354,15 @@ private fun EntryPage(
             // The sprite gets whatever height the text below leaves it.
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 val sprite = rememberRomBitmap(t, species, PokedexSource::cachedFrontSprite, PokedexSource::frontSprite)
-                PixelImage(sprite, 64, Modifier.fillMaxSize().clip(PixelRoundedShape(u * 4)).background(OptionColors.listFill))
+                val paper = OptionColors.spritePaper
+                if (paper != null) {
+                    // Dark mode on Gen 1: the picture on its own white card, padded inside the dark well.
+                    Box(Modifier.fillMaxSize().clip(PixelRoundedShape(u * 4)).background(OptionColors.listFill).padding(u * 4)) {
+                        PixelImage(sprite, 64, Modifier.fillMaxSize().clip(PixelRoundedShape(u * 3)).background(paper).padding(u * 4))
+                    }
+                } else {
+                    PixelImage(sprite, 64, Modifier.fillMaxSize().clip(PixelRoundedShape(u * 4)).background(OptionColors.listFill))
+                }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (t.footprints != 0L) {

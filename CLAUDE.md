@@ -127,6 +127,20 @@ New screens should reuse these rather than
 summary, battle INFO / SUGGESTIONS) use `SummaryFrame` (`MonDetailScreen.kt`): one white
 window split by `Separator`s over a row of square `PlatinumButton`s with Back bottom-right.
 
+**DARK MODE** (SETTINGS on either screen, SCREEN group; `Prefs.darkMode` OFF default / ON / AUTO = the device's uiMode;
+`DarkMode` in `theme/DarkMode.kt`, Compose state, `override` for Paparazzi / ui-preview): every `OptionColors` getter has a
+dark twin - the same window build (dark outer line, lighter inner band, lilac edge) in slate, light text with its GBA
+shadow *between* text and window, a brighter red value; Gen 1's black-on-white turns white-on-black. Backdrops dim
+towards `NIGHT` (`backdropScrim` 0.55, Gen 1 0.9): the game's party art under a scrim, the theme stripes lerped,
+`DaisyBackdrop` its own night page (plum / amber / indigo glows). Game art stays the game's (party slots, map, card,
+battle buttons); bags get `BagPalette.night()` (`theme/NightColors.kt`: each colour's hue kept, lightness remapped -
+yellows lean amber, a dark cream read olive), Yellow's party slots `YellowPartyPaletteNight`, Gen 1 pictures a white card
+(`spritePaper`: their paper is transparent). New colours: read `OptionColors` (or add a getter with both values), never a
+bare white / black fill. Look at it: `gradle render -Pdark=true -Pout=build/shots-dark`, `DarkCompanionScreenshotTest`.
+**ACHIEVEMENTS from a popup**: `AchievementPopup.achievementId` (unlocks and progress); a tap opens the tab on it
+(`AchievementFocus`: scrolled to, the white cursor row, followed for 3 s while the list re-sorts), BACK returns to the
+tab it was opened over (`popupReturn`). The list's filter button (pixel funnel, `OptionButton(pixelIcon = …)`) opens a
+pick-list: SHOW ALL / LOCKED ONLY / UNLOCKED ONLY (`AchievementFilter`).
 **Corners are pixel art, never smooth arcs**: use `PixelRoundedShape(r)` / `PixelPillShape`
 (`companion/ui/PixelShapes.kt`) instead of `RoundedCornerShape`/`CircleShape`, and
 `drawPixelRoundRect`/`drawPixelRoundFrame` instead of `drawRoundRect` — they step in
@@ -441,8 +455,10 @@ game starts it, calling the ROM's `m4aSongNumStart` - found by code signature (`
 agbcc-built game and binary hack, not pokeemerald-expansion) - via `pk_call`, which runs the
 call to its return and restores the CPU (a bare PC hijack corrupted Unbound mid-frame), after
 parking the booted game on a `b .` so its intro can't switch songs (only once the VBlank IRQ is
-fully on - Unbound froze otherwise). Until a clip exists (or on an unsupported ROM) STEADY falls
-back to SPED-UP, so every ROM pre-renders its music once in the background: FireRed/LeafGreen/Emerald-sized
+fully on - Unbound froze otherwise). Until a song's clip exists STEADY is silent
+through FF (`SongRenderer.willRender`; the user's call - it used to play the song SPED-UP meanwhile); only a song
+that can't get a clip (an unrecognised sound engine, FAILED / ENDED / not in the table, a renderer that died)
+plays SPED-UP. Every ROM pre-renders its music once in the background: FireRed/LeafGreen/Emerald-sized
 ROMs (retail + QoL) their `MapMusic*.kt` list, any other ROM every `gSongTable` entry on the BGM player
 (`M4aSongs.bgmSongIds`, `ms` 0); a song being heard pre-empts that pass mid-recording, songs that end by
 themselves (fanfares) count as done. **Clips loop where the song loops** (`M4aLoop.kt`, cache v6): the BGM's
@@ -682,6 +698,23 @@ The generators no longer write descriptions; `RomItemTextTest` pins a few per ga
 frame per refresh (60 Hz) or per two (120 Hz), audio resampled to match (`pkSetAudioRate`) with RetroArch-style dynamic
 rate control on the AudioTrack's fill, written non-blocking; no usable vsync (or another speed) falls back to the timer +
 blocking writes. Before, the audio clock paced frames and the display showed one twice / skipped one every few seconds.
+Then (a Thor Pro report: smoother, but pacing still off): a draw no longer races the frame its refresh starts -
+`EmulatorEngine.onVsync` returns how long the GL thread may wait for it (~60% of a refresh, only on the refresh that
+starts a frame) and `EmulatorView` waits on `publish`; at most one frame's worth of refreshes is banked (4 were: after a
+hiccup the game raced through frames); the game surface asks for 60 Hz (`Surface.setFrameRate`, a hint), so a 120 Hz
+screen can drop to 60 while it's up. Not yet checked on a Thor - read `fps=` in logcat and `dumpsys SurfaceFlinger`.
+**FPS / CPU** (SETTINGS on either screen, SCREEN group, `Prefs.showPerformance`, off): flush in the game screen's
+top-left corner on a small dark box (the HUD's messages moved top-right) - frames the core ran per second
+(`EmulatorEngine.framesRun`, ~60.0 on a 60 / 120 Hz screen, 59.7 on the timer) and the app's share of the whole CPU
+(`CpuUsage`, /proc/self/stat over all cores), twice a second. A tap on it or near it (`TOUCH_REACH`) opens the panel
+(`PerfReading`, shadowed text with no box - the user's call: box on the short one, none on the long): frames on screen, late frames (the GL wait timing out), frame time avg / worst,
+emulation load, refresh + pacing, speed, audio underruns, battery temperature, thermal status, memory.
+**Heat**: the STEADY background pass runs at most 10x real time (`BACKGROUND_FRAME_NANOS`; songs being heard go flat
+out), and gives up on a song that failed on 2 launches (`FfMusicCache.failures`) - a failing song kept the pass, and a
+second core, running on every launch.
+**Updater loop** (same report: the bar filled, nothing installed): with "install unknown apps" off, the settings page
+failing to open left only a toast and UPDATE downloading again; now the installer opens anyway (it asks itself), and an
+APK already downloaded for the offered release is reused (`AppUpdateFlow.check` keeps it).
 **Frontend launch (Cocoon / iiSU / ES-DE)**: `LaunchActivity` (exported, translucent, no intent
 filter, `taskAffinity=""`) takes the ROM as intent data or a `rom`/`ROM`/`path`/`file`/`uri` extra,
 plays a readable real path in place (`RomUris.originalPath`; needs All files access on 11+), else
@@ -728,6 +761,15 @@ mgba_dump's `cheat`, built against the app's flags). A hook / ROM patch would ch
 in for RA's hash. RetroAchievements pauses while any cheat is loaded (`rc_client_idle` instead of `do_frame`; CHEATS ON /
 OFF popups, PAUSED badge on the ACHIEVEMENTS tab). The render core `rg` never gets cheats.
 
+**Instant companion on a resume** (`SnapshotCache`, `<state>.companion` beside every savestate, a few KB): a launch
+that resumes from a state shows the party / bag / map / status bar as that state left them
+(`TelemetryStore.showCached`, set before the engine starts) and the live data replaces it in place once it has data
+(`hasData`); DEX / GUIDE / CARD need ROM tables, so only their tab chips are kept (`SnapshotView.cachedTabs`) and they
+wait on LOADING. A resume that doesn't load (save changed) drops the copy. Icons read live from the ROM reload on
+`DecompIconSource.generation`. The 5-6 s LOADING it replaced was mostly detection: retail FireRed / Emerald waited 6
+one-second probes for the QoL struct - now their (already computed) masked hash says retail (`RETAIL_SHA1S`) and they
+go native at once. The open tab (`selectedLabel`, `backTab`, `settingsUi`) lives outside `key(snapshot.game)`, so the
+game being detected mid-launch no longer sends a player who opened SETTINGS back to PARTY.
 **Save files are sacred**: an mGBA state carries the save as it was, and loading one
 (`SAVESTATE_SAVEDATA`) writes that copy over the save file. So the auto-resume first checks
 `pkStateMatchesSave`: if the file changed since the state was made (RetroArch played it, the saves
@@ -825,6 +867,14 @@ The site's game matrix is README's Supported games table; a row of all "—" mea
 so the export lists it under `inProgress` - off the matrix, and "in progress" in the ROM check (none since R.O.W.E.
 got its companion, 2026-10-09).
 The site's demos and art never use real Pokémon / move / item names or the games' art (the user's rule).
+**Feedback without GitHub** (`website/src/pages/feedback.astro`, `/feedback/`): game request / bug / idea, written
+to Firestore `feedback` (write-only, `firestore.rules`) and posted as a GitHub issue by `website/functions/index.js`
+(2nd-gen Firestore trigger, secret `GITHUB_TOKEN`, Blaze plan; setup in website/README.md). One definition,
+`functions/feedback-form.js`, feeds the page, the function and the issue layout (mirrors .github/ISSUE_TEMPLATE);
+change it with the rules (`test/feedback.test.js` checks they agree). The contact field never reaches the issue.
+The site's REPORT A BUG / REQUEST A GAME / SUGGEST A FEATURE go there (it links on to GitHub); the ROM check adds
+NO GITHUB ACCOUNT? next to ASK FOR SUPPORT, filled in through the URL's #hash. Astro needs Node 22.12+ (this Mac's
+default 22.1 can't build it: use `~/.nvm/versions/node/v22.23.3/bin`).
 
 **Library names** (`GameTitles.kt`): a game shows as its own name ("Pokémon FireRed") - the player's
 RENAME first, then the whole-file SHA1 looked up in `GameTitles.BY_SHA1` (retail from the pret
@@ -856,7 +906,8 @@ else Pixel Operator lacks (½, ◀) still falls to the system font, as before.
 **European Emeralds** (BPES / BPED / BPEF / BPEI; `NATIVE_EMERALD_ES` / `_DE` / `_FR` / `_IT`): English's RAM and
 save layout, their own ROM tables, and **names in the game's language** (the user's call): species / moves / items /
 natures / map sections from each ROM (`scripts/gen_emerald_lang_tables.py` -> `EmeraldText<Lang>Gen.kt`), switched by
-`NativeConfig.language` -> `romLanguage` -> `localEmerald` (types stay English: colours are keyed by name). The dex page
+`NativeConfig.language` -> `romLanguage` -> `localEmerald` (types are keyed in English - colours, the chart - and drawn in the game's words by `typeLabel` /
+`typeInText`, data/TypeNames.kt, GitHub #40). The dex page
 follows each game's wording and metric units; party art is per language (`partyem_<lang>/`); no TRAINER CARD yet. See
 docs/DEVELOPMENT.md. **Japanese Emerald** (BPEJ, `NATIVE_EMERALD_JA`) is its own build: every RAM global and the battle
 code moved (structs didn't - English's save loads), shorter ROM records (dex entries 0x1C, trainers 0x20, items 40,

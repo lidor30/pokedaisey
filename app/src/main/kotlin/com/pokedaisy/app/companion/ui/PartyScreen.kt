@@ -305,24 +305,25 @@ private fun flatSlot(outline: Color, fill: Color, text: Color? = null) =
  * cursor row is a light grey (the game marks it with its ▶).
  */
 private val G1_BLACK = Color(0xFF181818)
-val YellowPartyPalette = FireRedPartyPalette.copy(
-    normal = PartySlotColors(G1_BLACK, Color.White, Color.White, Color.White, band = Color.White,
-        text = G1_BLACK, textShadow = Color.Transparent),
-    selected = PartySlotColors(G1_BLACK, Color(0xFFDCDCDC), Color(0xFFDCDCDC), Color(0xFFDCDCDC), band = Color(0xFFDCDCDC),
-        text = G1_BLACK, textShadow = Color.Transparent),
-    fainted = PartySlotColors(G1_BLACK, Color.White, Color.White, Color.White, band = Color.White,
-        text = G1_BLACK, textShadow = Color.Transparent),
-    text = G1_BLACK, textShadow = Color.Transparent,
-    male = G1_BLACK, maleShadow = Color.Transparent,
-    female = G1_BLACK, femaleShadow = Color.Transparent,
-    hpFrame = G1_BLACK, hpInner = Color.White,
-    hpLabel = Color.White, hpLabelShade = Color.White,
+private fun yellowPartyPalette(ink: Color, paper: Color, cursor: Color) = FireRedPartyPalette.copy(
+    normal = PartySlotColors(ink, paper, paper, paper, band = paper, text = ink, textShadow = Color.Transparent),
+    selected = PartySlotColors(ink, cursor, cursor, cursor, band = cursor, text = ink, textShadow = Color.Transparent),
+    fainted = PartySlotColors(ink, paper, paper, paper, band = paper, text = ink, textShadow = Color.Transparent),
+    text = ink, textShadow = Color.Transparent,
+    male = ink, maleShadow = Color.Transparent,
+    female = ink, femaleShadow = Color.Transparent,
+    hpFrame = ink, hpInner = paper,
+    hpLabel = paper, hpLabelShade = paper,
     hpGreen = HpBarColors(Color(0xFF00FF00), Color(0xFF00FF00)),
     hpYellow = HpBarColors(Color(0xFFFF9400), Color(0xFFFF9400)),
     hpRed = HpBarColors(Color(0xFFFF0000), Color(0xFFFF0000)),
-    hpEmpty = HpBarColors(Color.White, Color.White),
+    hpEmpty = HpBarColors(paper, paper),
     ball = mapOf('K' to Color.Transparent, 'R' to Color.Transparent, 'H' to Color.Transparent, 'W' to Color.Transparent),
 )
+private val YellowPartyPaletteLight = yellowPartyPalette(G1_BLACK, Color.White, Color(0xFFDCDCDC))
+// Dark mode: the menu turned round like OptionColors' Gen 1 windows - light lines and text on black.
+private val YellowPartyPaletteNight = yellowPartyPalette(Color(0xFFE8E8E8), Color(0xFF181818), Color(0xFF3A3A3A))
+val YellowPartyPalette: PartyPalette get() = if (OptionColors.dark) YellowPartyPaletteNight else YellowPartyPaletteLight
 
 /** The generic slot's palette for [game] - add a palette here to restyle a game. */
 fun partyPaletteFor(game: GameKind): PartyPalette = when (game) {

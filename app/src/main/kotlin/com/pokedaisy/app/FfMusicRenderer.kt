@@ -37,6 +37,11 @@ interface SongRenderer {
     /** Render [key]'s song soon, unless it's cached or already asked for. */
     fun request(key: String)
     fun stop()
+
+    /** Whether [key]'s clip is coming (cached, or still to be rendered): STEADY stays silent through FF
+     * while it is, and plays the song SPED-UP only when no clip ever will (an unrecognised sound engine,
+     * a song that couldn't be recorded or ends by itself, a renderer that stopped). */
+    fun willRender(key: String): Boolean
 }
 
 /**
@@ -70,6 +75,8 @@ class FfMusicRenderer(
     // String keys (played now: first), Int song ids (prefetch: last) or CLICK (first of all).
     private val queue = LinkedBlockingDeque<Any>()
     private val requested = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
+    // Songs heard live that got no clip (FAILED / ENDED / not in the song table): STEADY plays them SPED-UP.
+    private val noClip = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
     @Volatile private var stopped = false
 
     /** False once the ROM's sound engine turned out unrecognised (STEADY then has no clips here). */
@@ -83,6 +90,7 @@ class FfMusicRenderer(
                 run()
             } catch (t: Throwable) {
                 Log.w("pokedaisy", "FF music renderer failed", t)
+                supported = false
             }
         }, "pokedaisy-ffmusic-render").apply { isDaemon = true; start() }
     }
@@ -96,6 +104,8 @@ class FfMusicRenderer(
         stopped = true
         queue.offerFirst(STOP)
     }
+
+    override fun willRender(key: String): Boolean = cache.complete(key) || supported && !stopped && key !in noClip
 
     private fun run() {
         val (songs, prefetch) = locateSongs() ?: run {
@@ -128,12 +138,20 @@ class FfMusicRenderer(
                     is String -> if (cache.complete(job)) null else songs.songId(job)
                     else -> null
                 }
-                val outcome = if (songId == null) Outcome.CACHED
+                // A background song that failed on earlier launches too is left alone (it counts as done).
+                val givenUp = job is Int && cache.failures(job.toString()) >= MAX_SONG_FAILURES
+                val outcome = if (songId == null || givenUp) Outcome.CACHED
                 else (core ?: RenderCore(songs).also { core = it }).record(songs, songId, background = job is Int)
+                if (job is String && !cache.complete(job) && (songId == null || outcome == Outcome.FAILED || outcome == Outcome.ENDED)) {
+                    noClip.add(job)
+                }
                 if (job is Int) {
                     // A song the player is hearing came first: this one goes back in line.
                     if (outcome == Outcome.DEFERRED) { queue.offerLast(job); continue }
-                    if (outcome == Outcome.FAILED) prefetchOk = false
+                    if (outcome == Outcome.FAILED) {
+                        cache.noteFailure(job.toString())
+                        prefetchOk = cache.failures(job.toString()) >= MAX_SONG_FAILURES && prefetchOk
+                    }
                     if (--prefetchLeft == 0 && prefetchOk) cache.prefetched = true
                 }
             }
@@ -211,11 +229,18 @@ class FfMusicRenderer(
                 val loop = M4aLoopWatch(reader)
                 var pos = 0
                 var frames = 0
+                // The background pass runs at most BACKGROUND_SPEED x real time: flat out it kept a core busy for
+                // minutes (heat, on a handheld) for clips nobody is waiting for. A song being heard goes flat out.
+                val paceFrom = System.nanoTime()
                 var stopAt = buf.size
                 var ended = false
                 while (pos < stopAt && frames < WATCHDOG_FRAMES && !stopped) {
                     if (background && liveRequestWaiting(songs, songId)) return Outcome.DEFERRED
                     frameStart[frames++] = pos
+                    if (background) {
+                        val ahead = paceFrom + frames * BACKGROUND_FRAME_NANOS - System.nanoTime()
+                        if (ahead > 2_000_000L) Thread.sleep(ahead / 1_000_000L)
+                    }
                     MgbaCore.pkRenderRunFrame()
                     val n = MgbaCore.pkRenderReadAudio(scratch)
                     // The song stopped by itself (a fanfare: nothing to loop), or the
@@ -351,6 +376,10 @@ class FfMusicRenderer(
 
         const val IDLE_SECONDS = 30L
         const val ATTEMPTS = 2
+        /** Launches a background song may fail in before the pass stops trying it. */
+        const val MAX_SONG_FAILURES = 2
+        /** The background pass's cap: 10x real time (a frame every 1.67 ms). */
+        const val BACKGROUND_FRAME_NANOS = 1_000_000_000L / 60 / 10
         const val START_FRAMES = 30                                   // up to half a second for a forced song to start
         const val BOOT_FRAMES = 300                                   // ~5 s of game time at 60 fps
         const val MAX_BOOT_FRAMES = 1800                              // 30 s: waiting for the title music

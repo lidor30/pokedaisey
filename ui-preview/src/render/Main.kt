@@ -614,6 +614,8 @@ fun main(args: Array<String>) {
         runCatching { com.pokedaisy.app.Prefs(android.content.Context()).appLanguage = code }
         com.pokedaisy.app.companion.i18n.L10n.apply(code, null)
     }
+    // -Pdark=true: DARK MODE on for every shot.
+    if (System.getProperty("dark") == "true") com.pokedaisy.app.companion.ui.theme.DarkMode.override = true
     val g = game.name.lowercase()
     val live = liveGuide()
     // AYN Thor: bottom screen 1240x1080 (landscape), top screen 1920x1080.

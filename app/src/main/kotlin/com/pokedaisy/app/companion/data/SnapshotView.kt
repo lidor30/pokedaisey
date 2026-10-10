@@ -144,7 +144,15 @@ data class SnapshotView(
     val playerGender: Int = -1,
     /** The CARD tab's data; null = the game gets no card. */
     val trainerCard: TrainerCardInfo? = null,
+    /** Non-null = the copy saved beside the savestate this launch resumed ([SnapshotCache]), shown
+     * until the live game's data is in: the data tabs the game had then (DEX / GUIDE / CARD, whose
+     * ROM tables aren't cached - they wait on LOADING). */
+    val cachedTabs: Set<String>? = null,
 )
+
+/** The game's data is in (not just detected): the save's party or the map. */
+val SnapshotView.hasData: Boolean
+    get() = connected && game != null && (party.isNotEmpty() || location.mapSecName.isNotEmpty())
 
 /** This battler's moves with their effectiveness against [foe] instead of the
  * foe that's out (BATTLE INFO showing another of the trainer's Pokémon). */

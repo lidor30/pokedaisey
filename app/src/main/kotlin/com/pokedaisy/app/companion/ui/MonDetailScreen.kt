@@ -167,10 +167,11 @@ private fun PartyStrip(party: List<MonView>, index: Int, onPick: (Int) -> Unit, 
     }
 }
 
-private val StripIdle = Color(0xFFA8B4C8)
-private val StripIdleFrame = Color(0xFF68748C)
-private val StripLit = Color(0xFFF8F8F8)
-private val StripLitFrame = Color(0xFFC0C8D8)
+// The party strip's squares: the shown mon lit, the rest a slate blue (dark mode: deeper, the lit one the cursor row's).
+private val StripIdle get() = if (OptionColors.dark) Color(0xFF2E3A52) else Color(0xFFA8B4C8)
+private val StripIdleFrame get() = if (OptionColors.dark) Color(0xFF151B27) else Color(0xFF68748C)
+private val StripLit get() = if (OptionColors.dark) Color(0xFF4A5468) else Color(0xFFF8F8F8)
+private val StripLitFrame get() = if (OptionColors.dark) Color(0xFF6F7A90) else Color(0xFFC0C8D8)
 
 /** A 1-GBA-pixel rule between the summary's sections, in the window frame's light grey. */
 @Composable
@@ -192,10 +193,10 @@ internal fun Separator(m: GbaTextMetrics, modifier: Modifier = Modifier, vertica
     )
 }
 
-private val SeparatorDark = Color(0xFFB8B8C0)
+private val SeparatorDark get() = if (OptionColors.dark) Color(0xFF0E1116) else Color(0xFFB8B8C0)
 /** The summary screen's EXP bar blue. */
 private val ExpBlue = Color(0xFF40B8F8)
-private val SeparatorLight = Color(0xFFE8E8EC)
+private val SeparatorLight get() = if (OptionColors.dark) Color(0xFF3A414D) else Color(0xFFE8E8EC)
 
 /** Name + gender, icon, level, types, status, HP - the summary's top-left block. */
 @Composable

@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -114,7 +116,7 @@ fun AchievementBadge(url: String?, size: Dp, modifier: Modifier = Modifier, dim:
         modifier = modifier
             .size(size)
             .clip(PixelRoundedShape(u * 2))
-            .background(Color(0xFF20242C))
+            .background(OptionColors.imageWell)
             .drawWithContent {
                 drawContent()
                 val px = u.toPx()
@@ -138,6 +140,25 @@ fun AchievementBadge(url: String?, size: Dp, modifier: Modifier = Modifier, dim:
     }
 }
 
+/** Which achievements the list shows (its filter button, a pick-list). */
+enum class AchievementFilter(val label: String, val short: String) {
+    ALL("SHOW ALL", "ALL"),
+    LOCKED("LOCKED ONLY", "LOCKED"),
+    UNLOCKED("UNLOCKED ONLY", "UNLOCKED");
+
+    fun shows(a: Achievement) = when (this) {
+        ALL -> true
+        LOCKED -> !a.unlocked
+        UNLOCKED -> a.unlocked
+    }
+}
+
+/** A request to open the list on achievement [id] (a tapped unlock / progress popup), marked as the
+ * cursor row; [unlocked] = it's an unlock, so a LOCKED filter would hide it. [id] 0 = just the list. */
+class AchievementFocus(val id: Int, val unlocked: Boolean) {
+    val at = System.nanoTime()
+}
+
 /**
  * The ACHIEVEMENTS tab: the running game's RetroAchievements set in the
  * OPTION look - a title window with the tally, then one list window, grouped
@@ -151,14 +172,38 @@ fun AchievementsScreen(
     /** Opens on the leaderboards, or on leaderboard [initialBoard]'s page - for screenshot tests. */
     initialLeaderboards: Boolean = false,
     initialBoard: Int? = null,
+    /** Open on this achievement (a tapped popup); [onFocused] once taken, so a later visit doesn't repeat it. */
+    focus: AchievementFocus? = null,
+    onFocused: () -> Unit = {},
+    /** The filter shown first, and its pick-list open - for screenshot tests. */
+    initialFilter: AchievementFilter = AchievementFilter.ALL,
+    initialPicking: Boolean = false,
 ) {
     val m = rememberGbaTextMetrics()
     val small = rememberGbaTextMetrics(1f)
     val state = achievements?.state?.collectAsState()?.value ?: AchievementsState()
     val game = state.game
-    var lockedOnly by remember { mutableStateOf(false) }
+    var filter by remember { mutableStateOf(initialFilter) }
+    var picking by remember { mutableStateOf(initialPicking) }
     var showBoards by remember { mutableStateOf(initialLeaderboards) }
     var openBoard by remember { mutableStateOf(initialBoard) }
+    // The achievement a popup opened, marked as the cursor row until the tab is left.
+    var marked by remember { mutableStateOf<AchievementFocus?>(null) }
+    val listState = rememberLazyListState()
+    LaunchedEffect(focus) {
+        val f = focus ?: return@LaunchedEffect
+        showBoards = false
+        if (openBoard != null) {
+            achievements?.closeLeaderboard()
+            openBoard = null
+        }
+        if (f.id != 0) {
+            // Don't let the filter hide what was asked for.
+            if (filter == (if (f.unlocked) AchievementFilter.LOCKED else AchievementFilter.UNLOCKED)) filter = AchievementFilter.ALL
+            marked = f
+        }
+        onFocused()
+    }
     val hasList = state.user != null && game != null && game.id != 0 && state.achievements.isNotEmpty()
     val board = openBoard?.let { id -> state.leaderboards.firstOrNull { it.id == id } }
     if (hasList && board != null) {
@@ -203,11 +248,20 @@ fun AchievementsScreen(
                 onOpen = { id -> openBoard = id; achievements?.openLeaderboard(id) },
             )
             else -> AchievementList(
-                state.achievements, game, lockedOnly, { lockedOnly = !lockedOnly }, m, small, Modifier.weight(1f),
+                state.achievements, game, filter, { picking = true }, m, small, Modifier.weight(1f),
                 onLeaderboards = if (state.leaderboards.isNotEmpty()) ({ showBoards = true }) else null,
                 paused = state.cheatsPaused,
+                listState = listState,
+                marked = marked,
             )
         }
+    }
+    if (picking) {
+        OptionSelector(
+            tk("FILTER"), AchievementFilter.entries, filter, { tk(it.label) }, m,
+            onPick = { filter = it; picking = false },
+            onDismiss = { picking = false },
+        )
     }
 }
 
@@ -215,8 +269,8 @@ fun AchievementsScreen(
 private fun AchievementList(
     list: List<Achievement>,
     game: AchievementGame,
-    lockedOnly: Boolean,
-    onToggle: () -> Unit,
+    filter: AchievementFilter,
+    onFilter: () -> Unit,
     m: GbaTextMetrics,
     small: GbaTextMetrics,
     modifier: Modifier,
@@ -224,8 +278,18 @@ private fun AchievementList(
     onLeaderboards: (() -> Unit)?,
     /** A cheat is on, so nothing unlocks (RetroAchievements.setCheatsActive). */
     paused: Boolean = false,
+    listState: LazyListState = rememberLazyListState(),
+    /** The achievement a popup opened: scrolled to and drawn as the cursor row. */
+    marked: AchievementFocus? = null,
 ) {
-    val shown = if (lockedOnly) list.filter { !it.unlocked } else list
+    val shown = list.filter { filter.shows(it) }
+    val target = marked?.let { f -> shown.indexOfFirst { it.id == f.id } } ?: -1
+    // Scrolls to it - and again for a moment after, as the list re-sorts once the unlock is
+    // reported (it moves up to RECENTLY UNLOCKED), but not later, under a player scrolling.
+    LaunchedEffect(marked, target) {
+        val f = marked ?: return@LaunchedEffect
+        if (target >= 0 && System.nanoTime() - f.at < FOLLOW_MARKED_NANOS) listState.animateScrollToItem(target)
+    }
     Column(modifier.fillMaxWidth()) {
         Row(
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.u * 4),
@@ -233,15 +297,21 @@ private fun AchievementList(
         ) {
             BackdropText(game.title.orEmpty(), m, Modifier.weight(1f).padding(start = m.u * 4))
             if (paused) OptionBadge(tk("PAUSED: CHEATS ON"), m)
-            OptionButton(if (lockedOnly) tk("SHOW ALL") else tk("LOCKED ONLY"), small, onClick = onToggle)
+            OptionButton(
+                tk(filter.short), small, onClick = onFilter, pixelIcon = PixelIcons.filter,
+                emphasis = filter != AchievementFilter.ALL, contentDescription = tr("FILTER"),
+            )
             onLeaderboards?.let { OptionButton(tk("LEADERBOARDS"), small, onClick = it) }
         }
         Spacer(Modifier.height(m.u * 4))
         OptionListWindow(m, Modifier.fillMaxWidth().weight(1f)) {
             if (shown.isEmpty()) {
-                GbaText(tr("ALL UNLOCKED!"), OptionColors.value, OptionColors.valueShadow, m, Modifier.padding(m.u * 6))
+                GbaText(
+                    if (filter == AchievementFilter.UNLOCKED) tr("NONE UNLOCKED YET") else tr("ALL UNLOCKED!"),
+                    OptionColors.value, OptionColors.valueShadow, m, Modifier.padding(m.u * 6),
+                )
             } else {
-                LazyColumn(Modifier.fillMaxSize()) {
+                LazyColumn(Modifier.fillMaxSize(), state = listState) {
                     itemsIndexed(shown, key = { _, a -> a.id }) { i, a ->
                         if (i == 0 || shown[i - 1].section != a.section) {
                             // rc_client's English bucket labels (LOCKED, ALMOST THERE...); a subset's carry its title.
@@ -250,7 +320,10 @@ private fun AchievementList(
                                 Modifier.padding(start = m.u * 6, top = m.u * if (i == 0) 2 else 6, bottom = m.u * 2),
                             )
                         }
-                        AchievementRow(a, m, small, divider = i < shown.lastIndex && shown[i + 1].section == a.section)
+                        AchievementRow(
+                            a, m, small, divider = i < shown.lastIndex && shown[i + 1].section == a.section,
+                            selected = a.id == marked?.id,
+                        )
                     }
                 }
             }
@@ -372,12 +445,13 @@ private fun EntryRow(e: LeaderboardEntry, m: GbaTextMetrics, divider: Boolean) {
 }
 
 @Composable
-private fun AchievementRow(a: Achievement, m: GbaTextMetrics, small: GbaTextMetrics, divider: Boolean) {
+private fun AchievementRow(a: Achievement, m: GbaTextMetrics, small: GbaTextMetrics, divider: Boolean, selected: Boolean = false) {
     val u = m.u
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
+            .background(if (selected) OptionColors.rowSelected else Color.Transparent)
             .then(if (divider) Modifier.drawBehind { drawRowDivider(OptionColors.divider, u.toPx(), 4 * u.toPx()) } else Modifier)
             .padding(horizontal = u * 6, vertical = u * 4),
     ) {
@@ -410,7 +484,7 @@ private fun ProgressBar(fraction: Float, modifier: Modifier) {
         modifier.drawBehind {
             val px = m.u.toPx()
             drawPixelRoundRect(OptionColors.frameDark, radius = px)
-            drawRect(Color.White, Offset(px, px), Size(size.width - 2 * px, size.height - 2 * px))
+            drawRect(if (OptionColors.dark) OptionColors.rowSelected else Color.White, Offset(px, px), Size(size.width - 2 * px, size.height - 2 * px))
             val w = (size.width - 2 * px) * fraction.coerceIn(0f, 1f)
             if (w > 0f) drawRect(OptionColors.value, Offset(px, px), Size(w, size.height - 2 * px))
         },
@@ -455,11 +529,17 @@ private fun Message(
 /**
  * Popups over the whole companion, top center, one at a time: unlocks,
  * mastery, the "achievements loaded" note, progress, leaderboards and
- * connection notices. Tap one to dismiss it early. [initial] shows one
- * right away (screenshot tests).
+ * connection notices. Tap one to dismiss it early - an unlock (or its progress)
+ * also opens it in the ACHIEVEMENTS list, mastery the list ([onOpen]). [initial]
+ * shows one right away (screenshot tests).
  */
 @Composable
-fun AchievementPopupHost(achievements: CompanionAchievements?, modifier: Modifier = Modifier, initial: AchievementPopup? = null) {
+fun AchievementPopupHost(
+    achievements: CompanionAchievements?,
+    modifier: Modifier = Modifier,
+    initial: AchievementPopup? = null,
+    onOpen: ((AchievementPopup) -> Unit)? = null,
+) {
     if (initial != null) {
         // Screenshot tests: shown as is, no timers.
         Box(modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) { PopupCard(initial, onTap = {}) }
@@ -502,10 +582,19 @@ fun AchievementPopupHost(achievements: CompanionAchievements?, modifier: Modifie
             enter = slideInVertically(tween(220)) { -it } + fadeIn(tween(220)),
             exit = slideOutVertically(tween(200)) { -it } + fadeOut(tween(200)),
         ) {
-            current?.let { PopupCard(it, onTap = { dismiss.trySend(Unit) }) }
+            current?.let { p ->
+                PopupCard(p, onTap = {
+                    if (p.opensList) onOpen?.invoke(p)
+                    dismiss.trySend(Unit)
+                })
+            }
         }
     }
 }
+
+/** A tap on this popup opens the ACHIEVEMENTS list (on its achievement, when it has one). */
+val AchievementPopup.opensList: Boolean
+    get() = achievementId != 0 || kind == AchievementPopup.Kind.MASTERED
 
 @Composable
 private fun PopupCard(p: AchievementPopup, onTap: () -> Unit) {
@@ -573,3 +662,6 @@ fun AchievementIndicators(achievements: CompanionAchievements?, modifier: Modifi
         state.challenges.forEach { c -> AchievementBadge(c.badgeUrl, m.lineHeight * 1.6f) }
     }
 }
+
+/** How long the list keeps scrolling to a popup's achievement as it re-sorts (see [AchievementList]). */
+private const val FOLLOW_MARKED_NANOS = 3_000_000_000L

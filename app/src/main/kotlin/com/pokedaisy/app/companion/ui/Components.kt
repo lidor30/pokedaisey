@@ -44,7 +44,7 @@ fun TypeBadge(type: String, modifier: Modifier = Modifier, fontSize: TextUnit = 
             .background(color)
             .padding(horizontal = 6.dp, vertical = 3.dp),
     ) {
-        Text(type.uppercase(), color = Color.White, fontSize = fontSize, fontFamily = pixelFontFamily())
+        Text(com.pokedaisy.app.companion.data.typeLabel(type), color = Color.White, fontSize = fontSize, fontFamily = pixelFontFamily())
     }
 }
 
@@ -129,7 +129,7 @@ fun TypeBadgeWithLabel(m: TypeMatchup, modifier: Modifier = Modifier) {
             .background(color)
             .padding(horizontal = 6.dp, vertical = 3.dp),
     ) {
-        Text("${m.type.uppercase()} ${m.label}", color = Color.White, fontSize = 12.sp, fontFamily = pixelFontFamily())
+        Text("${com.pokedaisy.app.companion.data.typeLabel(m.type)} ${m.label}", color = Color.White, fontSize = 12.sp, fontFamily = pixelFontFamily())
     }
 }
 

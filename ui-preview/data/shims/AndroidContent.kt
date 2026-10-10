@@ -17,6 +17,7 @@ open class Context {
     val applicationContext: Context get() = this
     val packageName = "com.pokedaisy.app"
     val applicationInfo = ContextAppInfo()
+    val resources = android.content.res.Resources()
     val assets = AssetManager(File(System.getProperty("user.dir")))
     val filesDir = File(System.getProperty("scratch") ?: System.getProperty("java.io.tmpdir"), "files").apply { mkdirs() }
     val cacheDir = File(System.getProperty("scratch") ?: System.getProperty("java.io.tmpdir"), "cache").apply { mkdirs() }

@@ -69,6 +69,8 @@ import com.pokedaisy.app.companion.data.BATTLE_INPUT_TARGET_SELECT
 import com.pokedaisy.app.companion.data.GameKind
 import com.pokedaisy.app.companion.data.SnapshotView
 import com.pokedaisy.app.companion.data.showsBattle
+import com.pokedaisy.app.companion.data.hasData
+import com.pokedaisy.app.companion.AchievementPopup
 import com.pokedaisy.app.companion.data.activeGame
 import com.pokedaisy.app.companion.data.withMovesVs
 import com.pokedaisy.app.companion.COMPANION_TABS
@@ -123,6 +125,18 @@ fun CompanionScreen(
     // Compose can't observe - without the key a freshly launched game kept the
     // previous game's backdrop until something else happened to recompose.
     val gameFont = rememberGameFont(snapshot.game)
+    // The tab picked stays picked through the key below: the game being detected
+    // (null -> its kind, a few seconds into a launch) once reset it to PARTY under a
+    // player who had already opened SETTINGS. Tracked by label, not index: the BATTLE
+    // tab appears/disappears and would otherwise shift every other tab's index.
+    var selectedLabel by remember { mutableStateOf(initialTab) }
+    // Where BACK from a tab opened from SETTINGS (or the GUIDE notice's GO BACK) returns.
+    var backTab by remember { mutableStateOf("PARTY") }
+    // SETTINGS' page / row / scroll, kept while other tabs are open.
+    val settingsUi = remember { SettingsUiState(initialSettingsPage) }
+    // A tapped achievement popup: the achievement to open ACHIEVEMENTS on, and the tab BACK returns to.
+    var achievementFocus by remember { mutableStateOf<AchievementFocus?>(null) }
+    var popupReturn by remember { mutableStateOf<String?>(null) }
     CompositionLocalProvider(
         LocalCompanionBack provides back, LocalClickSound provides clickSound, LocalGameFont provides gameFont,
         LocalGameTextScale provides if (gameFont != null) gameTextScale(snapshot.game) else 1f,
@@ -131,16 +145,12 @@ fun CompanionScreen(
         val game = snapshot.game
         // Until the first real data arrives (the ROM takes a few seconds to
         // boot / be detected) the data tabs show a loading animation.
-        val ready = snapshot.connected && game != null &&
-            (snapshot.party.isNotEmpty() || snapshot.location.mapSecName.isNotEmpty())
+        val ready = snapshot.hasData
         var loaded by remember { mutableStateOf(ready) }
         LaunchedEffect(ready) { if (ready) loaded = true }
         // The PARTY tab's open summary (MonDetailScreen), by party index so it
         // follows live data; null = the party slots.
         var detailIndex by remember { mutableStateOf(initialMonIndex) }
-        // Selection is tracked by label, not index: the BATTLE tab appears/disappears
-        // and would otherwise shift every other tab's index under the selection.
-        var selectedLabel by remember { mutableStateOf(initialTab) }
         // BATTLE tab: touch Controls (Gen 4 style) vs. info-dense Panel — see
         // BattleControlsScreen.kt. Resets to Controls each time the BATTLE tab
         // becomes available (a fresh battle), matching selectedLabel's own reset.
@@ -180,15 +190,12 @@ fun CompanionScreen(
         // DEX tab: filter / dex / scroll position / open entry, kept across tab switches.
         val dexListState = androidx.compose.foundation.lazy.rememberLazyListState()
         val dexUi = remember { DexUiState(dexListState) }
-        // SETTINGS' page / row / scroll, kept while other tabs are open.
-        val settingsUi = remember { SettingsUiState(initialSettingsPage) }
         val dex = snapshot.pokedex
         // GUIDE tab: page, reveals and scroll position, kept across tab switches.
         val guideUi = remember { GuideUiState() }
         val guide = rememberGuide(game, dex, snapshot.guideTables)
         // The GUIDE's AI notice, once per game; GO BACK returns to [backTab].
         var noticeAccepted by remember { mutableStateOf(game == null || settings?.guideNoticeAccepted(game.name) != false) }
-        var backTab by remember { mutableStateOf("PARTY") }
 
         // The player's pick of tabs (SETTINGS > TAB BAR). Settings aren't
         // Compose state, so the SETTINGS tab reports changes back here.
@@ -197,11 +204,13 @@ fun CompanionScreen(
         val card = snapshot.trainerCard
         val cardArt = rememberTrainerCardArt(card?.style)
         // Tabs this game has: DEX needs the ROM's dex tables, GUIDE a guide or evolutions.
+        // The launch's saved copy names the ones it had, which wait on LOADING for the live data.
+        val cachedTabs = snapshot.cachedTabs.orEmpty()
         val available = COMPANION_TABS.filter { id ->
             when (id) {
-                "DEX" -> dex != null
-                "GUIDE" -> guide != null
-                "CARD" -> card != null && cardArt?.style == card.style
+                "DEX" -> dex != null || id in cachedTabs
+                "GUIDE" -> guide != null || id in cachedTabs
+                "CARD" -> card != null && cardArt?.style == card.style || id in cachedTabs
                 "ACHIEVEMENTS" -> achievements != null
                 else -> true
             }
@@ -262,7 +271,14 @@ fun CompanionScreen(
         val selectedIdx = tabs.indexOf(if (current in hiddenTabs) "SETTINGS" else current)
         // BACK from a tab opened from SETTINGS returns there. Registered before
         // the tabs' own handlers, so an open summary / overlay closes first.
-        CompanionBackHandler(enabled = current in hiddenTabs) {
+        // ACHIEVEMENTS opened by tapping a popup goes back to the tab it was opened over.
+        val popupBack = popupReturn?.takeIf { current == "ACHIEVEMENTS" && it != current }
+        CompanionBackHandler(enabled = current in hiddenTabs || popupBack != null) {
+            if (popupBack != null) {
+                selectedLabel = popupBack
+                popupReturn = null
+                return@CompanionBackHandler
+            }
             backTab = current
             selectedLabel = "SETTINGS"; detailIndex = null; showSuggestions = false; showBattleStats = false; dexUi.open = null
         }
@@ -298,6 +314,7 @@ fun CompanionScreen(
                         // Any tab tap (PARTY's own included) closes an open summary.
                         // BATTLE's own chip also returns to the controls.
                         val open = {
+                            popupReturn = null
                             if (title != current) backTab = current
                             selectedLabel = title; detailIndex = null; showSuggestions = false; showBattleStats = false; dexUi.open = null
                             if (title == "BATTLE") battleShowControls = true
@@ -343,6 +360,7 @@ fun CompanionScreen(
                     snapshot.unsupported && current != "SETTINGS" && current != "ACHIEVEMENTS" -> "UNSUPPORTED"
                     // STATES / SETTINGS / ACHIEVEMENTS work before the game's data does.
                     !loaded && current != "STATES" && current != "SETTINGS" && current != "ACHIEVEMENTS" -> "LOADING"
+                    current in cachedTabs -> "LOADING"
                     current == "PARTY" && openDetail != null -> "PARTY/DETAIL"
                     current == "DEX" && dexUi.open != null -> "DEX/DETAIL"
                     else -> current
@@ -424,14 +442,14 @@ fun CompanionScreen(
                             CompanionSettingsScreen(
                                 settings, hiddenTabs, available,
                                 barChips = tabs.count { it != "SETTINGS" },
-                                onOpenTab = { backTab = "SETTINGS"; selectedLabel = it },
+                                onOpenTab = { backTab = "SETTINGS"; popupReturn = null; selectedLabel = it },
                                 onTabsChanged = { chosenTabs = it },
                                 initialPage = initialSettingsPage,
                                 ui = settingsUi,
                                 statusBarShown = statusBar != null && CompanionStatusBar.shown,
                             )
                         } else if (tab == "ACHIEVEMENTS") {
-                            AchievementsScreen(achievements)
+                            AchievementsScreen(achievements, focus = achievementFocus, onFocused = { achievementFocus = null })
                         } else if (tab == "STATES") {
                             // Same: its own OPTION-style windows over the backdrop.
                             StatesScreen(slots, snapshot.frameCounter)
@@ -516,7 +534,14 @@ fun CompanionScreen(
             }
 
             // Unlocks and the like, over every tab.
-            AchievementPopupHost(achievements, Modifier.padding(top = 12.dp), initial = initialPopup)
+            AchievementPopupHost(
+                achievements, Modifier.padding(top = 12.dp), initial = initialPopup,
+                onOpen = { p ->
+                    if (current != "ACHIEVEMENTS") popupReturn = current
+                    selectedLabel = "ACHIEVEMENTS"; detailIndex = null; showSuggestions = false; showBattleStats = false; dexUi.open = null
+                    achievementFocus = AchievementFocus(p.achievementId, unlocked = p.kind != AchievementPopup.Kind.PROGRESS)
+                },
+            )
 
             // TRY BEST EFFORT just found a match: what the game is read as, and what's off.
             snapshot.bestEffort?.takeIf { it.fresh }?.let { be ->
@@ -828,9 +853,9 @@ private fun ErrorBanner(message: String) {
             .background(QolColors.windowFrame)
             .padding(2.dp)
             .clip(PixelRoundedShape(4.dp))
-            .background(Color(0xFFFCEFD8))
+            .background(if (OptionColors.dark) Color(0xFF3A2A1E) else Color(0xFFFCEFD8))
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
-        Text(tr(message), color = Color(0xFF9A4A28), fontSize = 14.sp, textAlign = TextAlign.Center)
+        Text(tr(message), color = if (OptionColors.dark) Color(0xFFF2B48E) else Color(0xFF9A4A28), fontSize = 14.sp, textAlign = TextAlign.Center)
     }
 }

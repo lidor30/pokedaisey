@@ -26,6 +26,7 @@ import com.pokedaisy.app.companion.i18n.tr
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
@@ -40,6 +41,7 @@ import com.pokedaisy.app.companion.ScreenFilter
 import com.pokedaisy.app.companion.FfMusicMode
 import com.pokedaisy.app.companion.data.FfMenuWatch
 import com.pokedaisy.app.companion.TelemetryStore
+import com.pokedaisy.app.companion.data.hasData
 import com.pokedaisy.app.companion.data.RomArt
 import com.pokedaisy.app.companion.data.RegionMapWatch
 import com.pokedaisy.app.companion.data.RomRegionMap
@@ -345,7 +347,10 @@ class PokeDaisyActivity : Activity() {
             // EmulatorView.unbindCoreBlocking().
             view.unbindCoreBlocking()
             engine.stop()
-            states?.resumeFile?.let { if (it.exists()) it.delete() }
+            states?.resumeFile?.let {
+                if (it.exists()) it.delete()
+                com.pokedaisy.app.companion.data.SnapshotCache.fileFor(it).delete()
+            }
             val save = SavesLocation.saveFor(this@PokeDaisyActivity, Prefs(this@PokeDaisyActivity), r)
             syncCheats()
             engine.start(romData ?: r, save, null)
@@ -372,6 +377,11 @@ class PokeDaisyActivity : Activity() {
         override val statusBar get() = Prefs(this@PokeDaisyActivity).statusBar
         override fun setStatusBar(on: Boolean) {
             Prefs(this@PokeDaisyActivity).statusBar = on
+            runOnUiThread { syncGameScreen() }
+        }
+        override val showPerformance get() = Prefs(this@PokeDaisyActivity).showPerformance
+        override fun setShowPerformance(on: Boolean) {
+            Prefs(this@PokeDaisyActivity).showPerformance = on
             runOnUiThread { syncGameScreen() }
         }
         override val statusBarOnCompanion get() = Prefs(this@PokeDaisyActivity).statusBarOnCompanion
@@ -430,6 +440,8 @@ class PokeDaisyActivity : Activity() {
             Prefs(this@PokeDaisyActivity).appLanguage = code
             com.pokedaisy.app.companion.i18n.L10n.apply(code, romCode)
         }
+
+        override fun setDarkMode(v: Int) { Prefs(this@PokeDaisyActivity).darkMode = v }
         override val showFoeIvs get() = Prefs(this@PokeDaisyActivity).showFoeIvs
         override fun setShowFoeIvs(on: Boolean) {
             Prefs(this@PokeDaisyActivity).showFoeIvs = on
@@ -502,7 +514,7 @@ class PokeDaisyActivity : Activity() {
         view = EmulatorView(this)
         view.holdFrame = { ::engine.isInitialized && engine.holdFrame }
         // 1x frames follow the game screen's refresh (EmulatorEngine.onVsync).
-        view.onVsync = { if (::engine.isInitialized) engine.onVsync() }
+        view.onVsync = { if (::engine.isInitialized) engine.onVsync() else 0L }
         // SHADERS on the companion: its grid at the game's own pixel size, so both screens match.
         view.onGamePixel = CompanionColors::setCell
         if (debugMirror) view.setZOrderMediaOverlay(true) // see EmulatorView's z-order note
@@ -519,7 +531,8 @@ class PokeDaisyActivity : Activity() {
             visibility = View.GONE
         }
         statusBar = buildStatusBar()
-        val root = GameStageLayout(this, view, statusBar, hud).apply {
+        performance = buildPerformanceOverlay()
+        val root = GameStageLayout(this, view, statusBar, listOf(hud, performance)).apply {
             setBackgroundColor(Color.BLACK)
             // Shrink the game view to the left portion (instead of full-screen
             // underneath the mirror) so the whole GBA frame is actually
@@ -533,10 +546,13 @@ class PokeDaisyActivity : Activity() {
             addView(view, gameParams)
             addView(statusBar, FrameLayout.LayoutParams(-2, -2))
             addView(touchControls, FrameLayout.LayoutParams(-1, -1))
+            // The HUD's messages top-right: FPS / CPU has the top-left corner.
             addView(hud, FrameLayout.LayoutParams(-2, -2).apply {
-                gravity = Gravity.TOP or Gravity.START
-                topMargin = dp(12); leftMargin = dp(12)
+                gravity = Gravity.TOP or Gravity.END
+                topMargin = dp(12); rightMargin = dp(12)
             })
+            // FPS / CPU: flush in the top-left corner, like other emulators.
+            addView(performance, FrameLayout.LayoutParams(-2, -2).apply { gravity = Gravity.TOP or Gravity.START })
             if (debugMirror) {
                 addView(buildDebugCompanionMirror(), debugMirrorLayoutParams())
                 addView(
@@ -700,6 +716,7 @@ class PokeDaisyActivity : Activity() {
             onFastForwardToggledChanged = { on -> Prefs(this@PokeDaisyActivity).ffToggled = on }
             onFfMusicChanged = { clip -> runOnUiThread { ffMusicPlayer.setClip(clip) } }
             onFfMusicWanted = { key -> ffMusicRenderer?.request(key) }
+            ffMusicWillRender = { key -> ffMusicRenderer?.willRender(key) == true }
             onSample = {   // runs on the emu thread
                 val snap = telemetry.refresh()
                 // SMART FF reads the game's own gMain once the game is known (no scan
@@ -716,6 +733,13 @@ class PokeDaisyActivity : Activity() {
                 // moment. Bit the first fixture capture this existed for.
                 if (snap.connected && (snap.party.isNotEmpty() || forceFixtureDump)) dumpFixtureIfPending()
             }
+            // Every savestate carries the companion's data beside it, read fresh: a launch that
+            // resumes from it shows that at once instead of LOADING (TelemetryStore.showCached).
+            onStateSaved = { state ->
+                telemetry.refresh()
+                com.pokedaisy.app.companion.data.SnapshotCache.write(state, telemetry.forState())
+            }
+            onResumeResult = { loaded -> if (!loaded) telemetry.dropCached() }
             onBattleInputSample = {   // runs on the emu thread, ~15x/sec
                 telemetry.refreshBattleInputFast()?.let { (battler, state) ->
                     setBattleMenuState(battler, state, telemetry.battleMenuCursor())
@@ -840,8 +864,20 @@ class PokeDaisyActivity : Activity() {
             view.postDelayed({ (engine.lastError ?: engine.lastNotice)?.let { Toast.makeText(this, it, Toast.LENGTH_LONG).show() } }, 1500)
             return true
         }
-        st.latestResumeSource()?.let { src -> if (src != st.resumeFile) runCatching { src.copyTo(st.resumeFile, overwrite = true) } }
-        engine.start(romData ?: r, save, st.resumeFile.takeIf { it.isFile && it.length() > 0 })
+        st.latestResumeSource()?.let { src ->
+            if (src != st.resumeFile) runCatching {
+                src.copyTo(st.resumeFile, overwrite = true)
+                com.pokedaisy.app.companion.data.SnapshotCache.copy(src, st.resumeFile)
+            }
+        }
+        val resume = st.resumeFile.takeIf { it.isFile && it.length() > 0 }
+        // The companion's data as that state left it, until the game's own is read (a few KB).
+        // Not over live data (back from HOME: the game was never closed).
+        if (resume != null && !telemetry.snapshot.value.hasData) {
+            com.pokedaisy.app.companion.data.SnapshotCache.read(resume)?.let { telemetry.showCached(it) }
+        }
+        engine.start(romData ?: r, save, resume)
+        if (!engine.running) telemetry.dropCached()
         view.postDelayed({ (engine.lastError ?: engine.lastNotice)?.let { Toast.makeText(this, it, Toast.LENGTH_LONG).show() } }, 1500)
         return true
     }
@@ -886,6 +922,7 @@ class PokeDaisyActivity : Activity() {
         val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
         val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
         DeviceBattery.status.value = BatteryStatus(level * 100 / scale, charging)
+        intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE).takeIf { it != Int.MIN_VALUE }?.let { batteryTempC = it / 10f }
     }
 
     /**
@@ -960,6 +997,9 @@ class PokeDaisyActivity : Activity() {
     // A rotation (configChanges keeps the activity, and the game, running through it).
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
+        // AUTO dark mode follows the device's (uiMode is in configChanges: the game keeps running).
+        com.pokedaisy.app.companion.ui.theme.DarkMode.systemDark =
+            com.pokedaisy.app.companion.ui.theme.DarkMode.isSystemDark(this)
         if (::sidePanel.isInitialized) syncSingleScreen(singleScreen)
     }
 
@@ -997,6 +1037,7 @@ class PokeDaisyActivity : Activity() {
         val prefs = Prefs(this)
         // STATUS BAR > COMPANION: the strip goes over the companion's tabs instead.
         statusBar.visibility = if (prefs.statusBar && !prefs.statusBarOnCompanion) View.VISIBLE else View.GONE
+        performance.visibility = if (prefs.showPerformance) View.VISIBLE else View.GONE
         com.pokedaisy.app.companion.ui.CompanionStatusBar.shown = prefs.statusBar && prefs.statusBarOnCompanion
         (statusBar.parent as? GameStageLayout)?.stretch = prefs.stretchGame
         view.stretch = prefs.stretchGame
@@ -1018,6 +1059,62 @@ class PokeDaisyActivity : Activity() {
     // Tracked by CompanionColors: it sits on the game, so GBA COLORS recolours it with it.
     private fun buildStatusBar(): ComposeView = CompanionColors.track(ComposeView(this)).apply {
         setContent { StatusBarContent() }
+    }
+
+    /** SETTINGS > FPS / CPU: frames per second and CPU in the corner; a tap opens the rest (PerfReading). */
+    private lateinit var performance: ComposeView
+
+    /** The battery's temperature from its broadcast (°C), for the performance panel. */
+    @Volatile private var batteryTempC: Float? = null
+
+    private fun buildPerformanceOverlay(): ComposeView = ComposeView(this).apply {
+        visibility = View.GONE
+        setContent {
+            val reading by produceState(com.pokedaisy.app.companion.ui.PerfReading()) {
+                val cpu = CpuUsage()
+                val power = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+                val cores = Runtime.getRuntime().availableProcessors()
+                // Cumulative counters, read every half second: each reading is the difference.
+                var at = System.nanoTime()
+                var frames = 0L; var work = 0L; var shown = 0L; var late = 0L
+                fun take() {
+                    at = System.nanoTime()
+                    if (::engine.isInitialized) { frames = engine.framesRun; work = engine.workNanos; engine.takeMaxWorkNanos() }
+                    shown = view.framesShown; late = view.lateFrames
+                }
+                take()
+                withContext(Dispatchers.IO) { cpu.sample() }
+                while (true) {
+                    delay(500)
+                    if (!::engine.isInitialized) continue
+                    val e = engine
+                    val secs = (System.nanoTime() - at) / 1e9
+                    val df = (e.framesRun - frames).coerceAtLeast(0)
+                    val dw = (e.workNanos - work).coerceAtLeast(0)
+                    val maxWork = e.takeMaxWorkNanos()
+                    val cpuPct = withContext(Dispatchers.IO) { cpu.sample() }
+                    val rt = Runtime.getRuntime()
+                    value = com.pokedaisy.app.companion.ui.PerfReading(
+                        fps = (df / secs).toFloat(),
+                        shownFps = ((view.framesShown - shown).coerceAtLeast(0) / secs).toFloat(),
+                        latePerSecond = ((view.lateFrames - late).coerceAtLeast(0) / secs).toFloat(),
+                        frameMs = if (df > 0) (dw / df / 1e6).toFloat() else 0f,
+                        frameMaxMs = (maxWork / 1e6).toFloat(),
+                        emulationLoad = (dw / 1e9 / secs * 100).toInt().coerceIn(0, 100),
+                        cpu = cpuPct, cores = cores,
+                        refreshHz = e.refreshHz, refreshesPerFrame = e.refreshesPerFrame,
+                        speed = e.currentSpeed,
+                        audioDropouts = e.audioUnderruns,
+                        batteryTempC = batteryTempC,
+                        thermal = if (android.os.Build.VERSION.SDK_INT >= 29) power.currentThermalStatus else -1,
+                        memoryMb = ((rt.totalMemory() - rt.freeMemory() + android.os.Debug.getNativeHeapAllocatedSize()) shr 20).toInt(),
+                    )
+                    frames = e.framesRun; work = e.workNanos; shown = view.framesShown; late = view.lateFrames
+                    at = System.nanoTime()
+                }
+            }
+            com.pokedaisy.app.companion.ui.PerformanceOverlay(reading)
+        }
     }
 
     /** The same status bar over the companion's tabs (SETTINGS > STATUS BAR > COMPANION). */

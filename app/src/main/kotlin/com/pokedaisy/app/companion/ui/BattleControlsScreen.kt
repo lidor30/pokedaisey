@@ -655,7 +655,7 @@ private fun Gen1MoveList(
 private val gen1Buttons get() = com.pokedaisy.app.companion.data.activeGame == com.pokedaisy.app.companion.data.GameKind.YELLOW
 
 /** What's drawn on a [PlatinumButton]: white, or Gen 1's black on its white box. */
-internal val buttonContent: Color get() = if (gen1Buttons) Color(0xFF181818) else Color.White
+internal val buttonContent: Color get() = if (gen1Buttons) OptionColors.titleText else Color.White
 
 private val ButtonOutline = Color(0xFF202020)
 private val RunDrop = 16.dp

@@ -105,17 +105,27 @@ private fun peekMonIcon(asset: String?): Bitmap? {
 @Composable
 fun rememberMonIconSheet(asset: String?): Bitmap? {
     val context = LocalContext.current
+    val gen = rememberIconGeneration()
     var bitmap by remember(asset) { mutableStateOf<Bitmap?>(null) }
-    LaunchedEffect(asset) { bitmap = loadMonIconSheet(context, asset) }
+    LaunchedEffect(asset, gen) { loadMonIconSheet(context, asset)?.let { bitmap = it } }
     return bitmap
 }
+
+/** Changes when live icons may load (see [DecompIconSource.generation]): icon loads key on it. */
+@Composable
+private fun rememberIconGeneration(): Int = DecompIconSource.generation.collectAsState().value
 
 @Composable
 fun SpeciesIcon(asset: String?, size: Dp, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     // Starts from an already-decoded icon, so a list scrolling back doesn't flash blank.
     var bitmap by remember(asset) { mutableStateOf(peekMonIcon(asset)?.let { cropToFirstFrame(it) }) }
-    LaunchedEffect(asset) { if (bitmap == null) bitmap = loadMonIconSheet(context, asset)?.let { cropToFirstFrame(it) } }
+    // Again when the icons change (a launch's saved companion data shows before the core is up).
+    val gen = rememberIconGeneration()
+    val firstGen = remember(asset) { gen }
+    LaunchedEffect(asset, gen) {
+        if (bitmap == null || gen != firstGen) loadMonIconSheet(context, asset)?.let { bitmap = cropToFirstFrame(it) }
+    }
     Box(modifier = modifier.size(size)) {
         bitmap?.let {
             // Nearest-neighbour: a pixel-art sprite, often scaled up.
@@ -128,9 +138,10 @@ fun SpeciesIcon(asset: String?, size: Dp, modifier: Modifier = Modifier) {
 fun ItemIcon(asset: String?, size: Dp, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var bitmap by remember(asset) { mutableStateOf<Bitmap?>(null) }
-    LaunchedEffect(asset) {
+    val gen = rememberIconGeneration()
+    LaunchedEffect(asset, gen) {
         val id = asset?.substringAfterLast('/')?.substringBefore('.')?.toIntOrNull()
-        bitmap = when {
+        val loaded = when {
             asset == null -> null
             // Unbound item icons aren't bundled - pull them live from the game.
             asset.startsWith("items-unbound/") -> withContext(Dispatchers.IO) {
@@ -143,6 +154,7 @@ fun ItemIcon(asset: String?, size: Dp, modifier: Modifier = Modifier) {
                 GameArt.get(context, asset)
             }
         }
+        loaded?.let { bitmap = it }
     }
     Box(modifier = modifier.size(size)) {
         bitmap?.let {

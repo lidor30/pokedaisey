@@ -31,6 +31,8 @@ class TelemetrySampler {
     // re-hash a 16 MB ROM on every retry.
     private var smallBpeeHashChecked = false
     private var smallBpreHashChecked = false
+    // The ROM hashed as retail FireRed / Emerald: no QoL struct to wait for.
+    private var retailHash = false
 
     // BEST EFFORT (BestEffort.kt) for an unsupported ROM of a Gen 3 base game: its header code and
     // SHA-1 (what the match is kept by), the match in use and the config it was made from (the
@@ -274,6 +276,7 @@ class TelemetrySampler {
                 nativeCfg = NATIVE_ORANGE_ISLANDS
                 return
             }
+            retailHash = hash in RETAIL_SHA1S
         }
 
         // A big (>16 MB) BPRE ROM isn't unique to Unbound - other FireRed-based
@@ -364,20 +367,23 @@ class TelemetrySampler {
                 nativeCfg = NATIVE_EMERALD_SEAGLASS
                 return
             }
+            retailHash = hash in RETAIL_SHA1S
         }
 
         // FireRed / Emerald: the QoL struct's "QOLT" magic isn't written until
         // ~1 s of frames have run, so a -1 here early doesn't mean "no struct".
-        // Probe a few times before falling back to native-RAM reads.
+        // Probe a few times before falling back to native-RAM reads - unless the
+        // ROM hashed as retail, which has no struct (the probes held every retail
+        // FireRed / Emerald launch, resumed states included, ~6 s on LOADING).
         val emerald = code == "BPEE"
-        val addr = MgbaCore.pkFindMagic(QOLT_MAGIC)
+        val addr = if (retailHash) -1L else MgbaCore.pkFindMagic(QOLT_MAGIC)
         if (addr >= 0) {
             kind = if (emerald) GameKind.EMERALD else GameKind.FIRERED
             isEmeraldStruct = emerald
             structAddr = addr
             return
         }
-        if (++magicProbes < 6) return   // stay undecided; retry next tick
+        if (!retailHash && ++magicProbes < 6) return   // stay undecided; retry next tick
 
         // Gave up on the struct — read native RAM.
         isEmeraldStruct = emerald
@@ -543,6 +549,13 @@ class TelemetrySampler {
         const val AMETHYST_V1_3_0_SHA1 = "00e70c0384a5f1698588034201fd5b849d3542e2"
         // Pokemon Amethyst v1.4.1 - host-side masked hash (GPIO bytes zero, so a plain `shasum`).
         const val AMETHYST_V1_4_1_SHA1 = "91291aade04b4b111cd03ae7b6e2ff460e1edd8a"
+        // Retail FireRed rev 0 / rev 1 and Emerald (USA, Europe): pret's sha1s, which equal the
+        // masked hash (their GPIO bytes are zero).
+        val RETAIL_SHA1S = setOf(
+            "41cb23d8dccc8ebd7c649cd8fbb58eeace6e2fdc",
+            "dd5945db9b930750cb39d00c84da8571feebf417",
+            "f3ae088181bf583e55daf962a92bb46f4f1d07b7",
+        )
         // Emerald Seaglass v3.0 - GPIO-hole-masked hash computed host-side from
         // the file (its 0x080000C4-C9 bytes are zero, so it also equals a plain
         // `shasum`). NOT yet confirmed via the on-device live-bus log.

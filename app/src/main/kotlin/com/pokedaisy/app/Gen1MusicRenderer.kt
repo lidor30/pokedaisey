@@ -35,6 +35,7 @@ class Gen1MusicRenderer(
                 run()
             } catch (t: Throwable) {
                 Log.w("pokedaisy", "GB FF music renderer failed", t)
+                failed = true
             }
         }, "pokedaisy-gbmusic-render").apply { isDaemon = true; start() }
     }
@@ -47,6 +48,13 @@ class Gen1MusicRenderer(
         stopped = true
         queue.offerFirst(STOP)
     }
+
+    // Songs heard live that got no clip: STEADY plays them SPED-UP (see SongRenderer.willRender).
+    private val noClip = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
+    @Volatile private var failed = false
+
+    override fun willRender(key: String): Boolean =
+        cache.complete(key) || !failed && !stopped && Gen1Music.parse(key) != null && key !in noClip
 
     private fun run() {
         val background = if (cache.prefetched) emptyList() else tables.songs.map { (b, id) -> Background(Gen1Music.key(b, id)) }
@@ -63,11 +71,16 @@ class Gen1MusicRenderer(
                 if (job === STOP || stopped) break
                 val bg = job is Background
                 val key = if (job is Background) job.key else job as String
-                val outcome = if (cache.complete(key) || (bg && cache.has(key))) Outcome.CACHED
+                // A background song that failed on earlier launches too is left alone (FfMusicRenderer's rule).
+                val outcome = if (cache.complete(key) || (bg && cache.has(key)) || (bg && cache.failures(key) >= 2)) Outcome.CACHED
                 else (core ?: Core().also { core = it }).record(key, bg)
+                if (!bg && !cache.complete(key) && (outcome == Outcome.FAILED || outcome == Outcome.ENDED)) noClip.add(key)
                 if (bg) {
                     if (outcome == Outcome.DEFERRED) { queue.offerLast(job); continue }
-                    if (outcome == Outcome.FAILED) allOk = false
+                    if (outcome == Outcome.FAILED) {
+                        cache.noteFailure(key)
+                        allOk = cache.failures(key) >= 2 && allOk
+                    }
                     if (--left == 0 && allOk) cache.prefetched = true
                 }
             }

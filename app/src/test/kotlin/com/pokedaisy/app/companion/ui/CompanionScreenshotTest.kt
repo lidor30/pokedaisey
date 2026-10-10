@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion.ui
 
+import androidx.compose.foundation.background
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import com.android.resources.ScreenOrientation
@@ -218,6 +219,45 @@ open class CompanionScreenshotTest {
                 "Defeat Brock in Pewter City", points = 5,
             ),
         )
+    }
+
+    /** The list's filter: UNLOCKED ONLY, its pick-list, and an unlock popup's achievement marked after a tap. */
+    @Test fun achievementsUnlockedOnly() = achievementListShot { AchievementsScreen(it, pad, initialFilter = AchievementFilter.UNLOCKED) }
+
+    @Test fun achievementsFilterPicker() = achievementListShot { AchievementsScreen(it, pad, initialPicking = true) }
+
+    @Test fun achievementsFromPopup() = achievementListShot { AchievementsScreen(it, pad, focus = AchievementFocus(2, unlocked = false)) }
+
+    private val pad = androidx.compose.ui.Modifier.padding(12.dp)
+
+    private fun achievementListShot(content: @androidx.compose.runtime.Composable (com.pokedaisy.app.companion.CompanionAchievements) -> Unit) =
+        paparazzi.snapshot {
+            QolTheme {
+                androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
+                    GameBackdrop(GameKind.FIRERED)
+                    content(SampleCompanion.Achievements(SampleCompanion.achievementsState))
+                }
+            }
+        }
+
+    /** SETTINGS > FPS / CPU: the readout flush in the game screen's top-left corner, and the panel a tap opens. */
+    @Test fun performanceOverlay() = performanceShot(open = false)
+
+    @Test fun performanceOverlayOpen() = performanceShot(open = true)
+
+    private fun performanceShot(open: Boolean) = paparazzi.snapshot {
+        androidx.compose.foundation.layout.Box(
+            androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF3A6E3C)),
+        ) {
+            PerformanceOverlay(
+                PerfReading(
+                    fps = 60.0f, shownFps = 59.8f, latePerSecond = 0.2f, frameMs = 2.8f, frameMaxMs = 5.1f, emulationLoad = 17,
+                    cpu = 14, cores = 8, refreshHz = 60f, refreshesPerFrame = 1, audioDropouts = 0,
+                    batteryTempC = 36.5f, thermal = 1, memoryMb = 212,
+                ),
+                initiallyOpen = open,
+            )
+        }
     }
 
     /** The CHEEVOS tab's leaderboards: the list, and one board's page (the player 17th, below the top 5 shown). */

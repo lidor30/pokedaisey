@@ -1,6 +1,7 @@
 package com.pokedaisy.app.companion.ui
 
 import com.pokedaisy.app.companion.ui.theme.isDaisyTheme
+import com.pokedaisy.app.companion.ui.theme.DarkMode
 import com.pokedaisy.app.companion.i18n.tk
 import com.pokedaisy.app.companion.i18n.tr
 import androidx.compose.foundation.Canvas
@@ -40,6 +41,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.SolidColor
@@ -84,54 +87,80 @@ object OptionColors {
         get() = inGameState.value
         set(v) { inGameState.value = v }
     private val inGameState = androidx.compose.runtime.mutableStateOf(false)
-    private val G1_BLACK = Color(0xFF181818)
-    private val G1_WHITE = Color(0xFFFFFFFF)
-    private val G1_FRAME = listOf(G1_WHITE to 2, G1_BLACK to 1, G1_WHITE to 1, G1_BLACK to 1, G1_WHITE to 1)
+
+    /** DARK MODE ([DarkMode]): every colour below has its dark twin, Gen 1's included. */
+    val dark get() = DarkMode.on
+
+    // Gen 1: black on white; dark mode turns its windows round (white on black), same lines.
+    private val G1_INK get() = if (dark) Color(0xFFE8E8E8) else Color(0xFF181818)
+    private val G1_PAPER get() = if (dark) Color(0xFF181818) else Color(0xFFFFFFFF)
+    private val G1_FRAME get() = listOf(G1_PAPER to 2, G1_INK to 1, G1_PAPER to 1, G1_INK to 1, G1_PAPER to 1)
 
     // The PokéDaisy theme's light backdrop on the top screen (Library, Settings, setup): text drawn straight
-    // on it takes the windows' dark grey instead of white. Never inside a game (the game's own backdrops).
-    private val daisy get() = !inGame && isDaisyTheme
+    // on it takes the windows' dark grey instead of white. Never inside a game (the game's own backdrops),
+    // nor in dark mode (its backdrop is dark).
+    private val daisy get() = !inGame && isDaisyTheme && !dark
 
-    val hintBar get() = if (gen1) G1_BLACK else Color(0xFF007BC6)
+    /** [light] or, in dark mode, [dark] (both FireRed OPTION-style; Gen 1 has its own). */
+    private fun c(light: Long, dark: Long) = Color(if (this.dark) dark else light)
+
+    val hintBar get() = if (gen1) c(0xFF181818, 0xFF303030) else c(0xFF007BC6, 0xFF0B5C94)
     val hintText get() = Color(0xFFFFFFFF)
-    val hintShadow get() = if (gen1) Color.Transparent else Color(0xFF636363)
-    val titleLayers get() = if (gen1) G1_FRAME else listOf(Color(0xFF63737B) to 2, Color(0xFFCED6D6) to 1)
-    val titleFill get() = Color(0xFFFFFFFF)
-    val titleText get() = if (gen1) G1_BLACK else Color(0xFF636363)
-    val titleShadow get() = if (gen1) Color.Transparent else Color(0xFFD6D6CE)
-    val listLayers get() = if (gen1) G1_FRAME else listOf(
+    val hintShadow get() = if (gen1) Color.Transparent else c(0xFF636363, 0xFF06263D)
+    // Dark windows keep the light ones' build - a dark outer line, a lighter inner one - in slate.
+    val titleLayers get() = if (gen1) G1_FRAME else if (dark) listOf(Color(0xFF0B0D11) to 2, Color(0xFF465061) to 1)
+        else listOf(Color(0xFF63737B) to 2, Color(0xFFCED6D6) to 1)
+    val titleFill get() = if (gen1) G1_PAPER else c(0xFFFFFFFF, 0xFF262B34)
+    val titleText get() = if (gen1) G1_INK else c(0xFF636363, 0xFFE3E6EC)
+    // The game's shadow sits between the text and the window (lighter than grey text on white): mirrored in dark.
+    val titleShadow get() = if (gen1) Color.Transparent else c(0xFFD6D6CE, 0xFF3F4652)
+    val listLayers get() = if (gen1) G1_FRAME else if (dark) listOf(
+        Color(0xFF050608) to 1, Color(0xFF6F6FB8) to 1, Color(0xFF3B3653) to 2,
+        Color(0xFF242932) to 1, Color(0xFF2D333E) to 2,
+    ) else listOf(
         Color(0xFF293131) to 1, Color(0xFF8C8CCE) to 1, Color(0xFF736B84) to 2,
         Color(0xFFDED6DE) to 1, Color(0xFFFFFFFF) to 2,
     )
-    val listFill get() = if (gen1) G1_WHITE else Color(0xFFE0DFDF)
-    /** The cursor row (Gen 1 marks it with its ▶; here a light grey band). */
-    val rowSelected get() = if (gen1) Color(0xFFDCDCDC) else Color(0xFFFFFFFF)
-    val label get() = if (gen1) G1_BLACK else Color(0xFF575656)
-    val labelShadow get() = if (gen1) Color.Transparent else Color(0xFFBCBBB4)
-    val value get() = if (gen1) G1_BLACK else Color(0xFFCB0707)
-    val valueShadow get() = if (gen1) Color.Transparent else Color(0xFFE0A564)
-    /** Secondary text (paths, timestamps, hints) - lighter than [label]. */
-    val muted get() = if (gen1) Color(0xFF787878) else Color(0xFF8C8C94)
-    val mutedShadow get() = if (gen1) Color.Transparent else Color(0xFFD6D6D6)
+    val listFill get() = if (gen1) G1_PAPER else c(0xFFE0DFDF, 0xFF1D2128)
+    /** The cursor row (Gen 1 marks it with its ▶; here a light grey band, a lighter slate in dark). */
+    val rowSelected get() = if (gen1) c(0xFFDCDCDC, 0xFF3A3A3A) else c(0xFFFFFFFF, 0xFF353C49)
+    val label get() = if (gen1) G1_INK else c(0xFF575656, 0xFFCDD1D9)
+    val labelShadow get() = if (gen1) Color.Transparent else c(0xFFBCBBB4, 0xFF3A404B)
+    val value get() = if (gen1) G1_INK else c(0xFFCB0707, 0xFFFF6A5C)
+    val valueShadow get() = if (gen1) Color.Transparent else c(0xFFE0A564, 0xFF6E2A22)
+    /** Secondary text (paths, timestamps, hints) - lighter than [label] (dimmer in dark). */
+    val muted get() = if (gen1) c(0xFF787878, 0xFF9A9A9A) else c(0xFF8C8C94, 0xFF8F95A3)
+    val mutedShadow get() = if (gen1) Color.Transparent else c(0xFFD6D6D6, 0xFF2C313A)
     /** The dark outer line of [listLayers], for frames drawn around images. */
-    val frameDark get() = if (gen1) G1_BLACK else Color(0xFF293131)
-    val frameLight get() = if (gen1) G1_WHITE else Color(0xFF8C8CCE)
+    val frameDark get() = if (gen1) c(0xFF181818, 0xFF000000) else c(0xFF293131, 0xFF050608)
+    val frameLight get() = if (gen1) G1_PAPER else c(0xFF8C8CCE, 0xFF6F6FB8)
     /** Text straight on a game backdrop: white with the hint bar's grey shadow (black on Gen 1's white,
-     * the windows' grey on PokéDaisy's light backdrop). */
-    val onBackdrop get() = if (gen1) G1_BLACK else if (daisy) label else Color(0xFFFFFFFF)
-    val onBackdropShadow get() = if (gen1) Color.Transparent else if (daisy) labelShadow else Color(0xFF404850)
+     * the windows' grey on PokéDaisy's light backdrop). Dark mode's backdrops are dimmed: white. */
+    val onBackdrop get() = if (gen1) G1_INK else if (daisy) label else Color(0xFFFFFFFF)
+    val onBackdropShadow get() = if (gen1) Color.Transparent else if (daisy) labelShadow else c(0xFF404850, 0xFF000000)
     /** A tab chip's frame: the title window's, or for Gen 1 just its double line (black, white, black) - its
      * full text-box frame is six pixels a side, which left a narrow chip no room for CHEEVOS. */
-    val chipLayers get() = if (gen1) listOf(G1_BLACK to 1, G1_WHITE to 1, G1_BLACK to 1) else titleLayers
-    /** The tab bar's chips: the open one white over grey idle ones (Gen 1: the cursor row's grey over white). */
-    val tabSelectedFill get() = if (gen1) rowSelected else titleFill
-    val tabIdleFill get() = if (gen1) G1_WHITE else listFill
-    /** The dashed line between list rows (the bag list's 6/2 dash). */
+    val chipLayers get() = if (gen1) listOf(G1_INK to 1, G1_PAPER to 1, G1_INK to 1) else titleLayers
+    /** The tab bar's chips: the open one white over grey idle ones (Gen 1: the cursor row's grey over white;
+     * dark: the cursor row's slate over the list's). */
+    val tabSelectedFill get() = if (gen1) rowSelected else if (dark) rowSelected else titleFill
+    val tabIdleFill get() = if (gen1) G1_PAPER else listFill
     /** Settings group titles: Gen 1's value colour is the rows' black, so its titles get a black band (white text). */
-    val groupTitleFill: Color? get() = if (gen1) G1_BLACK else null
-    val groupTitleText get() = if (gen1) G1_WHITE else value
+    val groupTitleFill: Color? get() = if (gen1) G1_INK else null
+    val groupTitleText get() = if (gen1) G1_PAPER else value
     val groupTitleShadow get() = if (gen1) Color.Transparent else valueShadow
-    val divider get() = if (gen1) Color(0xFFB0B0B0) else Color(0xFFC6C5C5)
+    /** The dashed line between list rows (the bag list's 6/2 dash). */
+    val divider get() = if (gen1) c(0xFFB0B0B0, 0xFF505050) else c(0xFFC6C5C5, 0xFF353B46)
+    /** Gen 1's pictures are ink on the Game Boy's paper (the paper left clear): in dark mode they get their
+     * white back, a card behind the sprite, or their outline vanishes into the dark. Null = no card. */
+    val spritePaper: Color? get() = if (gen1 && dark) Color(0xFFFFFFFF) else null
+    /** Text on an [OptionBadge] (the value colour's pill): white, or Gen 1's paper (its value is the ink). */
+    val badgeText get() = if (gen1) G1_PAPER else Color(0xFFFFFFFF)
+    /** The dark box behind a picture that isn't there yet (covers, badges, state thumbnails); darker
+     * still in dark mode, so it stays a hole in the window rather than matching it. */
+    val imageWell get() = c(0xFF20242C, 0xFF0C0E12)
+    /** Over everything a dark mode backdrop draws (a game's party art): how much black. 0 in light mode. */
+    val backdropScrim get() = if (dark) 0.55f else 0f
 }
 
 /** A dashed row divider along the bottom edge, from [start] px in - the bag
@@ -296,7 +325,7 @@ fun OptionBadge(text: String, m: GbaTextMetrics, modifier: Modifier = Modifier, 
             .background(fill, PixelPillShape)
             .padding(horizontal = m.u * 5, vertical = m.u),
     ) {
-        GbaText(tr(text), Color.White, OptionColors.valueShadow.copy(alpha = 0.6f), small)
+        GbaText(tr(text), OptionColors.badgeText, OptionColors.valueShadow.copy(alpha = 0.6f), small)
     }
 }
 
@@ -351,6 +380,8 @@ fun OptionButton(
     emphasis: Boolean = false,
     enabled: Boolean = true,
     contentDescription: String? = label,
+    /** A [PixelIcons] bitmap before the label, drawn in the text's own pixels and shadow. */
+    pixelIcon: List<String>? = null,
 ) {
     val u = m.u
     val interaction = remember { MutableInteractionSource() }
@@ -384,7 +415,11 @@ fun OptionButton(
         if (icon != null) {
             Icon(icon, contentDescription, tint = fg, modifier = Modifier.size(m.lineHeight))
         }
-        if (icon != null && label != null) Spacer(Modifier.width(u * 4))
+        if (pixelIcon != null) {
+            val cell = with(androidx.compose.ui.platform.LocalDensity.current) { m.fontPixel.toDp() }
+            ShadowedPixelIcon(pixelIcon, fg, shadow, m, cell = cell)
+        }
+        if ((icon != null || pixelIcon != null) && label != null) Spacer(Modifier.width(u * 4))
         if (label != null) GbaText(tr(label), fg, shadow, m, bold = gameBoldLabels())
     }
 }
@@ -500,6 +535,10 @@ fun OptionConfirm(
 @Composable
 fun GameBackdrop(game: GameKind, modifier: Modifier = Modifier.fillMaxSize()) {
     val bg = rememberGameBackground(game) ?: return
+    // Dark mode: the game's art at night, under a blue-black scrim (Gen 1's white nearly all the way).
+    val scrim = OptionColors.backdropScrim.let { if (it > 0f && game == GameKind.YELLOW) 0.9f else it }
+    @Suppress("NAME_SHADOWING")
+    val modifier = if (scrim > 0f) modifier.drawWithContent { drawContent(); drawRect(NIGHT.copy(alpha = scrim)) } else modifier
     if (bg.tiled) {
         // Whole-number scale of a 240px-wide GBA screen - on the
         // Thor the same scale the party slots land on, so the grid
@@ -547,11 +586,15 @@ fun AppBackdrop(
         return
     }
     val m = rememberGbaTextMetrics()
-    val (a, b) = if (QolColors.currentThemeId == 0) {
+    val (light, lightDark) = if (QolColors.currentThemeId == 0) {
         Color(0xFF4AADA5) to Color(0xFF398C8C)
     } else {
         QolColors.slotFill to QolColors.slotFillDark
     }
+    // Dark mode: the theme's stripes at night (the game backdrops' scrim, worked out once).
+    val scrim = OptionColors.backdropScrim
+    val a = if (scrim > 0f) lerp(light, NIGHT, scrim) else light
+    val b = if (scrim > 0f) lerp(lightDark, NIGHT, scrim) else lightDark
     Canvas(Modifier.fillMaxSize()) {
         val stripe = m.px.toFloat()
         drawRect(b)
@@ -603,3 +646,6 @@ fun OptionTextField(
         },
     )
 }
+
+/** Dark mode's night: what the backdrops are dimmed towards ([OptionColors.backdropScrim]). */
+val NIGHT = Color(0xFF0A0D14)

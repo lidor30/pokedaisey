@@ -60,6 +60,28 @@ class LocalizedScreenshotTest(private val lang: AppLanguage) {
     @Test fun map() = tab("MAP")
     @Test fun states() = tab("STATES")
 
+    /** Battle INFO against an Onix with the game in this language: its types in the game's words (GitHub #40). */
+    @Test fun battleInfoTypes() {
+        com.pokedaisy.app.companion.data.romLanguage = lang.romLetter
+        try {
+            paparazzi.snapshot(lang.code) {
+                QolTheme {
+                    val party = SampleCompanion.snapshot.party
+                    val mu = com.pokedaisy.app.companion.data.typeMatchups(
+                        com.pokedaisy.app.companion.data.typeIdOf("Rock"), com.pokedaisy.app.companion.data.typeIdOf("Ground"),
+                    )
+                    val onix = party[1].copy(
+                        name = "ONIX", types = listOf("Rock", "Ground"),
+                        weaknesses = mu.weaknesses, resistances = mu.resistances, immunities = mu.immunities,
+                    )
+                    BattleInfoScreen(listOf(party[0].withMovesVs(onix)), listOf(onix), isDouble = false, showHints = true, onBack = {}, onShowSuggestions = {})
+                }
+            }
+        } finally {
+            com.pokedaisy.app.companion.data.romLanguage = 'E'
+        }
+    }
+
     /** The dex page's EVOLVE (EEVEE: stones, friendship by day / at night) and MOVES (BULBASAUR: level-up, TM / HM). */
     @Test fun dexEvolve() = dexSection(133, DexSection.EVOLVE)
     @Test fun dexMoves() = dexSection(1, DexSection.MOVES)
